@@ -18,15 +18,19 @@ today.setHours(0, 0, 0, 0);
 
 function addDays(dateString, days) {
   if (!dateString || !days) return "";
+
   const date = new Date(dateString);
   date.setDate(date.getDate() + Number(days));
+
   return date.toISOString().slice(0, 10);
 }
 
 function diffDays(dateString) {
   if (!dateString) return "";
+
   const target = new Date(dateString);
   target.setHours(0, 0, 0, 0);
+
   return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
 }
 
@@ -34,6 +38,7 @@ function getStatus(daysLeft) {
   if (daysLeft === "") return "未入力";
   if (daysLeft < 0) return "交換超過";
   if (daysLeft <= 7) return "交換間近";
+
   return "正常";
 }
 
@@ -46,6 +51,7 @@ export default function App() {
 
   async function loadParts() {
     const querySnapshot = await getDocs(collection(db, "parts"));
+
     const items = [];
 
     querySnapshot.forEach((docItem) => {
@@ -72,11 +78,13 @@ export default function App() {
     };
 
     await addDoc(collection(db, "parts"), newPart);
+
     loadParts();
   }
 
   async function removePart(id) {
     await deleteDoc(doc(db, "parts", id));
+
     loadParts();
   }
 
@@ -95,7 +103,9 @@ export default function App() {
   const rows = useMemo(() => {
     return parts.map((part) => {
       const nextDate = addDays(part.lastDate, part.cycle);
+
       const daysLeft = diffDays(nextDate);
+
       const status = getStatus(daysLeft);
 
       return {
@@ -110,11 +120,14 @@ export default function App() {
   return (
     <div className="page">
       <div className="container">
+
         <div className="header">
           <div>
             <div className="badge">設備部品管理</div>
+
             <h1>定量保全管理表</h1>
-            <p>編集するとFirebaseに自動保存されます。</p>
+
+            <p>Firebase自動保存</p>
           </div>
 
           <button className="primaryButton" onClick={addPart}>
@@ -125,6 +138,7 @@ export default function App() {
 
         <div className="tableWrap">
           <table>
+
             <thead>
               <tr>
                 <th>設備名</th>
@@ -144,8 +158,10 @@ export default function App() {
             </thead>
 
             <tbody>
+
               {rows.map((row) => (
                 <tr key={row.id}>
+
                   <td>
                     <input
                       value={row.equipment || ""}
@@ -175,12 +191,11 @@ export default function App() {
 
                   <td>
                     <input
-                      type="number"
                       value={row.price || ""}
                       onChange={(e) =>
                         updateField(row.id, "price", e.target.value)
                       }
-                      placeholder="例: 1500"
+                      placeholder="例: 200,000円"
                     />
                   </td>
 
@@ -215,6 +230,7 @@ export default function App() {
                   </td>
 
                   <td>{row.nextDate || "-"}</td>
+
                   <td>{row.daysLeft === "" ? "-" : row.daysLeft}</td>
 
                   <td>
@@ -249,11 +265,15 @@ export default function App() {
                       <Trash2 size={16} />
                     </button>
                   </td>
+
                 </tr>
               ))}
+
             </tbody>
+
           </table>
         </div>
+
       </div>
     </div>
   );
