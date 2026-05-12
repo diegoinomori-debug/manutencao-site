@@ -71,7 +71,6 @@ export default function App() {
       partNo: "",
       price: "",
       supplier: "",
-      maker: "",
       location: "",
       leadTime: "",
       cycle: 90,
@@ -149,7 +148,6 @@ export default function App() {
                 <th>部品番号</th>
                 <th>部品値段</th>
                 <th>購入先</th>
-                <th>部品工機</th>
                 <th>予備品ロケーション</th>
                 <th>部品納期</th>
                 <th>交換周期</th>
@@ -212,16 +210,6 @@ export default function App() {
                         updateField(row.id, "supplier", e.target.value)
                       }
                       placeholder="例: モノタロウ"
-                    />
-                  </td>
-
-                  <td>
-                    <input
-                      value={row.maker || ""}
-                      onChange={(e) =>
-                        updateField(row.id, "maker", e.target.value)
-                      }
-                      placeholder="例: THK"
                     />
                   </td>
 
