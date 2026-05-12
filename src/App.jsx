@@ -63,7 +63,8 @@ export default function App() {
       equipment: "",
       partName: "",
       partNo: "",
-      controlNo: "",
+      price: "",
+      supplier: "",
       cycle: 90,
       lastDate: "",
       owner: "",
@@ -129,7 +130,8 @@ export default function App() {
                 <th>設備名</th>
                 <th>部品名</th>
                 <th>部品番号</th>
-                <th>管理番号</th>
+                <th>部品値段</th>
+                <th>購入先</th>
                 <th>交換周期</th>
                 <th>前回交換日</th>
                 <th>次回交換日</th>
@@ -173,10 +175,22 @@ export default function App() {
 
                   <td>
                     <input
-                      value={row.controlNo || ""}
+                      type="number"
+                      value={row.price || ""}
                       onChange={(e) =>
-                        updateField(row.id, "controlNo", e.target.value)
+                        updateField(row.id, "price", e.target.value)
                       }
+                      placeholder="例: 1500"
+                    />
+                  </td>
+
+                  <td>
+                    <input
+                      value={row.supplier || ""}
+                      onChange={(e) =>
+                        updateField(row.id, "supplier", e.target.value)
+                      }
+                      placeholder="例: モノタロウ"
                     />
                   </td>
 
