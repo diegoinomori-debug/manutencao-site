@@ -1,0 +1,195 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle, Clock, Plus, Trash2 } from "lucide-react";
+import "./index.css";
+
+import { db } from "./firebase";
+
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc
+} from "firebase/firestore";
+
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+
+function addDays(dateString, days) {
+  if (!dateString || !days) return "";
+
+  const date = new Date(dateString);
+  date.setDate(date.getDate() + Number(days));
+
+  return date.toISOString().slice(0, 10);
+}
+
+function diffDays(dateString) {
+  if (!dateString) return "";
+
+  const target = new Date(dateString);
+  target.setHours(0, 0, 0, 0);
+
+  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+}
+
+function getStatus(daysLeft) {
+  if (daysLeft < 0) return "交換超過";
+  if (daysLeft <= 7) return "交換間近";
+
+  return "正常";
+}
+
+export default function App() {
+  const [parts, setParts] = useState([]);
+
+  useEffect(() => {
+    loadParts();
+  }, []);
+
+  async function loadParts() {
+    const querySnapshot = await getDocs(collection(db, "parts"));
+
+    const items = [];
+
+    querySnapshot.forEach((docItem) => {
+      items.push({
+        id: docItem.id,
+        ...docItem.data(),
+      });
+    });
+
+    setParts(items);
+  }
+
+  async function addPart() {
+    const newPart = {
+      equipment: "",
+      partName: "",
+      partNo: "",
+      controlNo: "",
+      cycle: 90,
+      lastDate: "2026-01-01",
+      owner: "",
+      note: "",
+    };
+
+    await addDoc(collection(db, "parts"), newPart);
+
+    loadParts();
+  }
+
+  async function removePart(id) {
+    await deleteDoc(doc(db, "parts", id));
+
+    loadParts();
+  }
+
+  const rows = useMemo(() => {
+    return parts.map((part) => {
+      const nextDate = addDays(part.lastDate, part.cycle);
+
+      const daysLeft = diffDays(nextDate);
+
+      const status = getStatus(daysLeft);
+
+      return {
+        ...part,
+        nextDate,
+        daysLeft,
+        status,
+      };
+    });
+  }, [parts]);
+
+  return (
+    <div className="page">
+      <div className="container">
+
+        <div className="header">
+          <div>
+            <div className="badge">設備部品管理</div>
+
+            <h1>定量保全管理表</h1>
+
+            <p>Firebase conectado com sucesso.</p>
+          </div>
+
+          <button className="primaryButton" onClick={addPart}>
+            <Plus size={16} />
+            部品追加
+          </button>
+        </div>
+
+        <div className="tableWrap">
+          <table>
+
+            <thead>
+              <tr>
+                <th>設備名</th>
+                <th>部品名</th>
+                <th>部品番号</th>
+                <th>管理番号</th>
+                <th>交換周期</th>
+                <th>前回交換日</th>
+                <th>次回交換日</th>
+                <th>残日数</th>
+                <th>状態</th>
+                <th>担当者</th>
+                <th>備考</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {rows.map((row) => (
+                <tr key={row.id}>
+
+                  <td>{row.equipment}</td>
+
+                  <td>{row.partName}</td>
+
+                  <td>{row.partNo}</td>
+
+                  <td>{row.controlNo}</td>
+
+                  <td>{row.cycle}</td>
+
+                  <td>{row.lastDate}</td>
+
+                  <td>{row.nextDate}</td>
+
+                  <td>{row.daysLeft}</td>
+
+                  <td>
+                    <span className={`status ${row.status}`}>
+                      {row.status}
+                    </span>
+                  </td>
+
+                  <td>{row.owner}</td>
+
+                  <td>{row.note}</td>
+
+                  <td>
+                    <button
+                      className="deleteButton"
+                      onClick={() => removePart(row.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+
+                </tr>
+              ))}
+
+            </tbody>
+
+          </table>
+        </div>
+
+      </div>
+    </div>
+  );
+}

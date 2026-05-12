@@ -1,0 +1,109 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.container {
+  max-width: 1400px;
+  margin: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  background: #dbeafe;
+  color: #2563eb;
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+h1 {
+  margin: 0;
+}
+
+.primaryButton {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  background: white;
+  padding: 20px;
+  border-radius: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background: #f8fafc;
+  text-align: left;
+  padding: 12px;
+}
+
+td {
+  padding: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+td input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+}
+
+.status {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.status.交換超過 {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status.交換間近 {
+  background: #fef9c3;
+  color: #ca8a04;
+}
+
+.status.正常 {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.deleteButton {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #dc2626;
+}
