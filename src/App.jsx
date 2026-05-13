@@ -76,12 +76,41 @@ export default function App() {
   }
 
   async function updateField(collectionName, id, field, value) {
-    await updateDoc(doc(db, collectionName, id), { [field]: value });
+    if (collectionName === "parts") {
+      setParts((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, [field]: value } : item
+        )
+      );
+    }
 
-    if (collectionName === "parts") loadParts();
-    if (collectionName === "inspections") loadInspections();
-    if (collectionName === "calendar") loadCalendar();
-    if (collectionName === "factoryLogs") loadFactoryLogs();
+    if (collectionName === "inspections") {
+      setInspections((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, [field]: value } : item
+        )
+      );
+    }
+
+    if (collectionName === "calendar") {
+      setCalendarEvents((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, [field]: value } : item
+        )
+      );
+    }
+
+    if (collectionName === "factoryLogs") {
+      setFactoryLogs((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, [field]: value } : item
+        )
+      );
+    }
+
+    await updateDoc(doc(db, collectionName, id), {
+      [field]: value,
+    });
   }
 
   async function removeItem(collectionName, id) {
@@ -133,9 +162,11 @@ export default function App() {
   async function addCalendarEvent() {
     await addDoc(collection(db, "calendar"), {
       date: selectedDate,
+      time: "",
       title: "",
       detail: "",
       owner: "",
+      importance: "通常",
       image: "",
     });
     loadCalendar();
@@ -428,7 +459,13 @@ export default function App() {
                             <strong>{Number(date.slice(8, 10))}</strong>
                             <div className="calendarEventList">
                               {dayEvents.slice(0, 3).map((event) => (
-                                <span key={event.id} className="calendarEventTag">
+                                <span
+                                  key={event.id}
+                                  className={`calendarEventTag ${
+                                    event.importance === "重要" ? "importantTag" : ""
+                                  }`}
+                                >
+                                  {event.time ? `${event.time} ` : ""}
                                   {event.title || "予定"}
                                 </span>
                               ))}
@@ -446,8 +483,12 @@ export default function App() {
                     .filter((event) => event.date === selectedDate)
                     .map((event) => (
                       <div key={event.id} className="eventRow">
-                        <b>{event.title || "無題"}</b>
-                        <span>{event.owner || "-"}</span>
+                        <b>
+                          {event.importance === "重要" ? "【重要】" : ""}
+                          {event.time ? `${event.time} ` : ""}
+                          {event.title || "予定"}
+                        </b>
+                        <span>担当: {event.owner || "-"}</span>
                         <span>{event.detail || "-"}</span>
                       </div>
                     ))}
@@ -459,7 +500,14 @@ export default function App() {
                 {calendarEvents.map((row) => (
                   <div key={row.id} className="calendarEditCard">
                     <input type="date" value={row.date || ""} onChange={(e) => updateField("calendar", row.id, "date", e.target.value)} />
+                    <input type="time" value={row.time || ""} onChange={(e) => updateField("calendar", row.id, "time", e.target.value)} />
                     <input value={row.title || ""} onChange={(e) => updateField("calendar", row.id, "title", e.target.value)} placeholder="タイトル" />
+
+                    <select value={row.importance || "通常"} onChange={(e) => updateField("calendar", row.id, "importance", e.target.value)}>
+                      <option value="通常">通常</option>
+                      <option value="重要">重要</option>
+                    </select>
+
                     <textarea value={row.detail || ""} onChange={(e) => updateField("calendar", row.id, "detail", e.target.value)} placeholder="内容" />
                     <input value={row.owner || ""} onChange={(e) => updateField("calendar", row.id, "owner", e.target.value)} placeholder="担当者" />
                     <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "calendar", row.id)} />
