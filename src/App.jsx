@@ -122,13 +122,22 @@ export default function App() {
       .sort((a, b) => {
         if (a.daysLeft === "") return 1;
         if (b.daysLeft === "") return -1;
+
         return a.daysLeft - b.daysLeft;
       });
   }, [parts]);
 
-  const overCount = rows.filter((row) => row.status === "交換超過").length;
-  const nearCount = rows.filter((row) => row.status === "交換間近").length;
-  const normalCount = rows.filter((row) => row.status === "正常").length;
+  const overCount = rows.filter(
+    (row) => row.status === "交換超過"
+  ).length;
+
+  const nearCount = rows.filter(
+    (row) => row.status === "交換間近"
+  ).length;
+
+  const normalCount = rows.filter(
+    (row) => row.status === "正常"
+  ).length;
 
   return (
     <div className="page">
@@ -136,60 +145,86 @@ export default function App() {
 
         <div className="header">
           <div>
-            <div className="badge">設備管理システム</div>
+            <div className="badge">
+              設備管理システム
+            </div>
 
             <h1>保全管理サイト</h1>
 
-            <p>交換期限が近い部品から自動で上に表示されます。</p>
+            <p>
+              交換期限が近い部品から自動で上に表示されます。
+            </p>
           </div>
         </div>
 
         <div className="tabs">
+
           <button
-            className={page === "maintenance" ? "active" : ""}
+            className={
+              page === "maintenance" ? "active" : ""
+            }
             onClick={() => setPage("maintenance")}
           >
-            定量保全管理
+            定期・定量保全
           </button>
 
           <button
-            className={page === "purchase" ? "active" : ""}
+            className={
+              page === "purchase" ? "active" : ""
+            }
             onClick={() => setPage("purchase")}
           >
             部品購入管理
           </button>
 
           <button
-            className={page === "inspection" ? "active" : ""}
+            className={
+              page === "inspection" ? "active" : ""
+            }
             onClick={() => setPage("inspection")}
           >
             設備点検
           </button>
 
           <button
-            className={page === "dashboard" ? "active" : ""}
+            className={
+              page === "dashboard" ? "active" : ""
+            }
             onClick={() => setPage("dashboard")}
           >
             ダッシュボード
           </button>
 
           <button
-            className={page === "settings" ? "active" : ""}
+            className={
+              page === "settings" ? "active" : ""
+            }
             onClick={() => setPage("settings")}
           >
             設定
           </button>
+
         </div>
 
         {page === "maintenance" && (
           <>
             <div className="header">
               <div>
-                <h2>定量保全管理表</h2>
-                <p>交換超過・交換間近の部品が上に表示されます。</p>
+
+                <h2>
+                  定期・定量保全管理表
+                </h2>
+
+                <p>
+                  交換超過・交換間近の部品が上に表示されます。
+                </p>
+
               </div>
 
-              <button className="primaryButton" onClick={addPart}>
+              <button
+                className="primaryButton"
+                onClick={addPart}
+              >
                 <Plus size={16} />
                 部品追加
               </button>
@@ -197,6 +232,7 @@ export default function App() {
 
             <div className="tableWrap">
               <table>
+
                 <thead>
                   <tr>
                     <th>設備名</th>
@@ -218,13 +254,19 @@ export default function App() {
                 </thead>
 
                 <tbody>
+
                   {rows.map((row) => (
                     <tr key={row.id}>
+
                       <td>
                         <input
                           value={row.equipment || ""}
                           onChange={(e) =>
-                            updateField(row.id, "equipment", e.target.value)
+                            updateField(
+                              row.id,
+                              "equipment",
+                              e.target.value
+                            )
                           }
                         />
                       </td>
@@ -233,7 +275,11 @@ export default function App() {
                         <input
                           value={row.partName || ""}
                           onChange={(e) =>
-                            updateField(row.id, "partName", e.target.value)
+                            updateField(
+                              row.id,
+                              "partName",
+                              e.target.value
+                            )
                           }
                         />
                       </td>
@@ -242,7 +288,11 @@ export default function App() {
                         <input
                           value={row.partNo || ""}
                           onChange={(e) =>
-                            updateField(row.id, "partNo", e.target.value)
+                            updateField(
+                              row.id,
+                              "partNo",
+                              e.target.value
+                            )
                           }
                         />
                       </td>
@@ -251,7 +301,11 @@ export default function App() {
                         <input
                           value={row.price || ""}
                           onChange={(e) =>
-                            updateField(row.id, "price", e.target.value)
+                            updateField(
+                              row.id,
+                              "price",
+                              e.target.value
+                            )
                           }
                           placeholder="例: 200,000円"
                         />
@@ -261,7 +315,11 @@ export default function App() {
                         <input
                           value={row.supplier || ""}
                           onChange={(e) =>
-                            updateField(row.id, "supplier", e.target.value)
+                            updateField(
+                              row.id,
+                              "supplier",
+                              e.target.value
+                            )
                           }
                           placeholder="例: モノタロウ"
                         />
@@ -271,7 +329,11 @@ export default function App() {
                         <input
                           value={row.location || ""}
                           onChange={(e) =>
-                            updateField(row.id, "location", e.target.value)
+                            updateField(
+                              row.id,
+                              "location",
+                              e.target.value
+                            )
                           }
                           placeholder="例: A-01"
                         />
@@ -281,7 +343,11 @@ export default function App() {
                         <input
                           value={row.leadTime || ""}
                           onChange={(e) =>
-                            updateField(row.id, "leadTime", e.target.value)
+                            updateField(
+                              row.id,
+                              "leadTime",
+                              e.target.value
+                            )
                           }
                           placeholder="例: 30日"
                         />
@@ -292,7 +358,11 @@ export default function App() {
                           type="number"
                           value={row.cycle || ""}
                           onChange={(e) =>
-                            updateField(row.id, "cycle", Number(e.target.value))
+                            updateField(
+                              row.id,
+                              "cycle",
+                              Number(e.target.value)
+                            )
                           }
                         />
                       </td>
@@ -302,17 +372,29 @@ export default function App() {
                           type="date"
                           value={row.lastDate || ""}
                           onChange={(e) =>
-                            updateField(row.id, "lastDate", e.target.value)
+                            updateField(
+                              row.id,
+                              "lastDate",
+                              e.target.value
+                            )
                           }
                         />
                       </td>
 
-                      <td>{row.nextDate || "-"}</td>
-
-                      <td>{row.daysLeft === "" ? "-" : row.daysLeft}</td>
+                      <td>
+                        {row.nextDate || "-"}
+                      </td>
 
                       <td>
-                        <span className={`status ${row.status}`}>
+                        {row.daysLeft === ""
+                          ? "-"
+                          : row.daysLeft}
+                      </td>
+
+                      <td>
+                        <span
+                          className={`status ${row.status}`}
+                        >
                           {row.status}
                         </span>
                       </td>
@@ -321,7 +403,11 @@ export default function App() {
                         <input
                           value={row.owner || ""}
                           onChange={(e) =>
-                            updateField(row.id, "owner", e.target.value)
+                            updateField(
+                              row.id,
+                              "owner",
+                              e.target.value
+                            )
                           }
                         />
                       </td>
@@ -330,7 +416,11 @@ export default function App() {
                         <input
                           value={row.note || ""}
                           onChange={(e) =>
-                            updateField(row.id, "note", e.target.value)
+                            updateField(
+                              row.id,
+                              "note",
+                              e.target.value
+                            )
                           }
                         />
                       </td>
@@ -338,14 +428,19 @@ export default function App() {
                       <td>
                         <button
                           className="deleteButton"
-                          onClick={() => removePart(row.id)}
+                          onClick={() =>
+                            removePart(row.id)
+                          }
                         >
                           <Trash2 size={16} />
                         </button>
                       </td>
+
                     </tr>
                   ))}
+
                 </tbody>
+
               </table>
             </div>
           </>
@@ -353,51 +448,35 @@ export default function App() {
 
         {page === "purchase" && (
           <div className="tableWrap">
+
             <h2>部品購入管理</h2>
-            <p>ここに今後、購入依頼・発注状況・納期確認を追加できます。</p>
 
-            <table>
-              <thead>
-                <tr>
-                  <th>部品名</th>
-                  <th>部品番号</th>
-                  <th>部品値段</th>
-                  <th>購入先</th>
-                  <th>部品納期</th>
-                  <th>予備品ロケーション</th>
-                  <th>担当者</th>
-                </tr>
-              </thead>
+            <p>
+              ここに今後、購入依頼・発注状況・納期確認を追加できます。
+            </p>
 
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.partName || "-"}</td>
-                    <td>{row.partNo || "-"}</td>
-                    <td>{row.price || "-"}</td>
-                    <td>{row.supplier || "-"}</td>
-                    <td>{row.leadTime || "-"}</td>
-                    <td>{row.location || "-"}</td>
-                    <td>{row.owner || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         )}
 
         {page === "inspection" && (
           <div className="tableWrap">
+
             <h2>設備点検</h2>
-            <p>ここに日常点検・月次点検・異常記録を追加できます。</p>
+
+            <p>
+              ここに日常点検・月次点検・異常記録を追加できます。
+            </p>
+
           </div>
         )}
 
         {page === "dashboard" && (
           <div className="tableWrap">
+
             <h2>ダッシュボード</h2>
 
             <div className="cards">
+
               <div className="card red">
                 <span>交換超過</span>
                 <strong>{overCount}</strong>
@@ -417,14 +496,20 @@ export default function App() {
                 <span>登録部品数</span>
                 <strong>{rows.length}</strong>
               </div>
+
             </div>
           </div>
         )}
 
         {page === "settings" && (
           <div className="tableWrap">
+
             <h2>設定</h2>
-            <p>ここにメール設定・担当者設定・管理者設定を追加できます。</p>
+
+            <p>
+              ここにメール設定・担当者設定・管理者設定を追加できます。
+            </p>
+
           </div>
         )}
 
