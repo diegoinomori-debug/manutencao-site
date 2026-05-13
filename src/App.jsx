@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import "./index.css";
 import { db } from "./firebase";
+
 import {
   collection,
   addDoc,
@@ -37,10 +38,12 @@ function getStatus(daysLeft) {
 
 export default function App() {
   const [parts, setParts] = useState([]);
+  const [inspections, setInspections] = useState([]);
   const [page, setPage] = useState("maintenance");
 
   useEffect(() => {
     loadParts();
+    loadInspections();
   }, []);
 
   async function loadParts() {
@@ -55,6 +58,20 @@ export default function App() {
     });
 
     setParts(items);
+  }
+
+  async function loadInspections() {
+    const querySnapshot = await getDocs(collection(db, "inspections"));
+    const items = [];
+
+    querySnapshot.forEach((docItem) => {
+      items.push({
+        id: docItem.id,
+        ...docItem.data(),
+      });
+    });
+
+    setInspections(items);
   }
 
   async function addPart() {
@@ -85,7 +102,7 @@ export default function App() {
     loadParts();
   }
 
-  async function updateField(id, field, value) {
+  async function updatePartField(id, field, value) {
     setParts((current) =>
       current.map((part) =>
         part.id === id ? { ...part, [field]: value } : part
@@ -93,6 +110,41 @@ export default function App() {
     );
 
     await updateDoc(doc(db, "parts", id), {
+      [field]: value,
+    });
+  }
+
+  async function addInspection() {
+    const newInspection = {
+      date: "",
+      equipment: "",
+      inspectionType: "日常点検",
+      checkItem: "",
+      result: "OK",
+      abnormalDetail: "",
+      action: "",
+      owner: "",
+      nextCheckDate: "",
+      note: "",
+    };
+
+    await addDoc(collection(db, "inspections"), newInspection);
+    loadInspections();
+  }
+
+  async function removeInspection(id) {
+    await deleteDoc(doc(db, "inspections", id));
+    loadInspections();
+  }
+
+  async function updateInspectionField(id, field, value) {
+    setInspections((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+
+    await updateDoc(doc(db, "inspections", id), {
       [field]: value,
     });
   }
@@ -118,9 +170,18 @@ export default function App() {
       });
   }, [parts]);
 
+  const inspectionRows = useMemo(() => {
+    return [...inspections].sort((a, b) => {
+      if (!a.nextCheckDate) return 1;
+      if (!b.nextCheckDate) return -1;
+      return a.nextCheckDate.localeCompare(b.nextCheckDate);
+    });
+  }, [inspections]);
+
   const overCount = rows.filter((row) => row.status === "交換超過").length;
   const nearCount = rows.filter((row) => row.status === "交換間近").length;
   const normalCount = rows.filter((row) => row.status === "正常").length;
+  const abnormalCount = inspectionRows.filter((row) => row.result === "NG").length;
 
   return (
     <div className="page">
@@ -213,7 +274,7 @@ export default function App() {
                         <input
                           value={row.equipment || ""}
                           onChange={(e) =>
-                            updateField(row.id, "equipment", e.target.value)
+                            updatePartField(row.id, "equipment", e.target.value)
                           }
                         />
                       </td>
@@ -222,7 +283,7 @@ export default function App() {
                         <input
                           value={row.partName || ""}
                           onChange={(e) =>
-                            updateField(row.id, "partName", e.target.value)
+                            updatePartField(row.id, "partName", e.target.value)
                           }
                         />
                       </td>
@@ -231,7 +292,7 @@ export default function App() {
                         <input
                           value={row.partNo || ""}
                           onChange={(e) =>
-                            updateField(row.id, "partNo", e.target.value)
+                            updatePartField(row.id, "partNo", e.target.value)
                           }
                         />
                       </td>
@@ -240,7 +301,7 @@ export default function App() {
                         <input
                           value={row.price || ""}
                           onChange={(e) =>
-                            updateField(row.id, "price", e.target.value)
+                            updatePartField(row.id, "price", e.target.value)
                           }
                           placeholder="例: 200,000円"
                         />
@@ -250,9 +311,8 @@ export default function App() {
                         <input
                           value={row.supplier || ""}
                           onChange={(e) =>
-                            updateField(row.id, "supplier", e.target.value)
+                            updatePartField(row.id, "supplier", e.target.value)
                           }
-                          placeholder="例: モノタロウ"
                         />
                       </td>
 
@@ -260,9 +320,8 @@ export default function App() {
                         <input
                           value={row.location || ""}
                           onChange={(e) =>
-                            updateField(row.id, "location", e.target.value)
+                            updatePartField(row.id, "location", e.target.value)
                           }
-                          placeholder="例: A-01"
                         />
                       </td>
 
@@ -270,9 +329,8 @@ export default function App() {
                         <input
                           value={row.leadTime || ""}
                           onChange={(e) =>
-                            updateField(row.id, "leadTime", e.target.value)
+                            updatePartField(row.id, "leadTime", e.target.value)
                           }
-                          placeholder="例: 30日"
                         />
                       </td>
 
@@ -281,7 +339,7 @@ export default function App() {
                           type="number"
                           value={row.cycle || ""}
                           onChange={(e) =>
-                            updateField(row.id, "cycle", Number(e.target.value))
+                            updatePartField(row.id, "cycle", Number(e.target.value))
                           }
                         />
                       </td>
@@ -291,7 +349,7 @@ export default function App() {
                           type="date"
                           value={row.lastDate || ""}
                           onChange={(e) =>
-                            updateField(row.id, "lastDate", e.target.value)
+                            updatePartField(row.id, "lastDate", e.target.value)
                           }
                         />
                       </td>
@@ -309,7 +367,7 @@ export default function App() {
                         <input
                           value={row.owner || ""}
                           onChange={(e) =>
-                            updateField(row.id, "owner", e.target.value)
+                            updatePartField(row.id, "owner", e.target.value)
                           }
                         />
                       </td>
@@ -318,7 +376,7 @@ export default function App() {
                         <input
                           value={row.note || ""}
                           onChange={(e) =>
-                            updateField(row.id, "note", e.target.value)
+                            updatePartField(row.id, "note", e.target.value)
                           }
                         />
                       </td>
@@ -360,7 +418,7 @@ export default function App() {
                   <th>発注日</th>
                   <th>入荷予定日</th>
                   <th>担当者</th>
-                  <th>備考</th>
+                  <th>購入メモ</th>
                 </tr>
               </thead>
 
@@ -377,7 +435,7 @@ export default function App() {
                       <select
                         value={row.purchaseStatus || "未発注"}
                         onChange={(e) =>
-                          updateField(row.id, "purchaseStatus", e.target.value)
+                          updatePartField(row.id, "purchaseStatus", e.target.value)
                         }
                       >
                         <option value="未発注">未発注</option>
@@ -392,7 +450,7 @@ export default function App() {
                         type="date"
                         value={row.orderDate || ""}
                         onChange={(e) =>
-                          updateField(row.id, "orderDate", e.target.value)
+                          updatePartField(row.id, "orderDate", e.target.value)
                         }
                       />
                     </td>
@@ -402,7 +460,7 @@ export default function App() {
                         type="date"
                         value={row.arrivalDate || ""}
                         onChange={(e) =>
-                          updateField(row.id, "arrivalDate", e.target.value)
+                          updatePartField(row.id, "arrivalDate", e.target.value)
                         }
                       />
                     </td>
@@ -413,9 +471,8 @@ export default function App() {
                       <input
                         value={row.purchaseNote || ""}
                         onChange={(e) =>
-                          updateField(row.id, "purchaseNote", e.target.value)
+                          updatePartField(row.id, "purchaseNote", e.target.value)
                         }
-                        placeholder="購入メモ"
                       />
                     </td>
                   </tr>
@@ -426,10 +483,168 @@ export default function App() {
         )}
 
         {page === "inspection" && (
-          <div className="tableWrap">
-            <h2>設備点検</h2>
-            <p>ここに日常点検・月次点検・異常記録を追加できます。</p>
-          </div>
+          <>
+            <div className="header">
+              <div>
+                <h2>設備点検</h2>
+                <p>日常点検・月次点検・異常記録を管理できます。</p>
+              </div>
+
+              <button className="primaryButton" onClick={addInspection}>
+                <Plus size={16} />
+                点検追加
+              </button>
+            </div>
+
+            <div className="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>点検日</th>
+                    <th>設備名</th>
+                    <th>点検区分</th>
+                    <th>点検項目</th>
+                    <th>結果</th>
+                    <th>異常内容</th>
+                    <th>処置内容</th>
+                    <th>担当者</th>
+                    <th>次回点検日</th>
+                    <th>備考</th>
+                    <th></th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {inspectionRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <input
+                          type="date"
+                          value={row.date || ""}
+                          onChange={(e) =>
+                            updateInspectionField(row.id, "date", e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <input
+                          value={row.equipment || ""}
+                          onChange={(e) =>
+                            updateInspectionField(row.id, "equipment", e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <select
+                          value={row.inspectionType || "日常点検"}
+                          onChange={(e) =>
+                            updateInspectionField(
+                              row.id,
+                              "inspectionType",
+                              e.target.value
+                            )
+                          }
+                        >
+                          <option value="日常点検">日常点検</option>
+                          <option value="週次点検">週次点検</option>
+                          <option value="月次点検">月次点検</option>
+                          <option value="年次点検">年次点検</option>
+                          <option value="異常記録">異常記録</option>
+                        </select>
+                      </td>
+
+                      <td>
+                        <input
+                          value={row.checkItem || ""}
+                          onChange={(e) =>
+                            updateInspectionField(row.id, "checkItem", e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <select
+                          value={row.result || "OK"}
+                          onChange={(e) =>
+                            updateInspectionField(row.id, "result", e.target.value)
+                          }
+                        >
+                          <option value="OK">OK</option>
+                          <option value="NG">NG</option>
+                          <option value="要確認">要確認</option>
+                        </select>
+                      </td>
+
+                      <td>
+                        <input
+                          value={row.abnormalDetail || ""}
+                          onChange={(e) =>
+                            updateInspectionField(
+                              row.id,
+                              "abnormalDetail",
+                              e.target.value
+                            )
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <input
+                          value={row.action || ""}
+                          onChange={(e) =>
+                            updateInspectionField(row.id, "action", e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <input
+                          value={row.owner || ""}
+                          onChange={(e) =>
+                            updateInspectionField(row.id, "owner", e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <input
+                          type="date"
+                          value={row.nextCheckDate || ""}
+                          onChange={(e) =>
+                            updateInspectionField(
+                              row.id,
+                              "nextCheckDate",
+                              e.target.value
+                            )
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <input
+                          value={row.note || ""}
+                          onChange={(e) =>
+                            updateInspectionField(row.id, "note", e.target.value)
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <button
+                          className="deleteButton"
+                          onClick={() => removeInspection(row.id)}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {page === "dashboard" && (
@@ -452,9 +667,19 @@ export default function App() {
                 <strong>{normalCount}</strong>
               </div>
 
+              <div className="card red">
+                <span>点検NG</span>
+                <strong>{abnormalCount}</strong>
+              </div>
+
               <div className="card">
                 <span>登録部品数</span>
                 <strong>{rows.length}</strong>
+              </div>
+
+              <div className="card">
+                <span>点検記録数</span>
+                <strong>{inspectionRows.length}</strong>
               </div>
             </div>
           </div>
@@ -463,7 +688,30 @@ export default function App() {
         {page === "settings" && (
           <div className="tableWrap">
             <h2>設定</h2>
-            <p>ここにメール設定・担当者設定・管理者設定を追加できます。</p>
+
+            <table>
+              <tbody>
+                <tr>
+                  <th>メール送信</th>
+                  <td>Vercel + Resend で自動送信</td>
+                </tr>
+
+                <tr>
+                  <th>交換通知</th>
+                  <td>交換予定日の7日前にメール送信</td>
+                </tr>
+
+                <tr>
+                  <th>購入通知</th>
+                  <td>部品納期の日数に合わせて購入通知</td>
+                </tr>
+
+                <tr>
+                  <th>保存先</th>
+                  <td>Firebase Firestore</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         )}
       </div>
