@@ -641,23 +641,23 @@ export default function App() {
         <div className="header">
           <div>
             <div className="badge">設備管理システム</div>
-            <h1>保全管理サイト</h1>
+            <h1>🔧 保全管理サイト</h1>
             <p>交換期限が近い部品から自動で上に表示されます。</p>
           </div>
         </div>
 
         <div className="tabs">
-          <button className={page === "maintenance" ? "active" : ""} onClick={() => setPage("maintenance")}>定期・定量保全</button>
-          <button className={page === "purchase" ? "active" : ""} onClick={() => setPage("purchase")}>部品購入管理</button>
-          <button className={page === "inspection" ? "active" : ""} onClick={() => setPage("inspection")}>設備点検</button>
-          <button className={page === "calendar" ? "active" : ""} onClick={() => setPage("calendar")}>予定カレンダー</button>
-          <button className={page === "factory" ? "active" : ""} onClick={() => setPage("factory")}>工場記録</button>
-          <button className={page === "report" ? "active" : ""} onClick={() => setPage("report")}>保全作業報告書</button>
-          <button className={page === "ai" ? "active" : ""} onClick={() => setPage("ai")}>AI検索</button>
-          <button className={page === "stock" ? "active" : ""} onClick={() => setPage("stock")}>在庫管理</button>
-          <button className={page === "order" ? "active" : ""} onClick={() => setPage("order")}>発注管理AI</button>
-          <button className={page === "dashboard" ? "active" : ""} onClick={() => setPage("dashboard")}>ダッシュボード</button>
-          <button className={page === "settings" ? "active" : ""} onClick={() => setPage("settings")}>設定</button>
+          <button className={page === "maintenance" ? "active" : ""} onClick={() => setPage("maintenance")}>🔧 定期・定量保全</button>
+          <button className={page === "purchase" ? "active" : ""} onClick={() => setPage("purchase")}>📦 部品購入管理</button>
+          <button className={page === "inspection" ? "active" : ""} onClick={() => setPage("inspection")}>✅ 設備点検</button>
+          <button className={page === "calendar" ? "active" : ""} onClick={() => setPage("calendar")}>📅 予定カレンダー</button>
+          <button className={page === "factory" ? "active" : ""} onClick={() => setPage("factory")}>🏭 工場記録</button>
+          <button className={page === "report" ? "active" : ""} onClick={() => setPage("report")}>📝 保全作業報告書</button>
+          <button className={page === "ai" ? "active" : ""} onClick={() => setPage("ai")}>🤖 AI検索</button>
+          <button className={page === "stock" ? "active" : ""} onClick={() => setPage("stock")}>🔩 在庫管理</button>
+          <button className={page === "order" ? "active" : ""} onClick={() => setPage("order")}>🛒 発注管理AI</button>
+          <button className={page === "dashboard" ? "active" : ""} onClick={() => setPage("dashboard")}>📊 ダッシュボード</button>
+          <button className={page === "settings" ? "active" : ""} onClick={() => setPage("settings")}>⚙️ 設定</button>
         </div>
 
         {page === "maintenance" && (
