@@ -38,6 +38,46 @@ body {
   z-index: 1;
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.header h1 {
+  font-size: 34px;
+  margin: 8px 0;
+  color: #0f172a;
+}
+
+.header h2 {
+  font-size: 26px;
+  margin: 8px 0;
+  color: #0f172a;
+}
+
+.header h3 {
+  margin: 8px 0;
+}
+
+.header p,
+.tableWrap p {
+  color: #64748b;
+  margin: 6px 0 12px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 13px;
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -62,6 +102,11 @@ body {
   min-height: 44px;
 }
 
+.tabs button:hover {
+  transform: translateY(-1px);
+  background: #eff6ff;
+}
+
 .tabs button.active {
   background: #2563eb;
   color: white;
@@ -73,8 +118,64 @@ body {
   backdrop-filter: blur(8px);
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.tableWrap {
   border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 18px;
   box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 950px;
+}
+
+th {
+  background: #f1f5f9;
+  color: #334155;
+  text-align: left;
+  font-size: 13px;
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+td {
+  padding: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+tr:hover td {
+  background: #f8fafc;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+label {
+  display: block;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 10px;
 }
 
 .primaryButton {
@@ -85,6 +186,15 @@ body {
   border-radius: 12px;
   cursor: pointer;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.24);
+}
+
+.primaryButton:hover {
+  background: #1d4ed8;
 }
 
 .deleteButton {
@@ -94,4 +204,387 @@ body {
   padding: 9px 12px;
   border-radius: 10px;
   cursor: pointer;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deleteButton:hover {
+  background: #fecaca;
+}
+
+.status,
+.stockStatus {
+  display: inline-block;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.status.交換超過,
+.stockBad {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status.交換間近,
+.stockWarn {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.status.正常,
+.stockOk {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status.未入力 {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.card {
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.card span {
+  display: block;
+  color: #64748b;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.card strong {
+  font-size: 34px;
+  color: #0f172a;
+}
+
+.card.red {
+  border-left: 6px solid #ef4444;
+}
+
+.card.yellow {
+  border-left: 6px solid #f59e0b;
+}
+
+.card.green {
+  border-left: 6px solid #22c55e;
+}
+
+.calendarLayout {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  gap: 18px;
+}
+
+.calendarMain,
+.calendarSide {
+  min-width: 0;
+}
+
+.calendarTop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.calendarTop button {
+  border: 0;
+  background: #e0ecff;
+  color: #1d4ed8;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.calendarWeek,
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendarWeek div {
+  text-align: center;
+  font-weight: 800;
+  color: #475569;
+  padding: 10px;
+}
+
+.calendarGrid {
+  gap: 8px;
+}
+
+.calendarDay {
+  min-height: 110px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 10px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.calendarDay:hover {
+  background: #eff6ff;
+}
+
+.selectedDay {
+  outline: 3px solid #2563eb;
+  background: #dbeafe;
+}
+
+.calendarEventList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.calendarEventTag {
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 3px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importantTag {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.selectedEvents {
+  margin-top: 16px;
+}
+
+.eventRow {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px;
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+}
+
+.calendarEditCard {
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 10px;
+}
+
+.calendarPhoto {
+  max-width: 180px;
+  max-height: 140px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+}
+
+.reportGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.simpleBarWrap {
+  width: 100%;
+  height: 18px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 120px;
+}
+
+.simpleBar {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 999px;
+}
+
+.aiHigh {
+  border-left: 8px solid #ef4444;
+  background: #fff1f2;
+}
+
+.aiMiddle {
+  border-left: 8px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.aiLow {
+  border-left: 8px solid #22c55e;
+  background: #f0fdf4;
+}
+
+/* ===== Mobile / Tablet ===== */
+
+@media (max-width: 900px) {
+  .page {
+    padding: 12px;
+  }
+
+  .container {
+    padding: 0;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header h1 {
+    font-size: 26px;
+  }
+
+  .header h2 {
+    font-size: 22px;
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .tabs button {
+    width: 100%;
+    font-size: 14px;
+    padding: 12px 8px;
+    min-height: 46px;
+  }
+
+  .primaryButton,
+  .deleteButton {
+    min-height: 44px;
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+
+  .tableWrap {
+    overflow-x: auto;
+    padding: 14px;
+  }
+
+  table {
+    min-width: 900px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: 42px;
+  }
+
+  textarea {
+    min-height: 90px;
+  }
+
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .card strong {
+    font-size: 28px;
+  }
+
+  .calendarLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .calendarGrid {
+    grid-template-columns: repeat(7, minmax(44px, 1fr));
+    gap: 4px;
+  }
+
+  .calendarDay {
+    min-height: 72px;
+    padding: 6px;
+    font-size: 12px;
+  }
+
+  .calendarEventTag {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+
+  .calendarSide {
+    margin-top: 16px;
+  }
+
+  .calendarEditCard {
+    padding: 14px;
+  }
+
+  .reportGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .header h1 {
+    font-size: 22px;
+  }
+
+  .badge {
+    font-size: 12px;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .calendarTop {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .calendarTop h2 {
+    width: 100%;
+    text-align: center;
+    font-size: 20px;
+  }
+
+  .calendarWeek div {
+    font-size: 12px;
+  }
+
+  .calendarDay {
+    min-height: 64px;
+  }
 }
