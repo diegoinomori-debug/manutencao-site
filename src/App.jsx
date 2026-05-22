@@ -551,6 +551,83 @@ export default function App() {
       });
   }, [stockRows]);
 
+  function printOrderPdf() {
+    const todayText = new Date().toISOString().slice(0, 10);
+
+    const rowsHtml = orderNeededParts
+      .map(
+        (item) => `
+          <tr>
+            <td>${item.priority}</td>
+            <td>${item.equipment || "-"}</td>
+            <td>${item.partName || "-"}</td>
+            <td>${item.partNo || "-"}</td>
+            <td>${item.supplier || "-"}</td>
+            <td>${item.stockQty}</td>
+            <td>${item.minStock}</td>
+            <td>${item.recommendedQty}</td>
+            <td>${item.stockStatus.includes("不足") ? "在庫がありません。すぐに発注が必要です。" : "最低在庫に近いです。早めに発注してください。"}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>発注リストPDF</title>
+          <style>
+            body { font-family: Arial, "Yu Gothic", "Meiryo", sans-serif; padding: 30px; color: #111827; }
+            h1 { text-align: center; margin-bottom: 10px; }
+            .date { text-align: right; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #eaf2ff; color: #003b8f; }
+            th, td { border: 1px solid #999; padding: 8px; text-align: left; }
+            .sign { margin-top: 40px; display: flex; justify-content: flex-end; gap: 30px; }
+            .box { border: 1px solid #333; width: 120px; height: 60px; text-align: center; padding-top: 8px; }
+            @media print { button { display: none; } }
+          </style>
+        </head>
+        <body>
+          <h1>発注必要部品リスト</h1>
+          <div class="date">作成日：${todayText}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>優先度</th>
+                <th>設備名</th>
+                <th>部品名</th>
+                <th>部品番号</th>
+                <th>購入先</th>
+                <th>現在在庫</th>
+                <th>最低在庫</th>
+                <th>推奨発注数</th>
+                <th>AIコメント</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || `<tr><td colspan="9">現在、発注が必要な部品はありません。</td></tr>`}
+            </tbody>
+          </table>
+
+          <div class="sign">
+            <div class="box">作成</div>
+            <div class="box">確認</div>
+            <div class="box">承認</div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  }
+
   return (
     <div className="page">
       <div className="container">
@@ -798,6 +875,10 @@ export default function App() {
           <div className="tableWrap">
             <h2>発注管理AI</h2>
             <p>在庫不足・在庫注意の部品を自動で発注候補として表示します。</p>
+
+            <button className="primaryButton" onClick={printOrderPdf} style={{ marginBottom: "16px" }}>
+              発注リストPDF作成
+            </button>
 
             <table>
               <thead>
