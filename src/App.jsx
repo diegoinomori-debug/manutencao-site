@@ -727,20 +727,6 @@ ${best.text}
                 報告書を自動作成
               </button>
             </div>
-
-            <div className="calendarEditCard" style={{ marginTop: "20px" }}>
-              <h3>AI自動報告書作成</h3>
-              <p>短く入力すると、保全作業報告書を自動で作成します。</p>
-              <textarea
-                value={autoReportInput}
-                onChange={(e) => setAutoReportInput(e.target.value)}
-                placeholder="例：78-60 ロードセル異常 荷重確認 配線確認"
-              />
-              <button className="primaryButton" onClick={createAutoReport}>
-                報告書を自動作成
-              </button>
-            </div>
-
             {aiLevel && (
               <div className={`calendarEditCard ${aiLevel.includes("緊急") ? "aiHigh" : aiLevel.includes("注意") ? "aiMiddle" : "aiLow"}`} style={{ marginTop: "20px" }}>
                 <h3>{aiLevel}</h3>
