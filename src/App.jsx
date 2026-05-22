@@ -47,6 +47,7 @@ export default function App() {
   const [aiSearch, setAiSearch] = useState("");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLevel, setAiLevel] = useState("");
+  const [autoReportInput, setAutoReportInput] = useState("");
   const [page, setPage] = useState("maintenance");
 
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -348,7 +349,9 @@ export default function App() {
 
     if (aiResults.length === 0) {
       setAiLevel("🟢 軽微");
-      setAiAnswer("過去の履歴から似ている内容は見つかりませんでした。\n\n新しいトラブルの可能性があります。設備名・現象・原因・処置内容を保全作業報告書に登録してください。");
+      setAiAnswer("過去の履歴から似ている内容は見つかりませんでした。
+
+新しいトラブルの可能性があります。設備名・現象・原因・処置内容を保全作業報告書に登録してください。");
       return;
     }
 
@@ -374,7 +377,125 @@ export default function App() {
 
     setAiLevel(level);
 
-    setAiAnswer(`【AI分析結果】\n\n危険度：${level}\n\n理由：\n${reason}\n\n似ている過去履歴が見つかりました。\n\n種類：${best.type}\n日付：${best.date}\n設備：${best.title}\n\n過去内容：\n${best.text}\n\n確認ポイント：\n・同じ設備、同じ部品、同じ異常内容がないか確認してください。\n・前回の原因と処置内容を参考にしてください。\n・再発している場合は、再発防止内容の見直しが必要です。\n・危険度が高い場合は、すぐに上司・保全担当へ連絡してください。`);
+    setAiAnswer(`【AI分析結果】
+
+危険度：${level}
+
+理由：
+${reason}
+
+似ている過去履歴が見つかりました。
+
+種類：${best.type}
+日付：${best.date}
+設備：${best.title}
+
+過去内容：
+${best.text}
+
+確認ポイント：
+・同じ設備、同じ部品、同じ異常内容がないか確認してください。
+・前回の原因と処置内容を参考にしてください。
+・再発している場合は、再発防止内容の見直しが必要です。
+・危険度が高い場合は、すぐに上司・保全担当へ連絡してください。`);
+  }
+
+  async function createAutoReport() {
+    const input = autoReportInput.trim();
+
+    if (!input) {
+      alert("内容を入力してください。例：78-60 ロードセル異常 荷重確認");
+      return;
+    }
+
+    const text = input;
+    const similar = aiResults[0];
+
+    let equipment = "";
+    let phenomenon = text;
+    let why1 = "";
+    let why2 = "";
+    let why3 = "";
+    let action = "";
+    let recurrencePrevention = "";
+    let note = "AI自動作成のため、内容を確認して必要に応じて修正してください。";
+
+    const words = text.split(/\s+/);
+    if (words.length > 0) equipment = words[0];
+
+    if (text.includes("ロードセル")) {
+      phenomenon = "ロードセルの異常が発生し、荷重値の確認が必要な状態。";
+      why1 = "ロードセル信号または荷重値に異常が発生したため。";
+      why2 = "配線、コネクタ、取付状態、またはロードセル本体の不具合が考えられるため。";
+      why3 = "経年劣化、過負荷、振動、接触不良により検出値が不安定になった可能性があるため。";
+      action = "ロードセルの表示値確認、配線・コネクタ確認、取付状態確認を実施。必要に応じてロードセル交換または再調整を行う。";
+      recurrencePrevention = "定期点検時にロードセル値の確認、配線固定状態の確認、異常傾向の記録を行う。";
+    } else if (text.includes("センサー")) {
+      phenomenon = "センサー異常により設備動作が不安定、または検出不良が発生。";
+      why1 = "センサー信号が正常に入っていないため。";
+      why2 = "センサー位置ズレ、汚れ、断線、コネクタ接触不良が考えられるため。";
+      why3 = "振動や経年劣化により検出状態が悪化した可能性があるため。";
+      action = "センサー清掃、位置調整、配線確認、I/O確認を実施。必要に応じてセンサー交換を行う。";
+      recurrencePrevention = "点検項目にセンサー清掃・位置確認を追加し、固定状態を定期確認する。";
+    } else if (text.includes("モーター") || text.includes("サーボ")) {
+      phenomenon = "モーターまたはサーボ系の異常により設備停止または動作不良が発生。";
+      why1 = "駆動系に異常信号または過負荷が発生したため。";
+      why2 = "モーター、アンプ、配線、機械負荷、原点位置に問題がある可能性があるため。";
+      why3 = "負荷増加、劣化、接触不良、設定値ズレにより異常が発生した可能性があるため。";
+      action = "アラーム内容確認、電源再投入、配線確認、負荷確認、原点確認を実施。必要に応じてメーカーへ確認する。";
+      recurrencePrevention = "アラーム履歴を記録し、負荷状態・配線状態・冷却状態を定期確認する。";
+    } else {
+      phenomenon = text + " の不具合が発生。";
+      why1 = "設備または部品に異常が発生したため。";
+      why2 = "原因箇所の確認が必要なため。";
+      why3 = "再発防止のため、発生条件と処置内容の記録が必要なため。";
+      action = "現象確認、原因調査、関係部品の確認を実施。必要に応じて調整・交換・清掃を行う。";
+      recurrencePrevention = "同様の異常が再発しないよう、点検項目追加と発生条件の記録を行う。";
+    }
+
+    if (similar) {
+      note += "
+
+類似履歴あり：" + similar.type + " / " + similar.date + " / " + similar.title;
+    }
+
+    await addDoc(collection(db, "maintenanceReports"), {
+      createdAt: new Date().toISOString().slice(0, 10),
+      maintenanceType: "突発保全",
+      troubleDateTime: "",
+      workStartDateTime: "",
+      workEndDateTime: "",
+      productionStartDateTime: "",
+      stopExclusionTime: "",
+      functionDownRate: "100",
+      groupName: "",
+      lineName: "",
+      equipment,
+      phenomenon,
+      troublePoint: "",
+      why1,
+      why2,
+      why3,
+      action,
+      link: "",
+      recurrenceCategory: "再発防止",
+      recurrencePrevention,
+      outflowPrevention: "同様の異常が他設備で発生していないか確認する。",
+      changeRank: "",
+      fpCheck: "",
+      worker: "",
+      laborCost: "",
+      partsCost: "",
+      totalCost: "",
+      replacedPart: "",
+      stockQty: "",
+      stockCheck: false,
+      note,
+    });
+
+    setAutoReportInput("");
+    await loadReports();
+    setPage("report");
   }
 
   const overCount = rows.filter((r) => r.status === "交換超過").length;
@@ -585,6 +706,40 @@ export default function App() {
             <button className="primaryButton" onClick={makeAiAnswer}>
               AI分析
             </button>
+
+            <div className="calendarEditCard" style={{ marginTop: "20px" }}>
+              <h3>AI自動報告書作成</h3>
+
+              <p>
+                短く入力すると、保全作業報告書を自動で作成します。
+              </p>
+
+              <textarea
+                value={autoReportInput}
+                onChange={(e) => setAutoReportInput(e.target.value)}
+                placeholder="例：78-60 ロードセル異常 荷重確認 配線確認"
+              />
+
+              <button
+                className="primaryButton"
+                onClick={createAutoReport}
+              >
+                報告書を自動作成
+              </button>
+            </div>
+
+            <div className="calendarEditCard" style={{ marginTop: "20px" }}>
+              <h3>AI自動報告書作成</h3>
+              <p>短く入力すると、保全作業報告書を自動で作成します。</p>
+              <textarea
+                value={autoReportInput}
+                onChange={(e) => setAutoReportInput(e.target.value)}
+                placeholder="例：78-60 ロードセル異常 荷重確認 配線確認"
+              />
+              <button className="primaryButton" onClick={createAutoReport}>
+                報告書を自動作成
+              </button>
+            </div>
 
             {aiLevel && (
               <div className={`calendarEditCard ${aiLevel.includes("緊急") ? "aiHigh" : aiLevel.includes("注意") ? "aiMiddle" : "aiLow"}`} style={{ marginTop: "20px" }}>
