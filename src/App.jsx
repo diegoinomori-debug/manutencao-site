@@ -536,6 +536,21 @@ export default function App() {
   const lowStockCount = stockRows.filter((item) => item.stockStatus.includes("不足")).length;
   const cautionStockCount = stockRows.filter((item) => item.stockStatus.includes("注意")).length;
 
+  const orderNeededParts = useMemo(() => {
+    return stockRows
+      .filter((item) => item.stockStatus.includes("不足") || item.stockStatus.includes("注意"))
+      .map((item) => {
+        const recommendedQty = Math.max(Number(item.minStock || 1) * 2 - Number(item.stockQty || 0), 1);
+        const priority = item.stockStatus.includes("不足") ? "🔴 緊急発注" : "🟡 早めに発注";
+
+        return {
+          ...item,
+          recommendedQty,
+          priority,
+        };
+      });
+  }, [stockRows]);
+
   return (
     <div className="page">
       <div className="container">
@@ -556,6 +571,7 @@ export default function App() {
           <button className={page === "report" ? "active" : ""} onClick={() => setPage("report")}>保全作業報告書</button>
           <button className={page === "ai" ? "active" : ""} onClick={() => setPage("ai")}>AI検索</button>
           <button className={page === "stock" ? "active" : ""} onClick={() => setPage("stock")}>在庫管理</button>
+          <button className={page === "order" ? "active" : ""} onClick={() => setPage("order")}>発注管理AI</button>
           <button className={page === "dashboard" ? "active" : ""} onClick={() => setPage("dashboard")}>ダッシュボード</button>
           <button className={page === "settings" ? "active" : ""} onClick={() => setPage("settings")}>設定</button>
         </div>
@@ -778,6 +794,52 @@ export default function App() {
           </div>
         )}
 
+        {page === "order" && (
+          <div className="tableWrap">
+            <h2>発注管理AI</h2>
+            <p>在庫不足・在庫注意の部品を自動で発注候補として表示します。</p>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>優先度</th>
+                  <th>設備名</th>
+                  <th>部品名</th>
+                  <th>部品番号</th>
+                  <th>購入先</th>
+                  <th>現在在庫</th>
+                  <th>最低在庫</th>
+                  <th>推奨発注数</th>
+                  <th>AIコメント</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderNeededParts.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.priority}</td>
+                    <td>{item.equipment || "-"}</td>
+                    <td>{item.partName || "-"}</td>
+                    <td>{item.partNo || "-"}</td>
+                    <td>{item.supplier || "-"}</td>
+                    <td>{item.stockQty}</td>
+                    <td>{item.minStock}</td>
+                    <td>{item.recommendedQty}</td>
+                    <td>
+                      {item.stockStatus.includes("不足")
+                        ? "在庫がありません。すぐに発注が必要です。"
+                        : "最低在庫に近いです。早めに発注してください。"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {orderNeededParts.length === 0 && (
+              <p style={{ marginTop: "20px" }}>現在、発注が必要な部品はありません。</p>
+            )}
+          </div>
+        )}
+
         {page === "dashboard" && (
           <div className="tableWrap">
             <h2>ダッシュボード</h2>
@@ -795,6 +857,7 @@ export default function App() {
               <div className="card red"><span>重大トラブル候補</span><strong>{seriousReports}</strong></div>
               <div className="card red"><span>在庫不足</span><strong>{lowStockCount}</strong></div>
               <div className="card yellow"><span>在庫注意</span><strong>{cautionStockCount}</strong></div>
+              <div className="card red"><span>発注必要</span><strong>{orderNeededParts.length}</strong></div>
             </div>
 
             <div className="tableWrap" style={{ marginTop: "24px" }}>
