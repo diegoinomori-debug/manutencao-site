@@ -382,3 +382,17 @@ textarea {
   }
 
 }
+
+.simpleBarWrap {
+  width: 100%;
+  height: 18px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.simpleBar {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 999px;
+}
