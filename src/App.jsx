@@ -869,11 +869,11 @@ export default function App() {
             </div>
             <div className="tableWrap" style={{ marginTop: "24px" }}>
               <h2>AI設備ランキング</h2><p>工場記録と保全作業報告書から、トラブルが多い設備を自動集計します。</p>
-              <table><thead><tr><th>順位</th><th>設備名</th><th>記録件数</th><th>グラフ</th><th>AIコメント</th></tr></thead><tbody>{equipmentRanking.map((item, index) => <tr key={item.name}><td>{index + 1}</td><td>{item.name}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxEquipmentCount) * 100}%` }} /></div></td><td>{item.count >= 3 ? "再発傾向あり。原因分析と再発防止の見直しが必要です。" : item.count === 2 ? "注意。今後も同じ異常が出るか確認してください。" : "記録あり。様子を確認してください。"}</td></tr>)}</tbody></table>
+              <table><thead><tr><th>順位</th><th>設備名</th><th>記録件数</th><th>グラフ</th><th>AIコメント</th></tr></thead><tbody>{equipmentRanking.map((item, index) => <tr key={item.name}><td>{index + 1}</td><td>{item.name}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxEquipmentCount) * 100}%` }} /><span className="barValue">{item.count}件</span></div></td><td>{item.count >= 3 ? "再発傾向あり。原因分析と再発防止の見直しが必要です。" : item.count === 2 ? "注意。今後も同じ異常が出るか確認してください。" : "記録あり。様子を確認してください。"}</td></tr>)}</tbody></table>
             </div>
             <div className="tableWrap" style={{ marginTop: "24px" }}>
               <h2>月別トラブル推移</h2><p>保全作業報告書と工場記録から、月ごとのトラブル件数を表示します。</p>
-              <table><thead><tr><th>月</th><th>件数</th><th>グラフ</th></tr></thead><tbody>{monthlyTroubleRanking.map((item) => <tr key={item.month}><td>{item.month}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxMonthlyCount) * 100}%` }} /></div></td></tr>)}</tbody></table>
+              <table><thead><tr><th>月</th><th>件数</th><th>グラフ</th></tr></thead><tbody>{monthlyTroubleRanking.map((item) => <tr key={item.month}><td>{item.month}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxMonthlyCount) * 100}%` }} /><span className="barValue">{item.count}件</span></div></td></tr>)}</tbody></table>
             </div>
           </div>
         )}
