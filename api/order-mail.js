@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     html += `</table>`;
 
     await resend.emails.send({
-      from: '保全管理AI <noreply@miyama-unitec.co.jp>',
+      from: 'Acme <onboarding@resend.dev>',
       to: process.env.SEND_TO_EMAIL,
       subject: '発注必要部品リスト',
       html,
