@@ -465,6 +465,28 @@ export default function App() {
     return text.includes("停止") || text.includes("緊急") || text.includes("異常停止") || text.includes("破損");
   }).length;
 
+  const monthlyTroubleRanking = useMemo(() => {
+    const countMap = {};
+
+    reports.forEach((report) => {
+      const month = (report.createdAt || "日付なし").slice(0, 7);
+      countMap[month] = (countMap[month] || 0) + 1;
+    });
+
+    factoryLogs.forEach((log) => {
+      const month = (log.date || "日付なし").slice(0, 7);
+      countMap[month] = (countMap[month] || 0) + 1;
+    });
+
+    return Object.entries(countMap)
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-6);
+  }, [reports, factoryLogs]);
+
+  const maxEquipmentCount = Math.max(...equipmentRanking.map((item) => item.count), 1);
+  const maxMonthlyCount = Math.max(...monthlyTroubleRanking.map((item) => item.count), 1);
+
   return (
     <div className="page">
       <div className="container">
@@ -673,6 +695,7 @@ export default function App() {
                     <th>順位</th>
                     <th>設備名</th>
                     <th>記録件数</th>
+                    <th>グラフ</th>
                     <th>AIコメント</th>
                   </tr>
                 </thead>
@@ -683,11 +706,44 @@ export default function App() {
                       <td>{item.name}</td>
                       <td>{item.count}</td>
                       <td>
+                        <div className="simpleBarWrap">
+                          <div className="simpleBar" style={{ width: `${(item.count / maxEquipmentCount) * 100}%` }} />
+                        </div>
+                      </td>
+                      <td>
                         {item.count >= 3
                           ? "再発傾向あり。原因分析と再発防止の見直しが必要です。"
                           : item.count === 2
                           ? "注意。今後も同じ異常が出るか確認してください。"
                           : "記録あり。様子を確認してください。"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="tableWrap" style={{ marginTop: "24px" }}>
+              <h2>月別トラブル推移</h2>
+              <p>保全作業報告書と工場記録から、月ごとのトラブル件数を表示します。</p>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>月</th>
+                    <th>件数</th>
+                    <th>グラフ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyTroubleRanking.map((item) => (
+                    <tr key={item.month}>
+                      <td>{item.month}</td>
+                      <td>{item.count}</td>
+                      <td>
+                        <div className="simpleBarWrap">
+                          <div className="simpleBar" style={{ width: `${(item.count / maxMonthlyCount) * 100}%` }} />
+                        </div>
                       </td>
                     </tr>
                   ))}
