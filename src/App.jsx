@@ -512,6 +512,30 @@ export default function App() {
   const maxEquipmentCount = Math.max(...equipmentRanking.map((item) => item.count), 1);
   const maxMonthlyCount = Math.max(...monthlyTroubleRanking.map((item) => item.count), 1);
 
+  const stockRows = useMemo(() => {
+    return rows.map((part) => {
+      const stockQty = Number(part.stockQty || 0);
+      const minStock = Number(part.minStock || 1);
+      let stockStatus = "🟢 在庫OK";
+
+      if (stockQty <= 0) {
+        stockStatus = "🔴 在庫不足";
+      } else if (stockQty <= minStock) {
+        stockStatus = "🟡 在庫注意";
+      }
+
+      return {
+        ...part,
+        stockQty,
+        minStock,
+        stockStatus,
+      };
+    });
+  }, [rows]);
+
+  const lowStockCount = stockRows.filter((item) => item.stockStatus.includes("不足")).length;
+  const cautionStockCount = stockRows.filter((item) => item.stockStatus.includes("注意")).length;
+
   return (
     <div className="page">
       <div className="container">
@@ -531,6 +555,7 @@ export default function App() {
           <button className={page === "factory" ? "active" : ""} onClick={() => setPage("factory")}>工場記録</button>
           <button className={page === "report" ? "active" : ""} onClick={() => setPage("report")}>保全作業報告書</button>
           <button className={page === "ai" ? "active" : ""} onClick={() => setPage("ai")}>AI検索</button>
+          <button className={page === "stock" ? "active" : ""} onClick={() => setPage("stock")}>在庫管理</button>
           <button className={page === "dashboard" ? "active" : ""} onClick={() => setPage("dashboard")}>ダッシュボード</button>
           <button className={page === "settings" ? "active" : ""} onClick={() => setPage("settings")}>設定</button>
         </div>
@@ -693,6 +718,66 @@ export default function App() {
           </div>
         )}
 
+        {page === "stock" && (
+          <div className="tableWrap">
+            <h2>在庫管理</h2>
+            <p>保全部品の在庫数を管理し、不足・注意・OKを自動判定します。</p>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>設備名</th>
+                  <th>部品名</th>
+                  <th>部品番号</th>
+                  <th>購入先</th>
+                  <th>予備品ロケーション</th>
+                  <th>現在在庫</th>
+                  <th>最低在庫</th>
+                  <th>状態</th>
+                  <th>メモ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.equipment || "-"}</td>
+                    <td>{row.partName || "-"}</td>
+                    <td>{row.partNo || "-"}</td>
+                    <td>{row.supplier || "-"}</td>
+                    <td>{row.location || "-"}</td>
+                    <td>
+                      <input
+                        type="number"
+                        value={row.stockQty || 0}
+                        onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        value={row.minStock || 1}
+                        onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <span className={`stockStatus ${row.stockStatus.includes("不足") ? "stockBad" : row.stockStatus.includes("注意") ? "stockWarn" : "stockOk"}`}>
+                        {row.stockStatus}
+                      </span>
+                    </td>
+                    <td>
+                      <input
+                        value={row.stockNote || ""}
+                        onChange={(e) => updateField("parts", row.id, "stockNote", e.target.value)}
+                        placeholder="例：発注必要"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {page === "dashboard" && (
           <div className="tableWrap">
             <h2>ダッシュボード</h2>
@@ -708,6 +793,8 @@ export default function App() {
               <div className="card"><span>工場記録数</span><strong>{factoryLogs.length}</strong></div>
               <div className="card"><span>報告書数</span><strong>{reports.length}</strong></div>
               <div className="card red"><span>重大トラブル候補</span><strong>{seriousReports}</strong></div>
+              <div className="card red"><span>在庫不足</span><strong>{lowStockCount}</strong></div>
+              <div className="card yellow"><span>在庫注意</span><strong>{cautionStockCount}</strong></div>
             </div>
 
             <div className="tableWrap" style={{ marginTop: "24px" }}>
