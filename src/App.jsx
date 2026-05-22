@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import "./index.css";
-import { db } from "./firebase";
+import { db 
+} from "./firebase";
 
 import {
   collection,
