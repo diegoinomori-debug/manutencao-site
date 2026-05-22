@@ -431,6 +431,30 @@ export default function App() {
       note,
     });
 
+    const emergencyWords = ["緊急", "異常停止", "ライン停止", "破損", "停止", "焼損"];
+    const checkText = `${input} ${phenomenon} ${action} ${note}`;
+    const isEmergency = emergencyWords.some((word) => checkText.includes(word));
+
+    if (isEmergency) {
+      try {
+        await fetch("/api/emergency-alert", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            equipment,
+            phenomenon,
+            action,
+            level: "🔴 緊急",
+            createdAt: new Date().toISOString().slice(0, 10),
+          }),
+        });
+      } catch (err) {
+        console.error("Emergency email error:", err);
+      }
+    }
+
     setAutoReportInput("");
     await loadReports();
     setPage("report");
