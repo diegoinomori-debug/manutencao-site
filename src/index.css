@@ -544,3 +544,43 @@ textarea {
     min-height: 64px;
   }
 }
+
+body {
+  background:
+    linear-gradient(rgba(245, 247, 250, 0.92), rgba(245, 247, 250, 0.92)),
+    radial-gradient(circle at 20% 20%, #dbeafe 0, transparent 30%),
+    radial-gradient(circle at 80% 10%, #e0f2fe 0, transparent 25%),
+    radial-gradient(circle at 50% 90%, #fef3c7 0, transparent 25%);
+}
+
+.page::before {
+  content: "🔧 🪛 ⚙️ 🏭 💻 🔩 🧰 🔨";
+  position: fixed;
+  inset: 0;
+  font-size: 70px;
+  opacity: 0.045;
+  letter-spacing: 35px;
+  line-height: 140px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+}
+
+.tableWrap,
+.calendarEditCard,
+.card {
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
