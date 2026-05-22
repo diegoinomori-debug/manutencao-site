@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import "./index.css";
-import { db 
-} from "./firebase";
+import { db } from "./firebase";
 
 import {
   collection,
@@ -52,7 +51,9 @@ export default function App() {
   const [autoReportInput, setAutoReportInput] = useState("");
 
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
 
   useEffect(() => {
     loadAll();
@@ -103,9 +104,12 @@ export default function App() {
     };
 
     const setter = setterMap[collectionName];
+
     if (setter) {
       setter((current) =>
-        current.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+        current.map((item) =>
+          item.id === id ? { ...item, [field]: value } : item
+        )
       );
     }
 
@@ -114,6 +118,7 @@ export default function App() {
 
   async function removeItem(collectionName, id) {
     await deleteDoc(doc(db, collectionName, id));
+
     if (collectionName === "parts") loadParts();
     if (collectionName === "inspections") loadInspections();
     if (collectionName === "calendar") loadCalendar();
@@ -138,6 +143,9 @@ export default function App() {
       orderDate: "",
       arrivalDate: "",
       purchaseNote: "",
+      stockQty: 0,
+      minStock: 1,
+      stockNote: "",
     });
     loadParts();
   }
@@ -188,11 +196,6 @@ export default function App() {
     loadFactoryLogs();
   }
 
-  async function addReport() {
-    await addDoc(collection(db, "maintenanceReports"), createBlankReport());
-    loadReports();
-  }
-
   function createBlankReport() {
     return {
       createdAt: new Date().toISOString().slice(0, 10),
@@ -229,6 +232,11 @@ export default function App() {
     };
   }
 
+  async function addReport() {
+    await addDoc(collection(db, "maintenanceReports"), createBlankReport());
+    loadReports();
+  }
+
   function handleImageUpload(event, collectionName, rowId) {
     const file = event.target.files[0];
     if (!file) return;
@@ -243,12 +251,16 @@ export default function App() {
     const firstDay = new Date(year, month, 1);
     const startDay = firstDay.getDay();
     const days = [];
+
     for (let i = 0; i < startDay; i++) days.push(null);
+
     const lastDate = new Date(year, month + 1, 0).getDate();
+
     for (let day = 1; day <= lastDate; day++) {
       const date = new Date(year, month, day);
       days.push(date.toISOString().slice(0, 10));
     }
+
     return days;
   }
 
@@ -275,6 +287,7 @@ export default function App() {
 
   const filteredReports = useMemo(() => {
     const keyword = reportSearch.toLowerCase();
+
     return reports
       .filter((r) =>
         [
@@ -302,6 +315,7 @@ export default function App() {
   const aiResults = useMemo(() => {
     const keyword = aiSearch.toLowerCase().trim();
     if (!keyword) return [];
+
     const keywords = keyword.split(/\s+/);
 
     const reportResults = reports.map((r) => ({
@@ -344,7 +358,9 @@ export default function App() {
 
     if (aiResults.length === 0) {
       setAiLevel("🟢 軽微");
-      setAiAnswer("過去の履歴から似ている内容は見つかりませんでした。\n\n新しいトラブルの可能性があります。設備名・現象・原因・処置内容を保全作業報告書に登録してください。");
+      setAiAnswer(
+        "過去の履歴から似ている内容は見つかりませんでした。\n\n新しいトラブルの可能性があります。設備名・現象・原因・処置内容を保全作業報告書に登録してください。"
+      );
       return;
     }
 
@@ -357,6 +373,7 @@ export default function App() {
 
     let level = "🟢 軽微";
     let reason = "・重大な停止や安全に関わるキーワードは少ないです。";
+
     if (highHit || aiResults.length >= 3) {
       level = "🔴 緊急";
       reason = "・停止、安全、重要設備、または複数の類似履歴が見つかりました。";
@@ -366,7 +383,9 @@ export default function App() {
     }
 
     setAiLevel(level);
-    setAiAnswer(`【AI分析結果】\n\n危険度：${level}\n\n理由：\n${reason}\n\n似ている過去履歴が見つかりました。\n\n種類：${best.type}\n日付：${best.date}\n設備：${best.title}\n\n過去内容：\n${best.text}\n\n確認ポイント：\n・同じ設備、同じ部品、同じ異常内容がないか確認してください。\n・前回の原因と処置内容を参考にしてください。\n・再発している場合は、再発防止内容の見直しが必要です。\n・危険度が高い場合は、すぐに上司・保全担当へ連絡してください。`);
+    setAiAnswer(
+      `【AI分析結果】\n\n危険度：${level}\n\n理由：\n${reason}\n\n似ている過去履歴が見つかりました。\n\n種類：${best.type}\n日付：${best.date}\n設備：${best.title}\n\n過去内容：\n${best.text}\n\n確認ポイント：\n・同じ設備、同じ部品、同じ異常内容がないか確認してください。\n・前回の原因と処置内容を参考にしてください。\n・再発している場合は、再発防止内容の見直しが必要です。\n・危険度が高い場合は、すぐに上司・保全担当へ連絡してください。`
+    );
   }
 
   async function createAutoReport() {
@@ -440,9 +459,7 @@ export default function App() {
       try {
         await fetch("/api/emergency-alert", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             equipment,
             phenomenon,
@@ -524,12 +541,7 @@ export default function App() {
         stockStatus = "🟡 在庫注意";
       }
 
-      return {
-        ...part,
-        stockQty,
-        minStock,
-        stockStatus,
-      };
+      return { ...part, stockQty, minStock, stockStatus };
     });
   }, [rows]);
 
@@ -542,18 +554,12 @@ export default function App() {
       .map((item) => {
         const recommendedQty = Math.max(Number(item.minStock || 1) * 2 - Number(item.stockQty || 0), 1);
         const priority = item.stockStatus.includes("不足") ? "🔴 緊急発注" : "🟡 早めに発注";
-
-        return {
-          ...item,
-          recommendedQty,
-          priority,
-        };
+        return { ...item, recommendedQty, priority };
       });
   }, [stockRows]);
 
   function printOrderPdf() {
     const todayText = new Date().toISOString().slice(0, 10);
-
     const rowsHtml = orderNeededParts
       .map(
         (item) => `
@@ -595,37 +601,38 @@ export default function App() {
           <table>
             <thead>
               <tr>
-                <th>優先度</th>
-                <th>設備名</th>
-                <th>部品名</th>
-                <th>部品番号</th>
-                <th>購入先</th>
-                <th>現在在庫</th>
-                <th>最低在庫</th>
-                <th>推奨発注数</th>
-                <th>AIコメント</th>
+                <th>優先度</th><th>設備名</th><th>部品名</th><th>部品番号</th><th>購入先</th><th>現在在庫</th><th>最低在庫</th><th>推奨発注数</th><th>AIコメント</th>
               </tr>
             </thead>
-            <tbody>
-              ${rowsHtml || `<tr><td colspan="9">現在、発注が必要な部品はありません。</td></tr>`}
-            </tbody>
+            <tbody>${rowsHtml || `<tr><td colspan="9">現在、発注が必要な部品はありません。</td></tr>`}</tbody>
           </table>
-
-          <div class="sign">
-            <div class="box">作成</div>
-            <div class="box">確認</div>
-            <div class="box">承認</div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
+          <div class="sign"><div class="box">作成</div><div class="box">確認</div><div class="box">承認</div></div>
+          <script>window.onload = function() { window.print(); };</script>
         </body>
       </html>
     `);
     printWindow.document.close();
+  }
+
+  async function sendOrderMail() {
+    try {
+      const response = await fetch("/api/order-mail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parts: orderNeededParts }),
+      });
+
+      const data = await response.json();
+
+      if (data.ok) {
+        alert("発注リストをメール送信しました。");
+      } else {
+        alert("メール送信エラー");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("メール送信失敗");
+    }
   }
 
   return (
@@ -815,55 +822,16 @@ export default function App() {
           <div className="tableWrap">
             <h2>在庫管理</h2>
             <p>保全部品の在庫数を管理し、不足・注意・OKを自動判定します。</p>
-
             <table>
-              <thead>
-                <tr>
-                  <th>設備名</th>
-                  <th>部品名</th>
-                  <th>部品番号</th>
-                  <th>購入先</th>
-                  <th>予備品ロケーション</th>
-                  <th>現在在庫</th>
-                  <th>最低在庫</th>
-                  <th>状態</th>
-                  <th>メモ</th>
-                </tr>
-              </thead>
+              <thead><tr><th>設備名</th><th>部品名</th><th>部品番号</th><th>購入先</th><th>予備品ロケーション</th><th>現在在庫</th><th>最低在庫</th><th>状態</th><th>メモ</th></tr></thead>
               <tbody>
                 {stockRows.map((row) => (
                   <tr key={row.id}>
-                    <td>{row.equipment || "-"}</td>
-                    <td>{row.partName || "-"}</td>
-                    <td>{row.partNo || "-"}</td>
-                    <td>{row.supplier || "-"}</td>
-                    <td>{row.location || "-"}</td>
-                    <td>
-                      <input
-                        type="number"
-                        value={row.stockQty || 0}
-                        onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        value={row.minStock || 1}
-                        onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <span className={`stockStatus ${row.stockStatus.includes("不足") ? "stockBad" : row.stockStatus.includes("注意") ? "stockWarn" : "stockOk"}`}>
-                        {row.stockStatus}
-                      </span>
-                    </td>
-                    <td>
-                      <input
-                        value={row.stockNote || ""}
-                        onChange={(e) => updateField("parts", row.id, "stockNote", e.target.value)}
-                        placeholder="例：発注必要"
-                      />
-                    </td>
+                    <td>{row.equipment || "-"}</td><td>{row.partName || "-"}</td><td>{row.partNo || "-"}</td><td>{row.supplier || "-"}</td><td>{row.location || "-"}</td>
+                    <td><input type="number" value={row.stockQty || 0} onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)} /></td>
+                    <td><input type="number" value={row.minStock || 1} onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)} /></td>
+                    <td><span className={`stockStatus ${row.stockStatus.includes("不足") ? "stockBad" : row.stockStatus.includes("注意") ? "stockWarn" : "stockOk"}`}>{row.stockStatus}</span></td>
+                    <td><input value={row.stockNote || ""} onChange={(e) => updateField("parts", row.id, "stockNote", e.target.value)} placeholder="例：発注必要" /></td>
                   </tr>
                 ))}
               </tbody>
@@ -875,49 +843,20 @@ export default function App() {
           <div className="tableWrap">
             <h2>発注管理AI</h2>
             <p>在庫不足・在庫注意の部品を自動で発注候補として表示します。</p>
-
-            <button className="primaryButton" onClick={printOrderPdf} style={{ marginBottom: "16px" }}>
-              発注リストPDF作成
-            </button>
-
+            <button className="primaryButton" onClick={printOrderPdf} style={{ marginBottom: "16px" }}>発注リストPDF作成</button>
+            <button className="primaryButton" onClick={sendOrderMail} style={{ marginLeft: "12px", marginBottom: "16px" }}>発注リストメール送信</button>
             <table>
-              <thead>
-                <tr>
-                  <th>優先度</th>
-                  <th>設備名</th>
-                  <th>部品名</th>
-                  <th>部品番号</th>
-                  <th>購入先</th>
-                  <th>現在在庫</th>
-                  <th>最低在庫</th>
-                  <th>推奨発注数</th>
-                  <th>AIコメント</th>
-                </tr>
-              </thead>
+              <thead><tr><th>優先度</th><th>設備名</th><th>部品名</th><th>部品番号</th><th>購入先</th><th>現在在庫</th><th>最低在庫</th><th>推奨発注数</th><th>AIコメント</th></tr></thead>
               <tbody>
                 {orderNeededParts.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.priority}</td>
-                    <td>{item.equipment || "-"}</td>
-                    <td>{item.partName || "-"}</td>
-                    <td>{item.partNo || "-"}</td>
-                    <td>{item.supplier || "-"}</td>
-                    <td>{item.stockQty}</td>
-                    <td>{item.minStock}</td>
-                    <td>{item.recommendedQty}</td>
-                    <td>
-                      {item.stockStatus.includes("不足")
-                        ? "在庫がありません。すぐに発注が必要です。"
-                        : "最低在庫に近いです。早めに発注してください。"}
-                    </td>
+                    <td>{item.priority}</td><td>{item.equipment || "-"}</td><td>{item.partName || "-"}</td><td>{item.partNo || "-"}</td><td>{item.supplier || "-"}</td><td>{item.stockQty}</td><td>{item.minStock}</td><td>{item.recommendedQty}</td>
+                    <td>{item.stockStatus.includes("不足") ? "在庫がありません。すぐに発注が必要です。" : "最低在庫に近いです。早めに発注してください。"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-
-            {orderNeededParts.length === 0 && (
-              <p style={{ marginTop: "20px" }}>現在、発注が必要な部品はありません。</p>
-            )}
+            {orderNeededParts.length === 0 && <p style={{ marginTop: "20px" }}>現在、発注が必要な部品はありません。</p>}
           </div>
         )}
 
@@ -925,91 +864,23 @@ export default function App() {
           <div className="tableWrap">
             <h2>ダッシュボード</h2>
             <p>保全データから設備の状態を自動で見える化します。</p>
-
             <div className="cards">
-              <div className="card red"><span>交換超過</span><strong>{overCount}</strong></div>
-              <div className="card yellow"><span>交換間近</span><strong>{nearCount}</strong></div>
-              <div className="card green"><span>正常</span><strong>{normalCount}</strong></div>
-              <div className="card red"><span>点検NG</span><strong>{ngCount}</strong></div>
-              <div className="card"><span>登録部品数</span><strong>{rows.length}</strong></div>
-              <div className="card"><span>予定件数</span><strong>{calendarEvents.length}</strong></div>
-              <div className="card"><span>工場記録数</span><strong>{factoryLogs.length}</strong></div>
-              <div className="card"><span>報告書数</span><strong>{reports.length}</strong></div>
-              <div className="card red"><span>重大トラブル候補</span><strong>{seriousReports}</strong></div>
-              <div className="card red"><span>在庫不足</span><strong>{lowStockCount}</strong></div>
-              <div className="card yellow"><span>在庫注意</span><strong>{cautionStockCount}</strong></div>
-              <div className="card red"><span>発注必要</span><strong>{orderNeededParts.length}</strong></div>
+              <div className="card red"><span>交換超過</span><strong>{overCount}</strong></div><div className="card yellow"><span>交換間近</span><strong>{nearCount}</strong></div><div className="card green"><span>正常</span><strong>{normalCount}</strong></div><div className="card red"><span>点検NG</span><strong>{ngCount}</strong></div><div className="card"><span>登録部品数</span><strong>{rows.length}</strong></div><div className="card"><span>予定件数</span><strong>{calendarEvents.length}</strong></div><div className="card"><span>工場記録数</span><strong>{factoryLogs.length}</strong></div><div className="card"><span>報告書数</span><strong>{reports.length}</strong></div><div className="card red"><span>重大トラブル候補</span><strong>{seriousReports}</strong></div><div className="card red"><span>在庫不足</span><strong>{lowStockCount}</strong></div><div className="card yellow"><span>在庫注意</span><strong>{cautionStockCount}</strong></div><div className="card red"><span>発注必要</span><strong>{orderNeededParts.length}</strong></div>
             </div>
-
             <div className="tableWrap" style={{ marginTop: "24px" }}>
-              <h2>AI設備ランキング</h2>
-              <p>工場記録と保全作業報告書から、トラブルが多い設備を自動集計します。</p>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>順位</th>
-                    <th>設備名</th>
-                    <th>記録件数</th>
-                    <th>グラフ</th>
-                    <th>AIコメント</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {equipmentRanking.map((item, index) => (
-                    <tr key={item.name}>
-                      <td>{index + 1}</td>
-                      <td>{item.name}</td>
-                      <td>{item.count}</td>
-                      <td>
-                        <div className="simpleBarWrap">
-                          <div className="simpleBar" style={{ width: `${(item.count / maxEquipmentCount) * 100}%` }} />
-                        </div>
-                      </td>
-                      <td>
-                        {item.count >= 3
-                          ? "再発傾向あり。原因分析と再発防止の見直しが必要です。"
-                          : item.count === 2
-                          ? "注意。今後も同じ異常が出るか確認してください。"
-                          : "記録あり。様子を確認してください。"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <h2>AI設備ランキング</h2><p>工場記録と保全作業報告書から、トラブルが多い設備を自動集計します。</p>
+              <table><thead><tr><th>順位</th><th>設備名</th><th>記録件数</th><th>グラフ</th><th>AIコメント</th></tr></thead><tbody>{equipmentRanking.map((item, index) => <tr key={item.name}><td>{index + 1}</td><td>{item.name}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxEquipmentCount) * 100}%` }} /></div></td><td>{item.count >= 3 ? "再発傾向あり。原因分析と再発防止の見直しが必要です。" : item.count === 2 ? "注意。今後も同じ異常が出るか確認してください。" : "記録あり。様子を確認してください。"}</td></tr>)}</tbody></table>
             </div>
-
             <div className="tableWrap" style={{ marginTop: "24px" }}>
-              <h2>月別トラブル推移</h2>
-              <p>保全作業報告書と工場記録から、月ごとのトラブル件数を表示します。</p>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>月</th>
-                    <th>件数</th>
-                    <th>グラフ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlyTroubleRanking.map((item) => (
-                    <tr key={item.month}>
-                      <td>{item.month}</td>
-                      <td>{item.count}</td>
-                      <td>
-                        <div className="simpleBarWrap">
-                          <div className="simpleBar" style={{ width: `${(item.count / maxMonthlyCount) * 100}%` }} />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <h2>月別トラブル推移</h2><p>保全作業報告書と工場記録から、月ごとのトラブル件数を表示します。</p>
+              <table><thead><tr><th>月</th><th>件数</th><th>グラフ</th></tr></thead><tbody>{monthlyTroubleRanking.map((item) => <tr key={item.month}><td>{item.month}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxMonthlyCount) * 100}%` }} /></div></td></tr>)}</tbody></table>
             </div>
           </div>
         )}
 
-        {page === "settings" && <div className="tableWrap"><h2>設定</h2><table><tbody><tr><th>保存先</th><td>Firebase Firestore</td></tr><tr><th>メール送信</th><td>Vercel + Resend</td></tr><tr><th>交換通知</th><td>交換予定日の7日前</td></tr><tr><th>購入通知</th><td>部品納期に合わせて通知</td></tr></tbody></table></div>}
+        {page === "settings" && (
+          <div className="tableWrap"><h2>設定</h2><table><tbody><tr><th>保存先</th><td>Firebase Firestore</td></tr><tr><th>メール送信</th><td>Vercel + Resend</td></tr><tr><th>交換通知</th><td>交換予定日の7日前</td></tr><tr><th>購入通知</th><td>部品納期に合わせて通知</td></tr></tbody></table></div>
+        )}
       </div>
     </div>
   );
