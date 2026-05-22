@@ -441,6 +441,30 @@ export default function App() {
   const normalCount = rows.filter((r) => r.status === "正常").length;
   const ngCount = inspections.filter((r) => r.result === "NG").length;
 
+  const equipmentRanking = useMemo(() => {
+    const countMap = {};
+
+    reports.forEach((report) => {
+      const name = report.equipment || "設備名なし";
+      countMap[name] = (countMap[name] || 0) + 1;
+    });
+
+    factoryLogs.forEach((log) => {
+      const name = log.machine || "設備名なし";
+      countMap[name] = (countMap[name] || 0) + 1;
+    });
+
+    return Object.entries(countMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [reports, factoryLogs]);
+
+  const seriousReports = reports.filter((r) => {
+    const text = `${r.phenomenon || ""} ${r.action || ""} ${r.note || ""}`;
+    return text.includes("停止") || text.includes("緊急") || text.includes("異常停止") || text.includes("破損");
+  }).length;
+
   return (
     <div className="page">
       <div className="container">
@@ -622,7 +646,56 @@ export default function App() {
           </div>
         )}
 
-        {page === "dashboard" && <div className="tableWrap"><h2>ダッシュボード</h2><div className="cards"><div className="card red"><span>交換超過</span><strong>{overCount}</strong></div><div className="card yellow"><span>交換間近</span><strong>{nearCount}</strong></div><div className="card green"><span>正常</span><strong>{normalCount}</strong></div><div className="card red"><span>点検NG</span><strong>{ngCount}</strong></div><div className="card"><span>登録部品数</span><strong>{rows.length}</strong></div><div className="card"><span>予定件数</span><strong>{calendarEvents.length}</strong></div><div className="card"><span>工場記録数</span><strong>{factoryLogs.length}</strong></div><div className="card"><span>報告書数</span><strong>{reports.length}</strong></div></div></div>}
+        {page === "dashboard" && (
+          <div className="tableWrap">
+            <h2>ダッシュボード</h2>
+            <p>保全データから設備の状態を自動で見える化します。</p>
+
+            <div className="cards">
+              <div className="card red"><span>交換超過</span><strong>{overCount}</strong></div>
+              <div className="card yellow"><span>交換間近</span><strong>{nearCount}</strong></div>
+              <div className="card green"><span>正常</span><strong>{normalCount}</strong></div>
+              <div className="card red"><span>点検NG</span><strong>{ngCount}</strong></div>
+              <div className="card"><span>登録部品数</span><strong>{rows.length}</strong></div>
+              <div className="card"><span>予定件数</span><strong>{calendarEvents.length}</strong></div>
+              <div className="card"><span>工場記録数</span><strong>{factoryLogs.length}</strong></div>
+              <div className="card"><span>報告書数</span><strong>{reports.length}</strong></div>
+              <div className="card red"><span>重大トラブル候補</span><strong>{seriousReports}</strong></div>
+            </div>
+
+            <div className="tableWrap" style={{ marginTop: "24px" }}>
+              <h2>AI設備ランキング</h2>
+              <p>工場記録と保全作業報告書から、トラブルが多い設備を自動集計します。</p>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>順位</th>
+                    <th>設備名</th>
+                    <th>記録件数</th>
+                    <th>AIコメント</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipmentRanking.map((item, index) => (
+                    <tr key={item.name}>
+                      <td>{index + 1}</td>
+                      <td>{item.name}</td>
+                      <td>{item.count}</td>
+                      <td>
+                        {item.count >= 3
+                          ? "再発傾向あり。原因分析と再発防止の見直しが必要です。"
+                          : item.count === 2
+                          ? "注意。今後も同じ異常が出るか確認してください。"
+                          : "記録あり。様子を確認してください。"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {page === "settings" && <div className="tableWrap"><h2>設定</h2><table><tbody><tr><th>保存先</th><td>Firebase Firestore</td></tr><tr><th>メール送信</th><td>Vercel + Resend</td></tr><tr><th>交換通知</th><td>交換予定日の7日前</td></tr><tr><th>購入通知</th><td>部品納期に合わせて通知</td></tr></tbody></table></div>}
       </div>
