@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Search,
+  Home,
+  Wrench,
+  CalendarDays,
+  FileText,
+  Package,
+  Hammer,
+  Bot,
+  Save,
+  X,
+} from "lucide-react";
 import "./index.css";
 import { db } from "./firebase";
 
@@ -36,24 +49,105 @@ function getStatus(daysLeft) {
   return "正常";
 }
 
+function todayText() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function createBlankReport() {
+  return {
+    createdAt: todayText(),
+    maintenanceType: "突発保全",
+    troubleDateTime: "",
+    workStartDateTime: "",
+    workEndDateTime: "",
+    productionStartDateTime: "",
+    stopExclusionTime: "",
+    functionDownRate: "",
+    groupName: "",
+    lineName: "",
+    equipment: "",
+    phenomenon: "",
+    troublePoint: "",
+    why1: "",
+    why2: "",
+    why3: "",
+    action: "",
+    recurrencePrevention: "",
+    outflowPrevention: "",
+    worker: "",
+    laborCost: "",
+    partsCost: "",
+    totalCost: "",
+    replacedPart: "",
+    stockQty: "",
+    note: "",
+    image: "",
+  };
+}
+
+function createBlankPlannedWork(date = "") {
+  return {
+    date: date || todayText(),
+    endDate: "",
+    title: "",
+    equipment: "",
+    purpose: "",
+    detail: "",
+    owner: "",
+    status: "計画中",
+    progress: 0,
+    risk: "",
+    note: "",
+    image: "",
+  };
+}
+
+function createBlankCalendarEvent(date = "") {
+  return {
+    date: date || todayText(),
+    time: "",
+    title: "",
+    detail: "",
+    owner: "",
+    importance: "通常",
+    category: "定期保全",
+    image: "",
+  };
+}
+
+function containsAll(text, keywords) {
+  const target = String(text || "").toLowerCase();
+  return keywords.every((keyword) => target.includes(keyword));
+}
+
 export default function App() {
   const [parts, setParts] = useState([]);
-  const [inspections, setInspections] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
-  const [factoryLogs, setFactoryLogs] = useState([]);
   const [reports, setReports] = useState([]);
+  const [plannedWorks, setPlannedWorks] = useState([]);
 
-  const [page, setPage] = useState("maintenance");
+  const [page, setPage] = useState("home");
+  const [globalSearch, setGlobalSearch] = useState("");
   const [reportSearch, setReportSearch] = useState("");
   const [aiSearch, setAiSearch] = useState("");
   const [aiAnswer, setAiAnswer] = useState("");
   const [aiLevel, setAiLevel] = useState("");
   const [autoReportInput, setAutoReportInput] = useState("");
 
+  const [newReport, setNewReport] = useState(null);
+  const [newCalendarEvent, setNewCalendarEvent] = useState(null);
+  const [newPlannedWork, setNewPlannedWork] = useState(null);
+
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [selectedDate, setSelectedDate] = useState(todayText());
+
+  const [openSections, setOpenSections] = useState({
+    basic: true,
+    trouble: true,
+    why: false,
+    cost: false,
+    other: false,
+  });
 
   useEffect(() => {
     loadAll();
@@ -62,10 +156,9 @@ export default function App() {
   async function loadAll() {
     await Promise.all([
       loadParts(),
-      loadInspections(),
       loadCalendar(),
-      loadFactoryLogs(),
       loadReports(),
+      loadPlannedWorks(),
     ]);
   }
 
@@ -74,19 +167,9 @@ export default function App() {
     setParts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   }
 
-  async function loadInspections() {
-    const snap = await getDocs(collection(db, "inspections"));
-    setInspections(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  }
-
   async function loadCalendar() {
     const snap = await getDocs(collection(db, "calendar"));
     setCalendarEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-  }
-
-  async function loadFactoryLogs() {
-    const snap = await getDocs(collection(db, "factoryLogs"));
-    setFactoryLogs(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   }
 
   async function loadReports() {
@@ -94,13 +177,22 @@ export default function App() {
     setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
   }
 
+  async function loadPlannedWorks() {
+    try {
+      const snap = await getDocs(collection(db, "plannedWorks"));
+      setPlannedWorks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error("plannedWorks load error:", err);
+      setPlannedWorks([]);
+    }
+  }
+
   async function updateField(collectionName, id, field, value) {
     const setterMap = {
       parts: setParts,
-      inspections: setInspections,
       calendar: setCalendarEvents,
-      factoryLogs: setFactoryLogs,
       maintenanceReports: setReports,
+      plannedWorks: setPlannedWorks,
     };
 
     const setter = setterMap[collectionName];
@@ -118,12 +210,10 @@ export default function App() {
 
   async function removeItem(collectionName, id) {
     await deleteDoc(doc(db, collectionName, id));
-
     if (collectionName === "parts") loadParts();
-    if (collectionName === "inspections") loadInspections();
     if (collectionName === "calendar") loadCalendar();
-    if (collectionName === "factoryLogs") loadFactoryLogs();
     if (collectionName === "maintenanceReports") loadReports();
+    if (collectionName === "plannedWorks") loadPlannedWorks();
   }
 
   async function addPart() {
@@ -139,110 +229,110 @@ export default function App() {
       lastDate: "",
       owner: "",
       note: "",
-      purchaseStatus: "未発注",
-      orderDate: "",
-      arrivalDate: "",
-      purchaseNote: "",
       stockQty: 0,
       minStock: 1,
       stockNote: "",
+      image: "",
     });
     loadParts();
   }
 
-  async function addInspection() {
-    await addDoc(collection(db, "inspections"), {
-      date: "",
-      equipment: "",
-      inspectionType: "日常点検",
-      checkItem: "",
-      result: "OK",
-      abnormalDetail: "",
-      action: "",
-      owner: "",
-      nextCheckDate: "",
-      note: "",
-    });
-    loadInspections();
+  function startNewReport() {
+    setNewReport(createBlankReport());
   }
 
-  async function addCalendarEvent() {
+  function cancelNewReport() {
+    setNewReport(null);
+  }
+
+  async function saveNewReport() {
+    if (!newReport) return;
+    if (!newReport.equipment && !newReport.phenomenon) {
+      alert("設備名または不具合現象を入力してください。");
+      return;
+    }
+    await addDoc(collection(db, "maintenanceReports"), newReport);
+    setNewReport(null);
+    await loadReports();
+    alert("保存しました。AI検索に反映されます。");
+  }
+
+  function startNewCalendarEvent(date = selectedDate) {
+    setNewCalendarEvent(createBlankCalendarEvent(date));
+  }
+
+  function cancelNewCalendarEvent() {
+    setNewCalendarEvent(null);
+  }
+
+  async function saveNewCalendarEvent() {
+    if (!newCalendarEvent) return;
+    if (!newCalendarEvent.title) {
+      alert("予定タイトルを入力してください。");
+      return;
+    }
+    await addDoc(collection(db, "calendar"), newCalendarEvent);
+    setNewCalendarEvent(null);
+    await loadCalendar();
+    alert("予定を保存しました。");
+  }
+
+  function startNewPlannedWork() {
+    setNewPlannedWork(createBlankPlannedWork());
+  }
+
+  function cancelNewPlannedWork() {
+    setNewPlannedWork(null);
+  }
+
+  async function saveNewPlannedWork() {
+    if (!newPlannedWork) return;
+    if (!newPlannedWork.title) {
+      alert("工事件名を入力してください。");
+      return;
+    }
+
+    const docRef = await addDoc(collection(db, "plannedWorks"), newPlannedWork);
+
     await addDoc(collection(db, "calendar"), {
-      date: selectedDate,
+      date: newPlannedWork.date || todayText(),
       time: "",
-      title: "",
-      detail: "",
-      owner: "",
-      importance: "通常",
-      image: "",
+      title: `計画工事：${newPlannedWork.title}`,
+      detail: `${newPlannedWork.equipment || ""} ${newPlannedWork.purpose || ""} ${newPlannedWork.detail || ""}`,
+      owner: newPlannedWork.owner || "",
+      importance: "重要",
+      category: "計画工事",
+      plannedWorkId: docRef.id,
+      image: newPlannedWork.image || "",
     });
-    loadCalendar();
-  }
 
-  async function addFactoryLog() {
-    await addDoc(collection(db, "factoryLogs"), {
-      date: "",
-      time: "",
-      sector: "",
-      machine: "",
-      problem: "",
-      cause: "",
-      action: "",
-      repairTime: "",
-      owner: "",
-      image: "",
-      note: "",
-    });
-    loadFactoryLogs();
-  }
-
-  function createBlankReport() {
-    return {
-      createdAt: new Date().toISOString().slice(0, 10),
-      maintenanceType: "",
-      troubleDateTime: "",
-      workStartDateTime: "",
-      workEndDateTime: "",
-      productionStartDateTime: "",
-      stopExclusionTime: "",
-      functionDownRate: "",
-      groupName: "",
-      lineName: "",
-      equipment: "",
-      phenomenon: "",
-      troublePoint: "",
-      why1: "",
-      why2: "",
-      why3: "",
-      action: "",
-      link: "",
-      recurrenceCategory: "",
-      recurrencePrevention: "",
-      outflowPrevention: "",
-      changeRank: "",
-      fpCheck: "",
-      worker: "",
-      laborCost: "",
-      partsCost: "",
-      totalCost: "",
-      replacedPart: "",
-      stockQty: "",
-      stockCheck: false,
-      note: "",
-    };
-  }
-
-  async function addReport() {
-    await addDoc(collection(db, "maintenanceReports"), createBlankReport());
-    loadReports();
+    setNewPlannedWork(null);
+    await Promise.all([loadPlannedWorks(), loadCalendar()]);
+    alert("計画工事を保存しました。カレンダーにも追加されました。");
   }
 
   function handleImageUpload(event, collectionName, rowId) {
     const file = event.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onloadend = () => updateField(collectionName, rowId, "image", reader.result);
     reader.readAsDataURL(file);
+  }
+
+  function handleDraftImageUpload(event, setter) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setter((current) => ({ ...current, image: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function toggleSection(key) {
+    setOpenSections((current) => ({ ...current, [key]: !current[key] }));
   }
 
   function getCalendarDays() {
@@ -270,7 +360,7 @@ export default function App() {
     setCalendarMonth(newDate);
   }
 
-  const rows = useMemo(() => {
+  const maintenanceRows = useMemo(() => {
     return parts
       .map((part) => {
         const nextDate = addDays(part.lastDate, part.cycle);
@@ -285,11 +375,38 @@ export default function App() {
       });
   }, [parts]);
 
-  const filteredReports = useMemo(() => {
-    const keyword = reportSearch.toLowerCase();
+  const spareRows = useMemo(() => {
+    return maintenanceRows.map((part) => {
+      const stockQty = Number(part.stockQty || 0);
+      const minStock = Number(part.minStock || 1);
+      let stockStatus = "🟢 在庫OK";
 
-    return reports
-      .filter((r) =>
+      if (stockQty <= 0) {
+        stockStatus = "🔴 在庫不足";
+      } else if (stockQty <= minStock) {
+        stockStatus = "🟡 在庫注意";
+      }
+
+      return { ...part, stockQty, minStock, stockStatus };
+    });
+  }, [maintenanceRows]);
+
+  const overCount = maintenanceRows.filter((r) => r.status === "交換超過").length;
+  const nearCount = maintenanceRows.filter((r) => r.status === "交換間近").length;
+  const lowStockCount = spareRows.filter((r) => r.stockStatus.includes("不足")).length;
+  const monthReportCount = reports.filter((report) =>
+    (report.createdAt || "").startsWith(new Date().toISOString().slice(0, 7))
+  ).length;
+
+  const filteredReports = useMemo(() => {
+    const keyword = reportSearch.toLowerCase().trim();
+    const sorted = [...reports].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    if (!keyword) return sorted;
+
+    const keywords = keyword.split(/\s+/);
+
+    return sorted.filter((r) =>
+      containsAll(
         [
           r.createdAt,
           r.maintenanceType,
@@ -304,13 +421,69 @@ export default function App() {
           r.action,
           r.worker,
           r.note,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(keyword)
+        ].join(" "),
+        keywords
       )
-      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    );
   }, [reports, reportSearch]);
+
+  const globalResults = useMemo(() => {
+    const keyword = globalSearch.toLowerCase().trim();
+    if (!keyword) return [];
+
+    const keywords = keyword.split(/\s+/);
+
+    const allItems = [
+      ...reports.map((r) => ({
+        category: "📝 保全報告書",
+        page: "report",
+        title: r.equipment || "設備名なし",
+        date: r.createdAt || "-",
+        text: `${r.lineName || ""} ${r.phenomenon || ""} ${r.troublePoint || ""} ${r.why1 || ""} ${r.why2 || ""} ${r.why3 || ""} ${r.action || ""} ${r.note || ""}`,
+      })),
+
+      ...maintenanceRows.map((p) => ({
+        category: "🔧 定期保全",
+        page: "maintenance",
+        title: p.equipment || "設備名なし",
+        date: p.nextDate || "-",
+        text: `${p.partName || ""} ${p.partNo || ""} ${p.supplier || ""} ${p.location || ""} ${p.status || ""} ${p.note || ""}`,
+      })),
+
+      ...spareRows.map((p) => ({
+        category: "📦 予備品管理",
+        page: "spare",
+        title: p.partName || "部品名なし",
+        date: p.leadTime || "-",
+        text: `${p.equipment || ""} ${p.partNo || ""} ${p.supplier || ""} ${p.location || ""} ${p.stockStatus || ""} ${p.stockNote || ""}`,
+      })),
+
+      ...calendarEvents.map((c) => ({
+        category: "📅 カレンダー",
+        page: "calendar",
+        title: c.title || "予定",
+        date: c.date || "-",
+        text: `${c.category || ""} ${c.detail || ""} ${c.owner || ""} ${c.importance || ""}`,
+      })),
+
+      ...plannedWorks.map((w) => ({
+        category: "🏗️ 計画工事",
+        page: "work",
+        title: w.title || "計画工事",
+        date: w.date || "-",
+        text: `${w.equipment || ""} ${w.purpose || ""} ${w.detail || ""} ${w.owner || ""} ${w.status || ""} ${w.note || ""}`,
+      })),
+    ];
+
+    return allItems
+      .map((item) => {
+        const allText = `${item.category} ${item.title} ${item.date} ${item.text}`.toLowerCase();
+        const score = keywords.filter((k) => allText.includes(k)).length;
+        return { ...item, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score);
+  }, [globalSearch, reports, maintenanceRows, spareRows, calendarEvents, plannedWorks]);
 
   const aiResults = useMemo(() => {
     const keyword = aiSearch.toLowerCase().trim();
@@ -318,36 +491,53 @@ export default function App() {
 
     const keywords = keyword.split(/\s+/);
 
-    const reportResults = reports.map((r) => ({
-      type: "保全作業報告書",
-      title: r.equipment || "設備名なし",
-      date: r.createdAt || "-",
-      text: `${r.lineName || ""} ${r.phenomenon || ""} ${r.troublePoint || ""} ${r.why1 || ""} ${r.why2 || ""} ${r.why3 || ""} ${r.action || ""} ${r.note || ""}`,
-    }));
+    const allItems = [
+      ...reports.map((r) => ({
+        category: "📝 保全報告書",
+        page: "report",
+        title: r.equipment || "設備名なし",
+        date: r.createdAt || "-",
+        text: `${r.lineName || ""} ${r.phenomenon || ""} ${r.troublePoint || ""} ${r.why1 || ""} ${r.why2 || ""} ${r.why3 || ""} ${r.action || ""} ${r.note || ""}`,
+      })),
+      ...maintenanceRows.map((p) => ({
+        category: "🔧 定期保全",
+        page: "maintenance",
+        title: p.equipment || "設備名なし",
+        date: p.nextDate || "-",
+        text: `${p.partName || ""} ${p.partNo || ""} ${p.status || ""} ${p.note || ""}`,
+      })),
+      ...spareRows.map((p) => ({
+        category: "📦 予備品管理",
+        page: "spare",
+        title: p.partName || "部品名なし",
+        date: p.leadTime || "-",
+        text: `${p.equipment || ""} ${p.partNo || ""} ${p.supplier || ""} ${p.location || ""} ${p.stockStatus || ""}`,
+      })),
+      ...calendarEvents.map((c) => ({
+        category: "📅 カレンダー",
+        page: "calendar",
+        title: c.title || "予定",
+        date: c.date || "-",
+        text: `${c.category || ""} ${c.detail || ""} ${c.owner || ""}`,
+      })),
+      ...plannedWorks.map((w) => ({
+        category: "🏗️ 計画工事",
+        page: "work",
+        title: w.title || "計画工事",
+        date: w.date || "-",
+        text: `${w.equipment || ""} ${w.purpose || ""} ${w.detail || ""} ${w.status || ""} ${w.note || ""}`,
+      })),
+    ];
 
-    const factoryResults = factoryLogs.map((r) => ({
-      type: "工場記録",
-      title: r.machine || "設備名なし",
-      date: r.date || "-",
-      text: `${r.sector || ""} ${r.problem || ""} ${r.cause || ""} ${r.action || ""} ${r.note || ""}`,
-    }));
-
-    const inspectionResults = inspections.map((r) => ({
-      type: "設備点検",
-      title: r.equipment || "設備名なし",
-      date: r.date || "-",
-      text: `${r.inspectionType || ""} ${r.checkItem || ""} ${r.abnormalDetail || ""} ${r.action || ""}`,
-    }));
-
-    return [...reportResults, ...factoryResults, ...inspectionResults]
+    return allItems
       .map((item) => {
-        const allText = `${item.title} ${item.text}`.toLowerCase();
+        const allText = `${item.category} ${item.title} ${item.date} ${item.text}`.toLowerCase();
         const score = keywords.filter((k) => allText.includes(k)).length;
         return { ...item, score };
       })
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score);
-  }, [aiSearch, reports, factoryLogs, inspections]);
+  }, [aiSearch, reports, maintenanceRows, spareRows, calendarEvents, plannedWorks]);
 
   function makeAiAnswer() {
     if (!aiSearch.trim()) {
@@ -357,9 +547,9 @@ export default function App() {
     }
 
     if (aiResults.length === 0) {
-      setAiLevel("🟢 軽微");
+      setAiLevel("🟢 履歴なし");
       setAiAnswer(
-        "過去の履歴から似ている内容は見つかりませんでした。\n\n新しいトラブルの可能性があります。設備名・現象・原因・処置内容を保全作業報告書に登録してください。"
+        "関連する履歴は見つかりませんでした。\n\n新しいトラブルまたは新しい部品の可能性があります。保全報告書、定期保全、予備品管理に情報を登録してください。"
       );
       return;
     }
@@ -367,24 +557,24 @@ export default function App() {
     const best = aiResults[0];
     const text = `${aiSearch} ${best.title} ${best.text}`;
     const highWords = ["停止", "ライン停止", "サーボ", "モーター", "安全", "異常停止", "漏れ", "火花", "焼損", "破損", "緊急"];
-    const middleWords = ["異常", "交換", "確認", "不具合", "センサー", "ロードセル", "エラー", "調整"];
+    const middleWords = ["異常", "交換", "確認", "不具合", "センサー", "ロードセル", "エラー", "調整", "在庫不足"];
     const highHit = highWords.some((word) => text.includes(word));
     const middleHit = middleWords.some((word) => text.includes(word));
 
     let level = "🟢 軽微";
-    let reason = "・重大な停止や安全に関わるキーワードは少ないです。";
+    let reason = "重大な停止や安全に関わるキーワードは少ないです。";
 
-    if (highHit || aiResults.length >= 3) {
-      level = "🔴 緊急";
-      reason = "・停止、安全、重要設備、または複数の類似履歴が見つかりました。";
+    if (highHit || aiResults.length >= 4) {
+      level = "🔴 緊急確認";
+      reason = "停止、安全、重要設備、または複数の関連履歴が見つかりました。";
     } else if (middleHit || aiResults.length >= 1) {
       level = "🟡 注意";
-      reason = "・異常、交換、確認、センサー系など注意が必要な内容が含まれています。";
+      reason = "異常、交換、確認、センサー系、在庫不足など注意が必要な内容が含まれています。";
     }
 
     setAiLevel(level);
     setAiAnswer(
-      `【AI分析結果】\n\n危険度：${level}\n\n理由：\n${reason}\n\n似ている過去履歴が見つかりました。\n\n種類：${best.type}\n日付：${best.date}\n設備：${best.title}\n\n過去内容：\n${best.text}\n\n確認ポイント：\n・同じ設備、同じ部品、同じ異常内容がないか確認してください。\n・前回の原因と処置内容を参考にしてください。\n・再発している場合は、再発防止内容の見直しが必要です。\n・危険度が高い場合は、すぐに上司・保全担当へ連絡してください。`
+      `【Maintenance AI 分析結果】\n\n危険度：${level}\n\n理由：\n・${reason}\n\n関連データ：${aiResults.length}件\n\n一番近い履歴：\n種類：${best.category}\n日付：${best.date}\nタイトル：${best.title}\n\n内容：\n${best.text}\n\n確認ポイント：\n・同じ設備、同じ部品、同じ異常内容がないか確認してください。\n・過去の原因と処置内容を参考にしてください。\n・再発している場合は、再発防止内容の見直しが必要です。\n・在庫不足が関係する場合は、予備品管理を確認してください。`
     );
   }
 
@@ -395,44 +585,35 @@ export default function App() {
       return;
     }
 
-    const text = input;
-    const similar = aiResults[0];
-    const words = text.split(/\s+/);
+    const words = input.split(/\s+/);
     const equipment = words[0] || "";
 
-    let phenomenon = `${text} の不具合が発生。`;
+    let phenomenon = `${input} の不具合が発生。`;
     let why1 = "設備または部品に異常が発生したため。";
     let why2 = "原因箇所の確認が必要なため。";
     let why3 = "再発防止のため、発生条件と処置内容の記録が必要なため。";
     let action = "現象確認、原因調査、関係部品の確認を実施。必要に応じて調整・交換・清掃を行う。";
     let recurrencePrevention = "同様の異常が再発しないよう、点検項目追加と発生条件の記録を行う。";
-    let note = "AI自動作成のため、内容を確認して必要に応じて修正してください。";
+    let note = "Maintenance AI 自動作成のため、内容を確認して必要に応じて修正してください。";
 
-    if (text.includes("ロードセル")) {
+    if (input.includes("ロードセル")) {
       phenomenon = "ロードセルの異常が発生し、荷重値の確認が必要な状態。";
       why1 = "ロードセル信号または荷重値に異常が発生したため。";
       why2 = "配線、コネクタ、取付状態、またはロードセル本体の不具合が考えられるため。";
       why3 = "経年劣化、過負荷、振動、接触不良により検出値が不安定になった可能性があるため。";
       action = "ロードセルの表示値確認、配線・コネクタ確認、取付状態確認を実施。必要に応じてロードセル交換または再調整を行う。";
-      recurrencePrevention = "定期点検時にロードセル値の確認、配線固定状態の確認、異常傾向の記録を行う。";
-    } else if (text.includes("センサー")) {
+      recurrencePrevention = "定期保全時にロードセル値の確認、配線固定状態の確認、異常傾向の記録を行う。";
+    } else if (input.includes("センサー")) {
       phenomenon = "センサー異常により設備動作が不安定、または検出不良が発生。";
       why1 = "センサー信号が正常に入っていないため。";
       why2 = "センサー位置ズレ、汚れ、断線、コネクタ接触不良が考えられるため。";
       why3 = "振動や経年劣化により検出状態が悪化した可能性があるため。";
       action = "センサー清掃、位置調整、配線確認、I/O確認を実施。必要に応じてセンサー交換を行う。";
-      recurrencePrevention = "点検項目にセンサー清掃・位置確認を追加し、固定状態を定期確認する。";
-    } else if (text.includes("モーター") || text.includes("サーボ")) {
-      phenomenon = "モーターまたはサーボ系の異常により設備停止または動作不良が発生。";
-      why1 = "駆動系に異常信号または過負荷が発生したため。";
-      why2 = "モーター、アンプ、配線、機械負荷、原点位置に問題がある可能性があるため。";
-      why3 = "負荷増加、劣化、接触不良、設定値ズレにより異常が発生した可能性があるため。";
-      action = "アラーム内容確認、電源再投入、配線確認、負荷確認、原点確認を実施。必要に応じてメーカーへ確認する。";
-      recurrencePrevention = "アラーム履歴を記録し、負荷状態・配線状態・冷却状態を定期確認する。";
+      recurrencePrevention = "定期保全にセンサー清掃・位置確認を追加し、固定状態を定期確認する。";
     }
 
-    if (similar) {
-      note += `\n\n類似履歴あり：${similar.type} / ${similar.date} / ${similar.title}`;
+    if (aiResults[0]) {
+      note += `\n\n関連履歴あり：${aiResults[0].category} / ${aiResults[0].date} / ${aiResults[0].title}`;
     }
 
     await addDoc(collection(db, "maintenanceReports"), {
@@ -445,442 +626,705 @@ export default function App() {
       why2,
       why3,
       action,
-      recurrenceCategory: "再発防止",
       recurrencePrevention,
       outflowPrevention: "同様の異常が他設備で発生していないか確認する。",
       note,
     });
-
-    const emergencyWords = ["緊急", "異常停止", "ライン停止", "破損", "停止", "焼損"];
-    const checkText = `${input} ${phenomenon} ${action} ${note}`;
-    const isEmergency = emergencyWords.some((word) => checkText.includes(word));
-
-    if (isEmergency) {
-      try {
-        await fetch("/api/emergency-alert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            equipment,
-            phenomenon,
-            action,
-            level: "🔴 緊急",
-            createdAt: new Date().toISOString().slice(0, 10),
-          }),
-        });
-      } catch (err) {
-        console.error("Emergency email error:", err);
-      }
-    }
 
     setAutoReportInput("");
     await loadReports();
     setPage("report");
   }
 
-  const overCount = rows.filter((r) => r.status === "交換超過").length;
-  const nearCount = rows.filter((r) => r.status === "交換間近").length;
-  const normalCount = rows.filter((r) => r.status === "正常").length;
-  const ngCount = inspections.filter((r) => r.result === "NG").length;
+  function renderGlobalSearchBox() {
+    return (
+      <div className="tableWrap" style={{ marginBottom: "18px" }}>
+        <h2>🔍 AI統合検索</h2>
+        <p>保全報告書・定期保全・予備品管理・カレンダー・計画工事をまとめて検索できます。</p>
 
-  const equipmentRanking = useMemo(() => {
-    const countMap = {};
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <input
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            placeholder="例：ロードセル、78-60、センサー、異常停止、在庫不足"
+          />
+          <button
+            className="primaryButton"
+            onClick={() => {
+              setAiSearch(globalSearch);
+              setPage("ai");
+            }}
+          >
+            <Search size={16} /> AI分析
+          </button>
+        </div>
 
-    reports.forEach((report) => {
-      const name = report.equipment || "設備名なし";
-      countMap[name] = (countMap[name] || 0) + 1;
-    });
+        {globalSearch && (
+          <div style={{ marginTop: "16px" }}>
+            <h3>検索結果：{globalResults.length}件</h3>
+            {globalResults.length === 0 && <p>関連データが見つかりません。</p>}
+            {globalResults.slice(0, 8).map((item, index) => (
+              <div
+                key={index}
+                className="calendarEditCard"
+                style={{ cursor: "pointer" }}
+                onClick={() => setPage(item.page)}
+              >
+                <b>{item.category} / {item.date}</b>
+                <h3>{item.title}</h3>
+                <p>{item.text || "-"}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
-    factoryLogs.forEach((log) => {
-      const name = log.machine || "設備名なし";
-      countMap[name] = (countMap[name] || 0) + 1;
-    });
+  function Section({ sectionKey, title, children }) {
+    const open = openSections[sectionKey];
+    return (
+      <div className="calendarEditCard" style={{ marginTop: "14px" }}>
+        <div
+          onClick={() => toggleSection(sectionKey)}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+          }}
+        >
+          <h3>{title}</h3>
+          <strong>{open ? "▲" : "▼"}</strong>
+        </div>
+        {open && <div style={{ marginTop: "10px" }}>{children}</div>}
+      </div>
+    );
+  }
 
-    return Object.entries(countMap)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-  }, [reports, factoryLogs]);
+  function ReportDraftForm() {
+    if (!newReport) return null;
 
-  const seriousReports = reports.filter((r) => {
-    const text = `${r.phenomenon || ""} ${r.action || ""} ${r.note || ""}`;
-    return text.includes("停止") || text.includes("緊急") || text.includes("異常停止") || text.includes("破損");
-  }).length;
+    return (
+      <div className="tableWrap" style={{ border: "2px solid #2563eb" }}>
+        <div className="header">
+          <div>
+            <h2>📝 新規 保全報告書</h2>
+            <p>保存するまではFirebaseに登録されません。</p>
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button className="primaryButton" onClick={saveNewReport}>
+              <Save size={16} /> 保存
+            </button>
+            <button className="deleteButton" onClick={cancelNewReport}>
+              <X size={16} /> キャンセル
+            </button>
+          </div>
+        </div>
 
-  const monthlyTroubleRanking = useMemo(() => {
-    const countMap = {};
+        <Section sectionKey="basic" title="📌 基本情報">
+          <div className="reportGrid">
+            <label>作成日<input type="date" value={newReport.createdAt || ""} onChange={(e) => setNewReport({ ...newReport, createdAt: e.target.value })} /></label>
+            <label>保全分類<input value={newReport.maintenanceType || ""} onChange={(e) => setNewReport({ ...newReport, maintenanceType: e.target.value })} /></label>
+            <label>グループ名<input value={newReport.groupName || ""} onChange={(e) => setNewReport({ ...newReport, groupName: e.target.value })} /></label>
+            <label>ライン名<input value={newReport.lineName || ""} onChange={(e) => setNewReport({ ...newReport, lineName: e.target.value })} /></label>
+            <label>設備名<input value={newReport.equipment || ""} onChange={(e) => setNewReport({ ...newReport, equipment: e.target.value })} /></label>
+            <label>担当者<input value={newReport.worker || ""} onChange={(e) => setNewReport({ ...newReport, worker: e.target.value })} /></label>
+          </div>
+        </Section>
 
-    reports.forEach((report) => {
-      const month = (report.createdAt || "日付なし").slice(0, 7);
-      countMap[month] = (countMap[month] || 0) + 1;
-    });
+        <Section sectionKey="trouble" title="📝 異常内容・処置">
+          <h3>不具合現象</h3>
+          <textarea value={newReport.phenomenon || ""} onChange={(e) => setNewReport({ ...newReport, phenomenon: e.target.value })} />
+          <h3>不具合箇所</h3>
+          <textarea value={newReport.troublePoint || ""} onChange={(e) => setNewReport({ ...newReport, troublePoint: e.target.value })} />
+          <h3>処置内容</h3>
+          <textarea value={newReport.action || ""} onChange={(e) => setNewReport({ ...newReport, action: e.target.value })} />
+        </Section>
 
-    factoryLogs.forEach((log) => {
-      const month = (log.date || "日付なし").slice(0, 7);
-      countMap[month] = (countMap[month] || 0) + 1;
-    });
+        <Section sectionKey="why" title="🔍 なぜなぜ分析">
+          <label>なぜ1<textarea value={newReport.why1 || ""} onChange={(e) => setNewReport({ ...newReport, why1: e.target.value })} /></label>
+          <label>なぜ2<textarea value={newReport.why2 || ""} onChange={(e) => setNewReport({ ...newReport, why2: e.target.value })} /></label>
+          <label>なぜ3<textarea value={newReport.why3 || ""} onChange={(e) => setNewReport({ ...newReport, why3: e.target.value })} /></label>
+          <h3>再発防止</h3>
+          <textarea value={newReport.recurrencePrevention || ""} onChange={(e) => setNewReport({ ...newReport, recurrencePrevention: e.target.value })} />
+          <h3>流出防止</h3>
+          <textarea value={newReport.outflowPrevention || ""} onChange={(e) => setNewReport({ ...newReport, outflowPrevention: e.target.value })} />
+        </Section>
 
-    return Object.entries(countMap)
-      .map(([month, count]) => ({ month, count }))
-      .sort((a, b) => a.month.localeCompare(b.month))
-      .slice(-6);
-  }, [reports, factoryLogs]);
+        <Section sectionKey="cost" title="💰 費用・交換部品">
+          <div className="reportGrid">
+            <label>交換部品<input value={newReport.replacedPart || ""} onChange={(e) => setNewReport({ ...newReport, replacedPart: e.target.value })} /></label>
+            <label>在庫数<input value={newReport.stockQty || ""} onChange={(e) => setNewReport({ ...newReport, stockQty: e.target.value })} /></label>
+            <label>労務費<input value={newReport.laborCost || ""} onChange={(e) => setNewReport({ ...newReport, laborCost: e.target.value })} /></label>
+            <label>部品費<input value={newReport.partsCost || ""} onChange={(e) => setNewReport({ ...newReport, partsCost: e.target.value })} /></label>
+            <label>合計<input value={newReport.totalCost || ""} onChange={(e) => setNewReport({ ...newReport, totalCost: e.target.value })} /></label>
+          </div>
+        </Section>
 
-  const maxEquipmentCount = Math.max(...equipmentRanking.map((item) => item.count), 1);
-  const maxMonthlyCount = Math.max(...monthlyTroubleRanking.map((item) => item.count), 1);
+        <Section sectionKey="other" title="⚙️ その他">
+          <h3>写真</h3>
+          <input type="file" accept="image/*" onChange={(e) => handleDraftImageUpload(e, setNewReport)} />
+          {newReport.image && <img src={newReport.image} alt="" className="calendarPhoto" />}
+          <h3>備考</h3>
+          <textarea value={newReport.note || ""} onChange={(e) => setNewReport({ ...newReport, note: e.target.value })} />
+        </Section>
 
-  const stockRows = useMemo(() => {
-    return rows.map((part) => {
-      const stockQty = Number(part.stockQty || 0);
-      const minStock = Number(part.minStock || 1);
-      let stockStatus = "🟢 在庫OK";
+        <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
+          <button className="primaryButton" onClick={saveNewReport}>
+            <Save size={16} /> 保存
+          </button>
+          <button className="deleteButton" onClick={cancelNewReport}>
+            <X size={16} /> キャンセル
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-      if (stockQty <= 0) {
-        stockStatus = "🔴 在庫不足";
-      } else if (stockQty <= minStock) {
-        stockStatus = "🟡 在庫注意";
-      }
+  function renderHome() {
+    return (
+      <>
+        <div className="tableWrap" style={{ textAlign: "center", padding: "42px 24px" }}>
+          <div style={{ fontSize: "54px" }}>⚙️</div>
+          <h1 style={{ fontSize: "42px", margin: "10px 0" }}>Maintenance AI</h1>
+          <h2>AI保全管理システム</h2>
+          <p>設備保全を、もっとスマートに。</p>
 
-      return { ...part, stockQty, minStock, stockStatus };
-    });
-  }, [rows]);
+          <div style={{ maxWidth: "760px", margin: "24px auto 0" }}>
+            <input
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              placeholder="設備・部品・トラブル内容を検索してください"
+              style={{ textAlign: "center", fontSize: "18px", minHeight: "52px" }}
+            />
+          </div>
 
-  const lowStockCount = stockRows.filter((item) => item.stockStatus.includes("不足")).length;
-  const cautionStockCount = stockRows.filter((item) => item.stockStatus.includes("注意")).length;
+          <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
+            <button
+              className="primaryButton"
+              onClick={() => {
+                setAiSearch(globalSearch);
+                setPage("ai");
+              }}
+            >
+              <Search size={16} /> AI検索へ
+            </button>
+            <button className="primaryButton" onClick={() => setPage("report")}>
+              システムへ入る
+            </button>
+          </div>
+        </div>
 
-  const orderNeededParts = useMemo(() => {
-    return stockRows
-      .filter((item) => item.stockStatus.includes("不足") || item.stockStatus.includes("注意"))
-      .map((item) => {
-        const recommendedQty = Math.max(Number(item.minStock || 1) * 2 - Number(item.stockQty || 0), 1);
-        const priority = item.stockStatus.includes("不足") ? "🔴 緊急発注" : "🟡 早めに発注";
-        return { ...item, recommendedQty, priority };
-      });
-  }, [stockRows]);
+        {globalSearch && renderGlobalSearchBox()}
 
-  function printOrderPdf() {
-    const todayText = new Date().toISOString().slice(0, 10);
-    const rowsHtml = orderNeededParts
-      .map(
-        (item) => `
-          <tr>
-            <td>${item.priority}</td>
-            <td>${item.equipment || "-"}</td>
-            <td>${item.partName || "-"}</td>
-            <td>${item.partNo || "-"}</td>
-            <td>${item.supplier || "-"}</td>
-            <td>${item.stockQty}</td>
-            <td>${item.minStock}</td>
-            <td>${item.recommendedQty}</td>
-            <td>${item.stockStatus.includes("不足") ? "在庫がありません。すぐに発注が必要です。" : "最低在庫に近いです。早めに発注してください。"}</td>
-          </tr>
-        `
-      )
-      .join("");
+        <div className="cards">
+          <div className="card red"><span>交換超過</span><strong>{overCount}</strong></div>
+          <div className="card yellow"><span>交換間近</span><strong>{nearCount}</strong></div>
+          <div className="card red"><span>在庫不足</span><strong>{lowStockCount}</strong></div>
+          <div className="card"><span>今月報告書</span><strong>{monthReportCount}</strong></div>
+        </div>
 
-    const printWindow = window.open("", "_blank");
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>発注リストPDF</title>
-          <style>
-            body { font-family: Arial, "Yu Gothic", "Meiryo", sans-serif; padding: 30px; color: #111827; }
-            h1 { text-align: center; margin-bottom: 10px; }
-            .date { text-align: right; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th { background: #eaf2ff; color: #003b8f; }
-            th, td { border: 1px solid #999; padding: 8px; text-align: left; }
-            .sign { margin-top: 40px; display: flex; justify-content: flex-end; gap: 30px; }
-            .box { border: 1px solid #333; width: 120px; height: 60px; text-align: center; padding-top: 8px; }
-            @media print { button { display: none; } }
-          </style>
-        </head>
-        <body>
-          <h1>発注必要部品リスト</h1>
-          <div class="date">作成日：${todayText}</div>
+        <div className="cards" style={{ marginTop: "20px" }}>
+          <div className="card" onClick={() => setPage("ai")} style={{ cursor: "pointer" }}><span>🔍 AI検索</span><strong>検索</strong></div>
+          <div className="card" onClick={() => setPage("report")} style={{ cursor: "pointer" }}><span>📝 保全報告書</span><strong>{reports.length}</strong></div>
+          <div className="card" onClick={() => setPage("maintenance")} style={{ cursor: "pointer" }}><span>🔧 定期保全</span><strong>{maintenanceRows.length}</strong></div>
+          <div className="card" onClick={() => setPage("spare")} style={{ cursor: "pointer" }}><span>📦 予備品管理</span><strong>{spareRows.length}</strong></div>
+          <div className="card" onClick={() => setPage("calendar")} style={{ cursor: "pointer" }}><span>📅 カレンダー</span><strong>{calendarEvents.length}</strong></div>
+          <div className="card" onClick={() => setPage("work")} style={{ cursor: "pointer" }}><span>🏗️ 計画工事</span><strong>{plannedWorks.length}</strong></div>
+        </div>
+      </>
+    );
+  }
+
+  function renderMaintenance() {
+    return (
+      <>
+        <div className="header">
+          <div>
+            <h2>🔧 定期保全</h2>
+            <p>交換周期、前回交換日、次回交換日、残日数を管理します。</p>
+          </div>
+          <button className="primaryButton" onClick={addPart}><Plus size={16} /> 部品追加</button>
+        </div>
+
+        <div className="tableWrap">
           <table>
             <thead>
               <tr>
-                <th>優先度</th><th>設備名</th><th>部品名</th><th>部品番号</th><th>購入先</th><th>現在在庫</th><th>最低在庫</th><th>推奨発注数</th><th>AIコメント</th>
+                <th>設備名</th><th>部品名</th><th>部品番号</th><th>交換周期（日）</th><th>前回交換日</th><th>次回交換日</th><th>残日数</th><th>状態</th><th>担当者</th><th>備考</th><th></th>
               </tr>
             </thead>
-            <tbody>${rowsHtml || `<tr><td colspan="9">現在、発注が必要な部品はありません。</td></tr>`}</tbody>
+            <tbody>
+              {maintenanceRows.map((row) => (
+                <tr key={row.id}>
+                  <td><input value={row.equipment || ""} onChange={(e) => updateField("parts", row.id, "equipment", e.target.value)} /></td>
+                  <td><input value={row.partName || ""} onChange={(e) => updateField("parts", row.id, "partName", e.target.value)} /></td>
+                  <td><input value={row.partNo || ""} onChange={(e) => updateField("parts", row.id, "partNo", e.target.value)} /></td>
+                  <td><input type="number" value={row.cycle || ""} onChange={(e) => updateField("parts", row.id, "cycle", Number(e.target.value))} /></td>
+                  <td><input type="date" value={row.lastDate || ""} onChange={(e) => updateField("parts", row.id, "lastDate", e.target.value)} /></td>
+                  <td>{row.nextDate || "-"}</td>
+                  <td>{row.daysLeft === "" ? "-" : row.daysLeft}</td>
+                  <td><span className={`status ${row.status}`}>{row.status}</span></td>
+                  <td><input value={row.owner || ""} onChange={(e) => updateField("parts", row.id, "owner", e.target.value)} /></td>
+                  <td><input value={row.note || ""} onChange={(e) => updateField("parts", row.id, "note", e.target.value)} /></td>
+                  <td><button className="deleteButton" onClick={() => removeItem("parts", row.id)}><Trash2 size={16} /></button></td>
+                </tr>
+              ))}
+            </tbody>
           </table>
-          <div class="sign"><div class="box">作成</div><div class="box">確認</div><div class="box">承認</div></div>
-          <script>window.onload = function() { window.print(); };</script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+        </div>
+      </>
+    );
   }
 
-  async function sendOrderMail() {
-    try {
-      const response = await fetch("/api/order-mail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parts: orderNeededParts }),
-      });
+  function renderSpareParts() {
+    return (
+      <>
+        <div className="header">
+          <div>
+            <h2>📦 予備品管理</h2>
+            <p>予備品の在庫数、購入先、保管場所、納期を管理します。</p>
+          </div>
+          <button className="primaryButton" onClick={addPart}><Plus size={16} /> 予備品追加</button>
+        </div>
 
-      const data = await response.json();
-
-      if (data.ok) {
-        alert("発注リストをメール送信しました。");
-      } else {
-        alert("メール送信エラー");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("メール送信失敗");
-    }
+        <div className="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>設備名</th><th>部品名</th><th>部品番号</th><th>購入先</th><th>価格</th><th>保管場所</th><th>納期</th><th>現在在庫</th><th>最低在庫</th><th>状態</th><th>写真</th><th>メモ</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {spareRows.map((row) => (
+                <tr key={row.id}>
+                  <td><input value={row.equipment || ""} onChange={(e) => updateField("parts", row.id, "equipment", e.target.value)} /></td>
+                  <td><input value={row.partName || ""} onChange={(e) => updateField("parts", row.id, "partName", e.target.value)} /></td>
+                  <td><input value={row.partNo || ""} onChange={(e) => updateField("parts", row.id, "partNo", e.target.value)} /></td>
+                  <td><input value={row.supplier || ""} onChange={(e) => updateField("parts", row.id, "supplier", e.target.value)} /></td>
+                  <td><input value={row.price || ""} onChange={(e) => updateField("parts", row.id, "price", e.target.value)} /></td>
+                  <td><input value={row.location || ""} onChange={(e) => updateField("parts", row.id, "location", e.target.value)} /></td>
+                  <td><input value={row.leadTime || ""} onChange={(e) => updateField("parts", row.id, "leadTime", e.target.value)} /></td>
+                  <td><input type="number" value={row.stockQty || 0} onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)} /></td>
+                  <td><input type="number" value={row.minStock || 1} onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)} /></td>
+                  <td><span className={`stockStatus ${row.stockStatus.includes("不足") ? "stockBad" : row.stockStatus.includes("注意") ? "stockWarn" : "stockOk"}`}>{row.stockStatus}</span></td>
+                  <td>
+                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "parts", row.id)} />
+                    {row.image && <img src={row.image} alt="" className="calendarPhoto" />}
+                  </td>
+                  <td><input value={row.stockNote || ""} onChange={(e) => updateField("parts", row.id, "stockNote", e.target.value)} /></td>
+                  <td><button className="deleteButton" onClick={() => removeItem("parts", row.id)}><Trash2 size={16} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
   }
+
+  function renderCalendarModal() {
+    if (!newCalendarEvent) return null;
+
+    return (
+      <div className="modalBackdrop">
+        <div className="modalCard">
+          <div className="header">
+            <div>
+              <h2>📅 新しい予定</h2>
+              <p>{newCalendarEvent.date} の予定を登録します。</p>
+            </div>
+            <button className="deleteButton" onClick={cancelNewCalendarEvent}><X size={16} /> 閉じる</button>
+          </div>
+
+          <div className="reportGrid">
+            <label>日付<input type="date" value={newCalendarEvent.date || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, date: e.target.value })} /></label>
+            <label>時間<input type="time" value={newCalendarEvent.time || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, time: e.target.value })} /></label>
+            <label>区分
+              <select value={newCalendarEvent.category || "定期保全"} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, category: e.target.value })}>
+                <option value="定期保全">定期保全</option>
+                <option value="計画工事">計画工事</option>
+                <option value="会議">会議</option>
+                <option value="緊急">緊急</option>
+              </select>
+            </label>
+            <label>重要度
+              <select value={newCalendarEvent.importance || "通常"} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, importance: e.target.value })}>
+                <option value="通常">通常</option>
+                <option value="重要">重要</option>
+              </select>
+            </label>
+            <label>タイトル<input value={newCalendarEvent.title || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, title: e.target.value })} /></label>
+            <label>担当者<input value={newCalendarEvent.owner || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, owner: e.target.value })} /></label>
+          </div>
+
+          <h3>内容</h3>
+          <textarea value={newCalendarEvent.detail || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, detail: e.target.value })} />
+
+          <h3>写真</h3>
+          <input type="file" accept="image/*" onChange={(e) => handleDraftImageUpload(e, setNewCalendarEvent)} />
+          {newCalendarEvent.image && <img src={newCalendarEvent.image} alt="" className="calendarPhoto" />}
+
+          <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
+            <button className="primaryButton" onClick={saveNewCalendarEvent}><Save size={16} /> 保存</button>
+            <button className="deleteButton" onClick={cancelNewCalendarEvent}><X size={16} /> キャンセル</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderCalendar() {
+    return (
+      <>
+        <div className="header">
+          <div>
+            <h2>📅 カレンダー</h2>
+            <p>日付をクリックすると、予定登録画面が開きます。</p>
+          </div>
+          <button className="primaryButton" onClick={() => startNewCalendarEvent(selectedDate)}>
+            <Plus size={16} /> 新しい予定
+          </button>
+        </div>
+
+        <div className="tableWrap">
+          <div className="calendarTop">
+            <button onClick={() => changeMonth(-1)}>＜</button>
+            <h2>{calendarMonth.getFullYear()}年 {calendarMonth.getMonth() + 1}月</h2>
+            <button onClick={() => changeMonth(1)}>＞</button>
+            <button onClick={() => {
+              const now = todayText();
+              setCalendarMonth(new Date());
+              setSelectedDate(now);
+            }}>今日に戻る</button>
+          </div>
+
+          <div className="calendarWeek">
+            <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+          </div>
+
+          <div className="calendarGrid">
+            {getCalendarDays().map((date, index) => {
+              const dayEvents = calendarEvents.filter((event) => event.date === date);
+              return (
+                <div
+                  key={index}
+                  className={`calendarDay ${date === selectedDate ? "selectedDay" : ""}`}
+                  onClick={() => {
+                    if (!date) return;
+                    setSelectedDate(date);
+                    startNewCalendarEvent(date);
+                  }}
+                >
+                  {date && (
+                    <>
+                      <strong>{Number(date.slice(8, 10))}</strong>
+                      {dayEvents.length > 0 && <span className="eventCount">{dayEvents.length}件</span>}
+                      <div className="calendarEventList">
+                        {dayEvents.slice(0, 4).map((event) => (
+                          <span key={event.id} className={`calendarEventTag ${event.importance === "重要" ? "importantTag" : ""}`}>
+                            {event.category === "計画工事" ? "🏗️ " : event.category === "緊急" ? "🔴 " : ""}
+                            {event.time ? `${event.time} ` : ""}{event.title || "予定"}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="selectedEvents">
+            <h3>{selectedDate} の予定一覧</h3>
+            {calendarEvents.filter((event) => event.date === selectedDate).length === 0 && <p>予定はありません。</p>}
+            {calendarEvents
+              .filter((event) => event.date === selectedDate)
+              .map((event) => (
+                <div key={event.id} className="eventRow">
+                  <b>{event.importance === "重要" ? "【重要】" : ""}{event.time ? `${event.time} ` : ""}{event.title || "予定"}</b>
+                  <span>区分: {event.category || "-"}</span>
+                  <span>担当: {event.owner || "-"}</span>
+                  <span>{event.detail || "-"}</span>
+                  <button className="deleteButton" onClick={() => removeItem("calendar", event.id)}><Trash2 size={16} /> 削除</button>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {renderCalendarModal()}
+      </>
+    );
+  }
+
+  function renderReports() {
+    return (
+      <>
+        <div className="header">
+          <div>
+            <h2>📝 保全報告書</h2>
+            <p>新規作成後、保存するとFirebaseに登録され、AI検索に反映されます。</p>
+          </div>
+          <button className="primaryButton" onClick={startNewReport}><Plus size={16} /> 新規作成</button>
+        </div>
+
+        <ReportDraftForm />
+
+        <div className="tableWrap">
+          <input
+            value={reportSearch}
+            onChange={(e) => setReportSearch(e.target.value)}
+            placeholder="検索：設備名・ライン名・不具合現象・原因・処置内容・担当者"
+          />
+        </div>
+
+        {filteredReports.map((row) => (
+          <div className="tableWrap" key={row.id} style={{ marginTop: "20px" }}>
+            <div className="header">
+              <div>
+                <h3>報告書：{row.equipment || "設備名未入力"} / {row.createdAt || "-"}</h3>
+                <p>{row.phenomenon || "不具合現象未入力"}</p>
+              </div>
+              <button className="deleteButton" onClick={() => removeItem("maintenanceReports", row.id)}>
+                <Trash2 size={16} /> 削除
+              </button>
+            </div>
+
+            <Section sectionKey="basic" title="📌 基本情報">
+              <div className="reportGrid">
+                <label>作成日<input type="date" value={row.createdAt || ""} onChange={(e) => updateField("maintenanceReports", row.id, "createdAt", e.target.value)} /></label>
+                <label>保全分類<input value={row.maintenanceType || ""} onChange={(e) => updateField("maintenanceReports", row.id, "maintenanceType", e.target.value)} /></label>
+                <label>ライン名<input value={row.lineName || ""} onChange={(e) => updateField("maintenanceReports", row.id, "lineName", e.target.value)} /></label>
+                <label>設備名<input value={row.equipment || ""} onChange={(e) => updateField("maintenanceReports", row.id, "equipment", e.target.value)} /></label>
+                <label>作業者<input value={row.worker || ""} onChange={(e) => updateField("maintenanceReports", row.id, "worker", e.target.value)} /></label>
+              </div>
+            </Section>
+
+            <Section sectionKey="trouble" title="📝 異常内容・処置">
+              <h3>不具合現象</h3>
+              <textarea value={row.phenomenon || ""} onChange={(e) => updateField("maintenanceReports", row.id, "phenomenon", e.target.value)} />
+              <h3>不具合箇所</h3>
+              <textarea value={row.troublePoint || ""} onChange={(e) => updateField("maintenanceReports", row.id, "troublePoint", e.target.value)} />
+              <h3>処置内容</h3>
+              <textarea value={row.action || ""} onChange={(e) => updateField("maintenanceReports", row.id, "action", e.target.value)} />
+            </Section>
+
+            <Section sectionKey="why" title="🔍 なぜなぜ分析">
+              <label>なぜ1<textarea value={row.why1 || ""} onChange={(e) => updateField("maintenanceReports", row.id, "why1", e.target.value)} /></label>
+              <label>なぜ2<textarea value={row.why2 || ""} onChange={(e) => updateField("maintenanceReports", row.id, "why2", e.target.value)} /></label>
+              <label>なぜ3<textarea value={row.why3 || ""} onChange={(e) => updateField("maintenanceReports", row.id, "why3", e.target.value)} /></label>
+              <h3>再発防止</h3>
+              <textarea value={row.recurrencePrevention || ""} onChange={(e) => updateField("maintenanceReports", row.id, "recurrencePrevention", e.target.value)} />
+            </Section>
+
+            <Section sectionKey="cost" title="💰 費用・交換部品">
+              <div className="reportGrid">
+                <label>交換部品<input value={row.replacedPart || ""} onChange={(e) => updateField("maintenanceReports", row.id, "replacedPart", e.target.value)} /></label>
+                <label>労務費<input value={row.laborCost || ""} onChange={(e) => updateField("maintenanceReports", row.id, "laborCost", e.target.value)} /></label>
+                <label>部品費<input value={row.partsCost || ""} onChange={(e) => updateField("maintenanceReports", row.id, "partsCost", e.target.value)} /></label>
+                <label>合計<input value={row.totalCost || ""} onChange={(e) => updateField("maintenanceReports", row.id, "totalCost", e.target.value)} /></label>
+              </div>
+            </Section>
+
+            <Section sectionKey="other" title="⚙️ その他">
+              <h3>写真</h3>
+              <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "maintenanceReports", row.id)} />
+              {row.image && <img src={row.image} alt="" className="calendarPhoto" />}
+              <h3>備考</h3>
+              <textarea value={row.note || ""} onChange={(e) => updateField("maintenanceReports", row.id, "note", e.target.value)} />
+            </Section>
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  function renderPlannedWorks() {
+    return (
+      <>
+        <div className="header">
+          <div>
+            <h2>🏗️ 計画工事</h2>
+            <p>保存すると自動でカレンダーにも登録されます。</p>
+          </div>
+          <button className="primaryButton" onClick={startNewPlannedWork}><Plus size={16} /> 工事追加</button>
+        </div>
+
+        {newPlannedWork && (
+          <div className="tableWrap" style={{ border: "2px solid #2563eb" }}>
+            <div className="header">
+              <h2>🏗️ 新規 計画工事</h2>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button className="primaryButton" onClick={saveNewPlannedWork}><Save size={16} /> 保存</button>
+                <button className="deleteButton" onClick={cancelNewPlannedWork}><X size={16} /> キャンセル</button>
+              </div>
+            </div>
+
+            <div className="reportGrid">
+              <label>開始日<input type="date" value={newPlannedWork.date || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, date: e.target.value })} /></label>
+              <label>完了予定日<input type="date" value={newPlannedWork.endDate || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, endDate: e.target.value })} /></label>
+              <label>工事件名<input value={newPlannedWork.title || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, title: e.target.value })} /></label>
+              <label>設備名<input value={newPlannedWork.equipment || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, equipment: e.target.value })} /></label>
+              <label>目的<input value={newPlannedWork.purpose || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, purpose: e.target.value })} /></label>
+              <label>担当者<input value={newPlannedWork.owner || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, owner: e.target.value })} /></label>
+              <label>状態
+                <select value={newPlannedWork.status || "計画中"} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, status: e.target.value })}>
+                  <option value="計画中">計画中</option>
+                  <option value="準備中">準備中</option>
+                  <option value="実施中">実施中</option>
+                  <option value="完了">完了</option>
+                  <option value="延期">延期</option>
+                </select>
+              </label>
+              <label>進捗<input type="number" value={newPlannedWork.progress || 0} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, progress: e.target.value })} /></label>
+            </div>
+
+            <h3>内容</h3>
+            <textarea value={newPlannedWork.detail || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, detail: e.target.value })} />
+
+            <h3>リスク</h3>
+            <textarea value={newPlannedWork.risk || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, risk: e.target.value })} />
+
+            <h3>備考</h3>
+            <textarea value={newPlannedWork.note || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, note: e.target.value })} />
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "18px" }}>
+              <button className="primaryButton" onClick={saveNewPlannedWork}><Save size={16} /> 保存</button>
+              <button className="deleteButton" onClick={cancelNewPlannedWork}><X size={16} /> キャンセル</button>
+            </div>
+          </div>
+        )}
+
+        <div className="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>開始日</th><th>完了予定日</th><th>工事件名</th><th>設備名</th><th>目的</th><th>内容</th><th>担当者</th><th>進捗</th><th>状態</th><th>リスク</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {plannedWorks.map((row) => (
+                <tr key={row.id}>
+                  <td><input type="date" value={row.date || ""} onChange={(e) => updateField("plannedWorks", row.id, "date", e.target.value)} /></td>
+                  <td><input type="date" value={row.endDate || ""} onChange={(e) => updateField("plannedWorks", row.id, "endDate", e.target.value)} /></td>
+                  <td><input value={row.title || ""} onChange={(e) => updateField("plannedWorks", row.id, "title", e.target.value)} /></td>
+                  <td><input value={row.equipment || ""} onChange={(e) => updateField("plannedWorks", row.id, "equipment", e.target.value)} /></td>
+                  <td><input value={row.purpose || ""} onChange={(e) => updateField("plannedWorks", row.id, "purpose", e.target.value)} /></td>
+                  <td><textarea value={row.detail || ""} onChange={(e) => updateField("plannedWorks", row.id, "detail", e.target.value)} /></td>
+                  <td><input value={row.owner || ""} onChange={(e) => updateField("plannedWorks", row.id, "owner", e.target.value)} /></td>
+                  <td><input type="number" value={row.progress || 0} onChange={(e) => updateField("plannedWorks", row.id, "progress", e.target.value)} /></td>
+                  <td>
+                    <select value={row.status || "計画中"} onChange={(e) => updateField("plannedWorks", row.id, "status", e.target.value)}>
+                      <option value="計画中">計画中</option>
+                      <option value="準備中">準備中</option>
+                      <option value="実施中">実施中</option>
+                      <option value="完了">完了</option>
+                      <option value="延期">延期</option>
+                    </select>
+                  </td>
+                  <td><textarea value={row.risk || ""} onChange={(e) => updateField("plannedWorks", row.id, "risk", e.target.value)} /></td>
+                  <td><button className="deleteButton" onClick={() => removeItem("plannedWorks", row.id)}><Trash2 size={16} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  }
+
+  function renderAiSearch() {
+    return (
+      <div className="tableWrap">
+        <h2>🔍 AI検索</h2>
+        <p>保全報告書・定期保全・予備品管理・カレンダー・計画工事から関連情報をまとめて検索します。</p>
+
+        <input
+          value={aiSearch}
+          onChange={(e) => {
+            setAiSearch(e.target.value);
+            setGlobalSearch(e.target.value);
+          }}
+          placeholder="例：ロードセル 78-60 異常停止 在庫不足"
+          style={{ margin: "16px 0" }}
+        />
+
+        <button className="primaryButton" onClick={makeAiAnswer}><Bot size={16} /> AI分析</button>
+
+        <div className="calendarEditCard" style={{ marginTop: "20px" }}>
+          <h3>AI自動報告書作成</h3>
+          <p>短く入力すると、保全作業報告書を自動で作成します。</p>
+          <textarea value={autoReportInput} onChange={(e) => setAutoReportInput(e.target.value)} placeholder="例：78-60 ロードセル異常 荷重確認 配線確認" />
+          <button className="primaryButton" onClick={createAutoReport}>報告書を自動作成</button>
+        </div>
+
+        {aiLevel && (
+          <div className={`calendarEditCard ${aiLevel.includes("緊急") ? "aiHigh" : aiLevel.includes("注意") ? "aiMiddle" : "aiLow"}`} style={{ marginTop: "20px" }}>
+            <h3>{aiLevel}</h3>
+          </div>
+        )}
+
+        {aiAnswer && <div className="calendarEditCard" style={{ marginTop: "20px", whiteSpace: "pre-line" }}>{aiAnswer}</div>}
+
+        <h3 style={{ marginTop: "24px" }}>関連データ一覧：{aiResults.length}件</h3>
+        {aiResults.length === 0 && aiSearch && <p>該当する履歴が見つかりません。</p>}
+
+        {aiResults.map((item, index) => (
+          <div key={index} className="calendarEditCard" style={{ cursor: "pointer" }} onClick={() => setPage(item.page)}>
+            <b>{item.category} / {item.date}</b>
+            <h3>{item.title}</h3>
+            <p>{item.text || "-"}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function renderCurrentPage() {
+    if (page === "home") return renderHome();
+    if (page === "ai") return renderAiSearch();
+    if (page === "report") return renderReports();
+    if (page === "maintenance") return renderMaintenance();
+    if (page === "spare") return renderSpareParts();
+    if (page === "calendar") return renderCalendar();
+    if (page === "work") return renderPlannedWorks();
+    return renderHome();
+  }
+
+  const menuItems = [
+    { key: "home", label: "ホーム", icon: <Home size={16} /> },
+    { key: "ai", label: "AI検索", icon: <Search size={16} /> },
+    { key: "report", label: "保全報告書", icon: <FileText size={16} /> },
+    { key: "maintenance", label: "定期保全", icon: <Wrench size={16} /> },
+    { key: "spare", label: "予備品管理", icon: <Package size={16} /> },
+    { key: "calendar", label: "カレンダー", icon: <CalendarDays size={16} /> },
+    { key: "work", label: "計画工事", icon: <Hammer size={16} /> },
+  ];
 
   return (
     <div className="page">
       <div className="container">
         <div className="header">
           <div>
-            <div className="badge">設備管理システム</div>
-            <h1>🔧 保全管理サイト</h1>
-            <p>交換期限が近い部品から自動で上に表示されます。</p>
+            <div className="badge">AI保全管理システム</div>
+            <h1>⚙️ Maintenance AI</h1>
+            <p>設備保全を、もっとスマートに。</p>
           </div>
         </div>
 
         <div className="tabs">
-          <button className={page === "maintenance" ? "active" : ""} onClick={() => setPage("maintenance")}>🔧 定期・定量保全</button>
-          <button className={page === "purchase" ? "active" : ""} onClick={() => setPage("purchase")}>📦 部品購入管理</button>
-          <button className={page === "inspection" ? "active" : ""} onClick={() => setPage("inspection")}>✅ 設備点検</button>
-          <button className={page === "calendar" ? "active" : ""} onClick={() => setPage("calendar")}>📅 予定カレンダー</button>
-          <button className={page === "factory" ? "active" : ""} onClick={() => setPage("factory")}>🏭 工場記録</button>
-          <button className={page === "report" ? "active" : ""} onClick={() => setPage("report")}>📝 保全作業報告書</button>
-          <button className={page === "ai" ? "active" : ""} onClick={() => setPage("ai")}>🤖 AI検索</button>
-          <button className={page === "stock" ? "active" : ""} onClick={() => setPage("stock")}>🔩 在庫管理</button>
-          <button className={page === "order" ? "active" : ""} onClick={() => setPage("order")}>🛒 発注管理AI</button>
-          <button className={page === "dashboard" ? "active" : ""} onClick={() => setPage("dashboard")}>📊 ダッシュボード</button>
-          <button className={page === "settings" ? "active" : ""} onClick={() => setPage("settings")}>⚙️ 設定</button>
+          {menuItems.map((item) => (
+            <button key={item.key} className={page === item.key ? "active" : ""} onClick={() => setPage(item.key)}>
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
         </div>
 
-        {page === "maintenance" && (
-          <>
-            <div className="header">
-              <div>
-                <h2>定期・定量保全管理表</h2>
-                <p>交換超過・交換間近の部品が上に表示されます。</p>
-              </div>
-              <button className="primaryButton" onClick={addPart}><Plus size={16} /> 部品追加</button>
-            </div>
-            <div className="tableWrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>設備名</th><th>部品名</th><th>部品番号</th><th>部品値段</th><th>購入先</th><th>予備品ロケーション</th><th>部品納期</th><th>交換周期</th><th>前回交換日</th><th>次回交換日</th><th>残日数</th><th>状態</th><th>担当者</th><th>備考</th><th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id}>
-                      <td><input value={row.equipment || ""} onChange={(e) => updateField("parts", row.id, "equipment", e.target.value)} /></td>
-                      <td><input value={row.partName || ""} onChange={(e) => updateField("parts", row.id, "partName", e.target.value)} /></td>
-                      <td><input value={row.partNo || ""} onChange={(e) => updateField("parts", row.id, "partNo", e.target.value)} /></td>
-                      <td><input value={row.price || ""} onChange={(e) => updateField("parts", row.id, "price", e.target.value)} /></td>
-                      <td><input value={row.supplier || ""} onChange={(e) => updateField("parts", row.id, "supplier", e.target.value)} /></td>
-                      <td><input value={row.location || ""} onChange={(e) => updateField("parts", row.id, "location", e.target.value)} /></td>
-                      <td><input value={row.leadTime || ""} onChange={(e) => updateField("parts", row.id, "leadTime", e.target.value)} /></td>
-                      <td><input type="number" value={row.cycle || ""} onChange={(e) => updateField("parts", row.id, "cycle", Number(e.target.value))} /></td>
-                      <td><input type="date" value={row.lastDate || ""} onChange={(e) => updateField("parts", row.id, "lastDate", e.target.value)} /></td>
-                      <td>{row.nextDate || "-"}</td>
-                      <td>{row.daysLeft === "" ? "-" : row.daysLeft}</td>
-                      <td><span className={`status ${row.status}`}>{row.status}</span></td>
-                      <td><input value={row.owner || ""} onChange={(e) => updateField("parts", row.id, "owner", e.target.value)} /></td>
-                      <td><input value={row.note || ""} onChange={(e) => updateField("parts", row.id, "note", e.target.value)} /></td>
-                      <td><button className="deleteButton" onClick={() => removeItem("parts", row.id)}><Trash2 size={16} /></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
+        {page !== "home" && renderGlobalSearchBox()}
 
-        {page === "purchase" && (
-          <div className="tableWrap">
-            <h2>部品購入管理</h2>
-            <table>
-              <thead><tr><th>部品名</th><th>部品番号</th><th>購入先</th><th>発注状況</th><th>発注日</th><th>入荷予定日</th></tr></thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.partName}</td><td>{row.partNo}</td><td>{row.supplier}</td>
-                    <td><select value={row.purchaseStatus || "未発注"} onChange={(e) => updateField("parts", row.id, "purchaseStatus", e.target.value)}><option value="未発注">未発注</option><option value="見積依頼中">見積依頼中</option><option value="発注済み">発注済み</option><option value="入荷済み">入荷済み</option></select></td>
-                    <td><input type="date" value={row.orderDate || ""} onChange={(e) => updateField("parts", row.id, "orderDate", e.target.value)} /></td>
-                    <td><input type="date" value={row.arrivalDate || ""} onChange={(e) => updateField("parts", row.id, "arrivalDate", e.target.value)} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {page === "inspection" && (
-          <>
-            <div className="header"><h2>設備点検</h2><button className="primaryButton" onClick={addInspection}><Plus size={16} /> 点検追加</button></div>
-            <div className="tableWrap">
-              <table>
-                <thead><tr><th>点検日</th><th>設備名</th><th>点検区分</th><th>点検項目</th><th>結果</th><th>異常内容</th><th>処置内容</th><th></th></tr></thead>
-                <tbody>
-                  {inspections.map((row) => (
-                    <tr key={row.id}>
-                      <td><input type="date" value={row.date || ""} onChange={(e) => updateField("inspections", row.id, "date", e.target.value)} /></td>
-                      <td><input value={row.equipment || ""} onChange={(e) => updateField("inspections", row.id, "equipment", e.target.value)} /></td>
-                      <td><select value={row.inspectionType || "日常点検"} onChange={(e) => updateField("inspections", row.id, "inspectionType", e.target.value)}><option value="日常点検">日常点検</option><option value="週次点検">週次点検</option><option value="月次点検">月次点検</option><option value="異常記録">異常記録</option></select></td>
-                      <td><input value={row.checkItem || ""} onChange={(e) => updateField("inspections", row.id, "checkItem", e.target.value)} /></td>
-                      <td><select value={row.result || "OK"} onChange={(e) => updateField("inspections", row.id, "result", e.target.value)}><option value="OK">OK</option><option value="NG">NG</option></select></td>
-                      <td><textarea value={row.abnormalDetail || ""} onChange={(e) => updateField("inspections", row.id, "abnormalDetail", e.target.value)} /></td>
-                      <td><textarea value={row.action || ""} onChange={(e) => updateField("inspections", row.id, "action", e.target.value)} /></td>
-                      <td><button className="deleteButton" onClick={() => removeItem("inspections", row.id)}><Trash2 size={16} /></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {page === "calendar" && (
-          <>
-            <div className="header"><div><h2>予定カレンダー</h2><p>日常予定・会議・保全予定・工事予定を管理できます。</p></div><button className="primaryButton" onClick={addCalendarEvent}><Plus size={16} /> 新しい予定</button></div>
-            <div className="calendarLayout">
-              <div className="calendarMain">
-                <div className="calendarTop"><button onClick={() => changeMonth(-1)}>＜</button><h2>{calendarMonth.getFullYear()}年 {calendarMonth.getMonth() + 1}月</h2><button onClick={() => changeMonth(1)}>＞</button><button onClick={() => { const todayText = new Date().toISOString().slice(0, 10); setCalendarMonth(new Date()); setSelectedDate(todayText); }}>今日に戻る</button></div>
-                <div className="calendarWeek"><div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div></div>
-                <div className="calendarGrid">
-                  {getCalendarDays().map((date, index) => {
-                    const dayEvents = calendarEvents.filter((event) => event.date === date);
-                    return <div key={index} className={`calendarDay ${date === selectedDate ? "selectedDay" : ""}`} onClick={() => date && setSelectedDate(date)}>{date && <><strong>{Number(date.slice(8, 10))}</strong><div className="calendarEventList">{dayEvents.slice(0, 3).map((event) => <span key={event.id} className={`calendarEventTag ${event.importance === "重要" ? "importantTag" : ""}`}>{event.time ? `${event.time} ` : ""}{event.title || "予定"}</span>)}</div></>}</div>;
-                  })}
-                </div>
-                <div className="selectedEvents"><h3>{selectedDate} の予定一覧</h3>{calendarEvents.filter((event) => event.date === selectedDate).map((event) => <div key={event.id} className="eventRow"><b>{event.importance === "重要" ? "【重要】" : ""}{event.time ? `${event.time} ` : ""}{event.title || "予定"}</b><span>担当: {event.owner || "-"}</span><span>{event.detail || "-"}</span></div>)}</div>
-              </div>
-              <div className="calendarSide"><h3>予定の詳細</h3>{calendarEvents.map((row) => <div key={row.id} className="calendarEditCard"><input type="date" value={row.date || ""} onChange={(e) => updateField("calendar", row.id, "date", e.target.value)} /><input type="time" value={row.time || ""} onChange={(e) => updateField("calendar", row.id, "time", e.target.value)} /><input value={row.title || ""} placeholder="タイトル" onChange={(e) => updateField("calendar", row.id, "title", e.target.value)} /><select value={row.importance || "通常"} onChange={(e) => updateField("calendar", row.id, "importance", e.target.value)}><option value="通常">通常</option><option value="重要">重要</option></select><textarea placeholder="内容" value={row.detail || ""} onChange={(e) => updateField("calendar", row.id, "detail", e.target.value)} /><input placeholder="担当者" value={row.owner || ""} onChange={(e) => updateField("calendar", row.id, "owner", e.target.value)} /><input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "calendar", row.id)} />{row.image && <img src={row.image} alt="" className="calendarPhoto" />}<button className="deleteButton" onClick={() => removeItem("calendar", row.id)}><Trash2 size={16} /> 削除</button></div>)}</div>
-            </div>
-          </>
-        )}
-
-        {page === "factory" && (
-          <>
-            <div className="header"><div><h2>工場記録</h2><p>故障・設備異常・停止内容を記録できます。</p></div><button className="primaryButton" onClick={addFactoryLog}><Plus size={16} /> 記録追加</button></div>
-            <div className="tableWrap"><table><thead><tr><th>発生日</th><th>時間</th><th>工程</th><th>設備名</th><th>異常内容</th><th>原因</th><th>処置内容</th><th>復旧時間</th><th>担当者</th><th>写真</th><th>備考</th><th></th></tr></thead><tbody>{factoryLogs.map((row) => <tr key={row.id}><td><input type="date" value={row.date || ""} onChange={(e) => updateField("factoryLogs", row.id, "date", e.target.value)} /></td><td><input type="time" value={row.time || ""} onChange={(e) => updateField("factoryLogs", row.id, "time", e.target.value)} /></td><td><input value={row.sector || ""} onChange={(e) => updateField("factoryLogs", row.id, "sector", e.target.value)} /></td><td><input value={row.machine || ""} onChange={(e) => updateField("factoryLogs", row.id, "machine", e.target.value)} /></td><td><textarea value={row.problem || ""} onChange={(e) => updateField("factoryLogs", row.id, "problem", e.target.value)} /></td><td><textarea value={row.cause || ""} onChange={(e) => updateField("factoryLogs", row.id, "cause", e.target.value)} /></td><td><textarea value={row.action || ""} onChange={(e) => updateField("factoryLogs", row.id, "action", e.target.value)} /></td><td><input value={row.repairTime || ""} onChange={(e) => updateField("factoryLogs", row.id, "repairTime", e.target.value)} /></td><td><input value={row.owner || ""} onChange={(e) => updateField("factoryLogs", row.id, "owner", e.target.value)} /></td><td><input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "factoryLogs", row.id)} />{row.image && <img src={row.image} alt="" className="calendarPhoto" />}</td><td><textarea value={row.note || ""} onChange={(e) => updateField("factoryLogs", row.id, "note", e.target.value)} /></td><td><button className="deleteButton" onClick={() => removeItem("factoryLogs", row.id)}><Trash2 size={16} /></button></td></tr>)}</tbody></table></div>
-          </>
-        )}
-
-        {page === "report" && (
-          <>
-            <div className="header"><div><h2>保全作業報告書</h2><p>複数の報告書を保存して、過去トラブルを検索・確認できます。</p></div><button className="primaryButton" onClick={addReport}><Plus size={16} /> 報告書追加</button></div>
-            <div className="tableWrap"><input value={reportSearch} onChange={(e) => setReportSearch(e.target.value)} placeholder="検索：設備名・ライン名・不具合現象・原因・処置内容・担当者" /></div>
-            {filteredReports.map((row) => (
-              <div className="tableWrap" key={row.id} style={{ marginTop: "20px" }}>
-                <div className="header"><div><h3>報告書：{row.equipment || "設備名未入力"} / {row.createdAt || "-"}</h3><p>{row.phenomenon || "不具合現象未入力"}</p></div><button className="deleteButton" onClick={() => removeItem("maintenanceReports", row.id)}><Trash2 size={16} /> 削除</button></div>
-                <div className="reportGrid"><label>作成日<input type="date" value={row.createdAt || ""} onChange={(e) => updateField("maintenanceReports", row.id, "createdAt", e.target.value)} /></label><label>保全分類<input value={row.maintenanceType || ""} onChange={(e) => updateField("maintenanceReports", row.id, "maintenanceType", e.target.value)} /></label><label>①不具合発生日時<input type="datetime-local" value={row.troubleDateTime || ""} onChange={(e) => updateField("maintenanceReports", row.id, "troubleDateTime", e.target.value)} /></label><label>②保全作業開始日時<input type="datetime-local" value={row.workStartDateTime || ""} onChange={(e) => updateField("maintenanceReports", row.id, "workStartDateTime", e.target.value)} /></label><label>③保全作業完了日時<input type="datetime-local" value={row.workEndDateTime || ""} onChange={(e) => updateField("maintenanceReports", row.id, "workEndDateTime", e.target.value)} /></label><label>④生産開始日時<input type="datetime-local" value={row.productionStartDateTime || ""} onChange={(e) => updateField("maintenanceReports", row.id, "productionStartDateTime", e.target.value)} /></label><label>⑤停止除外時間<input value={row.stopExclusionTime || ""} onChange={(e) => updateField("maintenanceReports", row.id, "stopExclusionTime", e.target.value)} /></label><label>⑥機能低下(%)<input type="number" value={row.functionDownRate || ""} onChange={(e) => updateField("maintenanceReports", row.id, "functionDownRate", e.target.value)} /></label><label>グループ名<input value={row.groupName || ""} onChange={(e) => updateField("maintenanceReports", row.id, "groupName", e.target.value)} /></label><label>ライン名<input value={row.lineName || ""} onChange={(e) => updateField("maintenanceReports", row.id, "lineName", e.target.value)} /></label><label>設備名<input value={row.equipment || ""} onChange={(e) => updateField("maintenanceReports", row.id, "equipment", e.target.value)} /></label></div>
-                <h3>不具合現象</h3><textarea value={row.phenomenon || ""} onChange={(e) => updateField("maintenanceReports", row.id, "phenomenon", e.target.value)} />
-                <h3>不具合箇所</h3><textarea value={row.troublePoint || ""} onChange={(e) => updateField("maintenanceReports", row.id, "troublePoint", e.target.value)} />
-                <h3>不具合原因</h3><label>なぜ1<textarea value={row.why1 || ""} onChange={(e) => updateField("maintenanceReports", row.id, "why1", e.target.value)} /></label><label>なぜ2<textarea value={row.why2 || ""} onChange={(e) => updateField("maintenanceReports", row.id, "why2", e.target.value)} /></label><label>なぜ3<textarea value={row.why3 || ""} onChange={(e) => updateField("maintenanceReports", row.id, "why3", e.target.value)} /></label>
-                <h3>処置内容</h3><textarea value={row.action || ""} onChange={(e) => updateField("maintenanceReports", row.id, "action", e.target.value)} />
-                <h3>リンク先</h3><textarea value={row.link || ""} onChange={(e) => updateField("maintenanceReports", row.id, "link", e.target.value)} />
-                <h3>再発防止</h3><div className="reportGrid"><label>再発防止区分<input value={row.recurrenceCategory || ""} onChange={(e) => updateField("maintenanceReports", row.id, "recurrenceCategory", e.target.value)} /></label></div><textarea value={row.recurrencePrevention || ""} onChange={(e) => updateField("maintenanceReports", row.id, "recurrencePrevention", e.target.value)} />
-                <h3>流出防止</h3><textarea value={row.outflowPrevention || ""} onChange={(e) => updateField("maintenanceReports", row.id, "outflowPrevention", e.target.value)} />
-                <h3>変化点ランク / FP点検</h3><div className="reportGrid"><label>変化点ランク<input value={row.changeRank || ""} onChange={(e) => updateField("maintenanceReports", row.id, "changeRank", e.target.value)} /></label><label>FP点検<input value={row.fpCheck || ""} onChange={(e) => updateField("maintenanceReports", row.id, "fpCheck", e.target.value)} /></label></div>
-                <h3>保全費用</h3><div className="reportGrid"><label>作業者<input value={row.worker || ""} onChange={(e) => updateField("maintenanceReports", row.id, "worker", e.target.value)} /></label><label>労務費<input value={row.laborCost || ""} onChange={(e) => updateField("maintenanceReports", row.id, "laborCost", e.target.value)} /></label><label>保全交換部品費・外注費<input value={row.partsCost || ""} onChange={(e) => updateField("maintenanceReports", row.id, "partsCost", e.target.value)} /></label><label>保全費用合計<input value={row.totalCost || ""} onChange={(e) => updateField("maintenanceReports", row.id, "totalCost", e.target.value)} /></label></div>
-                <h3>在庫</h3><div className="reportGrid"><label>保全交換部品<input value={row.replacedPart || ""} onChange={(e) => updateField("maintenanceReports", row.id, "replacedPart", e.target.value)} /></label><label>在庫数<input value={row.stockQty || ""} onChange={(e) => updateField("maintenanceReports", row.id, "stockQty", e.target.value)} /></label><label>リスト更新チェック<input type="checkbox" checked={!!row.stockCheck} onChange={(e) => updateField("maintenanceReports", row.id, "stockCheck", e.target.checked)} /></label></div>
-                <h3>備考</h3><textarea value={row.note || ""} onChange={(e) => updateField("maintenanceReports", row.id, "note", e.target.value)} />
-              </div>
-            ))}
-          </>
-        )}
-
-        {page === "ai" && (
-          <div className="tableWrap">
-            <h2>AI検索</h2>
-            <p>過去の保全作業報告書・工場記録・設備点検から似ている内容を探して、AI風にまとめます。</p>
-            <input value={aiSearch} onChange={(e) => setAiSearch(e.target.value)} placeholder="例: ロードセル 78-60 異常" style={{ margin: "16px 0" }} />
-            <button className="primaryButton" onClick={makeAiAnswer}>AI分析</button>
-
-            <div className="calendarEditCard" style={{ marginTop: "20px" }}>
-              <h3>AI自動報告書作成</h3>
-              <p>短く入力すると、保全作業報告書を自動で作成します。</p>
-              <textarea value={autoReportInput} onChange={(e) => setAutoReportInput(e.target.value)} placeholder="例：78-60 ロードセル異常 荷重確認 配線確認" />
-              <button className="primaryButton" onClick={createAutoReport}>報告書を自動作成</button>
-            </div>
-
-            {aiLevel && <div className={`calendarEditCard ${aiLevel.includes("緊急") ? "aiHigh" : aiLevel.includes("注意") ? "aiMiddle" : "aiLow"}`} style={{ marginTop: "20px" }}><h3>{aiLevel}</h3></div>}
-            {aiAnswer && <div className="calendarEditCard" style={{ marginTop: "20px", whiteSpace: "pre-line" }}>{aiAnswer}</div>}
-            {aiResults.length === 0 && aiSearch && <p>該当する履歴が見つかりません。</p>}
-            {aiResults.map((item, index) => <div key={index} className="calendarEditCard"><b>{item.type} / {item.date}</b><h3>{item.title}</h3><p>{item.text}</p></div>)}
-          </div>
-        )}
-
-        {page === "stock" && (
-          <div className="tableWrap">
-            <h2>在庫管理</h2>
-            <p>保全部品の在庫数を管理し、不足・注意・OKを自動判定します。</p>
-            <table>
-              <thead><tr><th>設備名</th><th>部品名</th><th>部品番号</th><th>購入先</th><th>予備品ロケーション</th><th>現在在庫</th><th>最低在庫</th><th>状態</th><th>メモ</th></tr></thead>
-              <tbody>
-                {stockRows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.equipment || "-"}</td><td>{row.partName || "-"}</td><td>{row.partNo || "-"}</td><td>{row.supplier || "-"}</td><td>{row.location || "-"}</td>
-                    <td><input type="number" value={row.stockQty || 0} onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)} /></td>
-                    <td><input type="number" value={row.minStock || 1} onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)} /></td>
-                    <td><span className={`stockStatus ${row.stockStatus.includes("不足") ? "stockBad" : row.stockStatus.includes("注意") ? "stockWarn" : "stockOk"}`}>{row.stockStatus}</span></td>
-                    <td><input value={row.stockNote || ""} onChange={(e) => updateField("parts", row.id, "stockNote", e.target.value)} placeholder="例：発注必要" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {page === "order" && (
-          <div className="tableWrap">
-            <h2>発注管理AI</h2>
-            <p>在庫不足・在庫注意の部品を自動で発注候補として表示します。</p>
-            <button className="primaryButton" onClick={printOrderPdf} style={{ marginBottom: "16px" }}>発注リストPDF作成</button>
-            <button className="primaryButton" onClick={sendOrderMail} style={{ marginLeft: "12px", marginBottom: "16px" }}>発注リストメール送信</button>
-            <table>
-              <thead><tr><th>優先度</th><th>設備名</th><th>部品名</th><th>部品番号</th><th>購入先</th><th>現在在庫</th><th>最低在庫</th><th>推奨発注数</th><th>AIコメント</th></tr></thead>
-              <tbody>
-                {orderNeededParts.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.priority}</td><td>{item.equipment || "-"}</td><td>{item.partName || "-"}</td><td>{item.partNo || "-"}</td><td>{item.supplier || "-"}</td><td>{item.stockQty}</td><td>{item.minStock}</td><td>{item.recommendedQty}</td>
-                    <td>{item.stockStatus.includes("不足") ? "在庫がありません。すぐに発注が必要です。" : "最低在庫に近いです。早めに発注してください。"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {orderNeededParts.length === 0 && <p style={{ marginTop: "20px" }}>現在、発注が必要な部品はありません。</p>}
-          </div>
-        )}
-
-        {page === "dashboard" && (
-          <div className="tableWrap">
-            <h2>ダッシュボード</h2>
-            <p>保全データから設備の状態を自動で見える化します。</p>
-            <div className="cards">
-              <div className="card red"><span>交換超過</span><strong>{overCount}</strong></div><div className="card yellow"><span>交換間近</span><strong>{nearCount}</strong></div><div className="card green"><span>正常</span><strong>{normalCount}</strong></div><div className="card red"><span>点検NG</span><strong>{ngCount}</strong></div><div className="card"><span>登録部品数</span><strong>{rows.length}</strong></div><div className="card"><span>予定件数</span><strong>{calendarEvents.length}</strong></div><div className="card"><span>工場記録数</span><strong>{factoryLogs.length}</strong></div><div className="card"><span>報告書数</span><strong>{reports.length}</strong></div><div className="card red"><span>重大トラブル候補</span><strong>{seriousReports}</strong></div><div className="card red"><span>在庫不足</span><strong>{lowStockCount}</strong></div><div className="card yellow"><span>在庫注意</span><strong>{cautionStockCount}</strong></div><div className="card red"><span>発注必要</span><strong>{orderNeededParts.length}</strong></div>
-            </div>
-            <div className="tableWrap" style={{ marginTop: "24px" }}>
-              <h2>AI設備ランキング</h2><p>工場記録と保全作業報告書から、トラブルが多い設備を自動集計します。</p>
-              <table><thead><tr><th>順位</th><th>設備名</th><th>記録件数</th><th>グラフ</th><th>AIコメント</th></tr></thead><tbody>{equipmentRanking.map((item, index) => <tr key={item.name}><td>{index + 1}</td><td>{item.name}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxEquipmentCount) * 100}%` }} /><span className="barValue">{item.count}件</span></div></td><td>{item.count >= 3 ? "再発傾向あり。原因分析と再発防止の見直しが必要です。" : item.count === 2 ? "注意。今後も同じ異常が出るか確認してください。" : "記録あり。様子を確認してください。"}</td></tr>)}</tbody></table>
-            </div>
-            <div className="tableWrap" style={{ marginTop: "24px" }}>
-              <h2>月別トラブル推移</h2><p>保全作業報告書と工場記録から、月ごとのトラブル件数を表示します。</p>
-              <table><thead><tr><th>月</th><th>件数</th><th>グラフ</th></tr></thead><tbody>{monthlyTroubleRanking.map((item) => <tr key={item.month}><td>{item.month}</td><td>{item.count}</td><td><div className="simpleBarWrap"><div className="simpleBar" style={{ width: `${(item.count / maxMonthlyCount) * 100}%` }} /><span className="barValue">{item.count}件</span></div></td></tr>)}</tbody></table>
-            </div>
-          </div>
-        )}
-
-        {page === "settings" && (
-          <div className="tableWrap"><h2>設定</h2><table><tbody><tr><th>保存先</th><td>Firebase Firestore</td></tr><tr><th>メール送信</th><td>Vercel + Resend</td></tr><tr><th>交換通知</th><td>交換予定日の7日前</td></tr><tr><th>購入通知</th><td>部品納期に合わせて通知</td></tr></tbody></table></div>
-        )}
+        {renderCurrentPage()}
       </div>
     </div>
   );
