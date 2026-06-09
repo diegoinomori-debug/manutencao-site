@@ -786,9 +786,14 @@ export default function App() {
     return (
       <>
         <div className="tableWrap" style={{ textAlign: "center", padding: "42px 24px" }}>
-          <div style={{ fontSize: "54px" }}>⚙️</div>
+          <img
+            src="/miyama-logo.png"
+            alt="MIYAMA ONE TEAM"
+            className="homeLogo"
+          />
           <h1 style={{ fontSize: "42px", margin: "10px 0" }}>Maintenance AI</h1>
           <h2>AI保全管理システム</h2>
+          <p className="oneTeamSlogan">One Team Maintenance Group</p>
           <p>設備保全を、もっとスマートに。</p>
 
           <div style={{ maxWidth: "760px", margin: "24px auto 0" }}>
@@ -1306,10 +1311,18 @@ export default function App() {
     <div className="page">
       <div className="container">
         <div className="header">
-          <div>
-            <div className="badge">AI保全管理システム</div>
-            <h1>⚙️ Maintenance AI</h1>
-            <p>設備保全を、もっとスマートに。</p>
+          <div className="headerLogo">
+            <img
+              src="/miyama-logo.png"
+              alt="MIYAMA ONE TEAM"
+              className="miyamaLogo"
+            />
+            <div>
+              <div className="badge">AI保全管理システム</div>
+              <h1>Maintenance AI</h1>
+              <p className="oneTeamSlogan">One Team Maintenance Group</p>
+              <p>設備保全を、もっとスマートに。</p>
+            </div>
           </div>
         </div>
 
