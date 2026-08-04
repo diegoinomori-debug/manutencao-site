@@ -1,107 +1,113 @@
 // ======================================================
-// MIYAMA AI
-// similarity.js
-// Versão 2.0
+// MIYAMA AI - similarity.js
+// Busca local por similaridade para português técnico, inglês e japonês.
 // ======================================================
 
-// Normaliza texto
-function normalize(text = "") {
-    return String(text ?? "")
-        .toLowerCase()
-        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c =>
-            String.fromCharCode(c.charCodeAt(0) - 65248)
-        )
-        .replace(/[^\w\u3040-\u30ff\u3400-\u9fff]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+function normalizeText(value = "") {
+  return String(value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[‐‑‒–—―ー]/g, "-")
+    .replace(/[^\p{L}\p{N}_-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-// Separa palavras
-function words(text = "") {
-    return normalize(text)
-        .split(" ")
-        .filter(Boolean);
-}
+function makeTokens(value = "") {
+  const normalized = normalizeText(value);
+  if (!normalized) return new Set();
 
-// Similaridade Jaccard
-function jaccard(a = "", b = "") {
+  const tokens = new Set(normalized.split(" ").filter(Boolean));
 
-    const A = new Set(words(a));
-    const B = new Set(words(b));
-
-    if (A.size === 0 && B.size === 0)
-        return 1;
-
-    if (A.size === 0 || B.size === 0)
-        return 0;
-
-    let intersection = 0;
-
-    for (const word of A) {
-        if (B.has(word))
-            intersection++;
+  // Japonês geralmente não possui espaços. Bigramas permitem encontrar
+  // frases parecidas como リベット詰まり / リベットつまり.
+  const compact = normalized.replace(/\s+/g, "");
+  if (/[\u3040-\u30ff\u3400-\u9fff]/.test(compact)) {
+    for (let index = 0; index < compact.length - 1; index += 1) {
+      tokens.add(compact.slice(index, index + 2));
     }
+  }
 
-    const union = new Set([...A, ...B]).size;
-
-    return union === 0 ? 0 : intersection / union;
+  return tokens;
 }
 
-// Obtém valor de forma segura
-function value(obj, field) {
-    return obj?.[field] ?? "";
+function jaccardSimilarity(left = "", right = "") {
+  const setA = makeTokens(left);
+  const setB = makeTokens(right);
+
+  if (setA.size === 0 || setB.size === 0) return 0;
+
+  let intersection = 0;
+  for (const token of setA) {
+    if (setB.has(token)) intersection += 1;
+  }
+
+  const unionSize = new Set([...setA, ...setB]).size;
+  return unionSize ? intersection / unionSize : 0;
 }
 
-// Calcula a similaridade entre dois problemas
+function containsBonus(left = "", right = "") {
+  const a = normalizeText(left);
+  const b = normalizeText(right);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) return 0.65;
+  return 0;
+}
+
+function fieldSimilarity(left = "", right = "") {
+  return Math.max(jaccardSimilarity(left, right), containsBonus(left, right));
+}
+
 export function calculateSimilarity(problem = {}, report = {}) {
+  const fields = [
+    ["equipment", 28],
+    ["lineName", 10],
+    ["machineName", 5],
+    ["phenomenon", 25],
+    ["troublePoint", 15],
+    ["why1", 4],
+    ["why2", 3],
+    ["why3", 3],
+    ["action", 4],
+    ["replacedPart", 3],
+  ];
 
-    const weights = {
-        equipment: 25,
-        lineName: 10,
-        machineName: 10,
-        phenomenon: 20,
-        troublePoint: 10,
-        why1: 5,
-        why2: 5,
-        why3: 5,
-        action: 10
-    };
+  let weightedScore = 0;
+  let activeWeight = 0;
 
-    let score = 0;
+  for (const [field, weight] of fields) {
+    const queryValue = problem?.[field] ?? "";
+    if (!normalizeText(queryValue)) continue;
 
-    Object.entries(weights).forEach(([field, weight]) => {
+    activeWeight += weight;
+    weightedScore += fieldSimilarity(queryValue, report?.[field] ?? "") * weight;
+  }
 
-        score +=
-            jaccard(
-                value(problem, field),
-                value(report, field)
-            ) * weight;
+  if (!activeWeight) return 0;
 
-    });
-
-    return Math.round(score);
+  return Math.max(0, Math.min(100, Math.round((weightedScore / activeWeight) * 100)));
 }
 
-// Ordena pela similaridade
 export function sortBySimilarity(problem = {}, reports = []) {
+  if (!Array.isArray(reports)) return [];
 
-    if (!Array.isArray(reports))
-        return [];
-
-    return reports
-        .map(report => ({
-            ...report,
-            similarity: calculateSimilarity(problem, report)
-        }))
-        .sort((a, b) => b.similarity - a.similarity);
-
+  return reports
+    .filter(Boolean)
+    .map((report) => ({
+      ...report,
+      similarity: calculateSimilarity(problem, report),
+    }))
+    .sort((a, b) => {
+      if (b.similarity !== a.similarity) return b.similarity - a.similarity;
+      return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+    });
 }
 
-// Retorna somente os melhores
-export function getTopMatches(problem = {}, reports = [], limit = 10) {
+export function getTopMatches(problem = {}, reports = [], limit = 10, minimumScore = 18) {
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 10));
 
-    return sortBySimilarity(problem, reports)
-        .filter(item => item.similarity >= 20)
-        .slice(0, limit);
-
+  return sortBySimilarity(problem, reports)
+    .filter((item) => item.similarity >= minimumScore)
+    .slice(0, safeLimit);
 }

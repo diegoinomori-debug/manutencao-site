@@ -1,176 +1,100 @@
 // ==========================================================
-// MIYAMA AI
-// History Search V2
-// Desenvolvido para MIYAMA Maintenance
+// MIYAMA AI - historySearch.js
+// Pesquisa os relatórios que já estão carregados no App.jsx.
 // ==========================================================
 
 import { getTopMatches } from "../utils/similarity";
 
-/**
- * Pesquisa inteligente
- */
-export function searchHistory(currentProblem = {}, reports = []) {
-
-    if (!Array.isArray(reports))
-        return [];
-
-    return getTopMatches(currentProblem, reports, 10);
-
+function safeText(value = "") {
+  return String(value ?? "").normalize("NFKC").toLowerCase().trim();
 }
 
-/**
- * Valor seguro
- */
-function safe(value) {
-    return String(value ?? "").toLowerCase();
+function reportSearchText(report = {}) {
+  return [
+    report.createdAt,
+    report.reportCreatedDate,
+    report.equipment,
+    report.machineName,
+    report.lineName,
+    report.phenomenon,
+    report.troublePoint,
+    report.why1,
+    report.why2,
+    report.why3,
+    report.action,
+    report.recurrencePrevention,
+    report.note,
+    report.replacedPart,
+    report.partName1,
+    report.partName2,
+    report.partName3,
+    report.worker,
+    report.owner,
+  ]
+    .map(safeText)
+    .join(" ");
 }
 
-/**
- * Pesquisa texto livre
- */
-export function searchByText(text = "", reports = []) {
+export function searchHistory(currentProblem = {}, reports = [], options = {}) {
+  if (!Array.isArray(reports)) return [];
 
-    const keyword = safe(text).trim();
+  const limit = options.limit ?? 10;
+  const minimumScore = options.minimumScore ?? 18;
 
-    if (!keyword)
-        return [];
-
-    return reports.filter(report => {
-
-        const content = [
-
-            report.equipment,
-            report.machineName,
-            report.lineName,
-            report.phenomenon,
-            report.troublePoint,
-            report.action,
-            report.why1,
-            report.why2,
-            report.why3,
-            report.memo,
-            report.partName,
-            report.failurePart,
-            report.owner,
-            report.worker
-
-        ]
-            .map(safe)
-            .join(" ");
-
-        return content.includes(keyword);
-
-    });
-
+  return getTopMatches(currentProblem, reports, limit, minimumScore);
 }
 
-/**
- * Pesquisa equipamento
- */
+export function searchByText(text = "", reports = [], limit = 50) {
+  const keywords = safeText(text).split(/\s+/).filter(Boolean);
+  if (!keywords.length || !Array.isArray(reports)) return [];
+
+  return reports
+    .filter((report) => {
+      const content = reportSearchText(report);
+      return keywords.every((keyword) => content.includes(keyword));
+    })
+    .slice(0, Math.max(1, Number(limit) || 50));
+}
+
 export function searchEquipment(equipment = "", reports = []) {
-
-    const keyword = safe(equipment);
-
-    return reports.filter(r =>
-        safe(r.equipment).includes(keyword)
-    );
-
+  const keyword = safeText(equipment);
+  if (!keyword || !Array.isArray(reports)) return [];
+  return reports.filter((report) => safeText(report?.equipment).includes(keyword));
 }
 
-/**
- * Pesquisa máquina
- */
-export function searchMachine(machine = "", reports = []) {
-
-    const keyword = safe(machine);
-
-    return reports.filter(r =>
-        safe(r.machineName).includes(keyword)
-    );
-
+export function searchPhenomenon(phenomenon = "", reports = []) {
+  const keyword = safeText(phenomenon);
+  if (!keyword || !Array.isArray(reports)) return [];
+  return reports.filter((report) => safeText(report?.phenomenon).includes(keyword));
 }
 
-/**
- * Pesquisa linha
- */
-export function searchLine(line = "", reports = []) {
+export function searchPart(part = "", reports = []) {
+  const keyword = safeText(part);
+  if (!keyword || !Array.isArray(reports)) return [];
 
-    const keyword = safe(line);
-
-    return reports.filter(r =>
-        safe(r.lineName).includes(keyword)
-    );
-
+  return reports.filter((report) =>
+    [
+      report?.replacedPart,
+      report?.partName1,
+      report?.partName2,
+      report?.partName3,
+      report?.failurePart,
+    ]
+      .map(safeText)
+      .join(" ")
+      .includes(keyword)
+  );
 }
 
-/**
- * Pesquisa fenômeno
- */
-export function searchPhenomenon(text = "", reports = []) {
-
-    const keyword = safe(text);
-
-    return reports.filter(r =>
-        safe(r.phenomenon).includes(keyword)
-    );
-
-}
-
-/**
- * Pesquisa peça
- */
-export function searchPart(text = "", reports = []) {
-
-    const keyword = safe(text);
-
-    return reports.filter(r =>
-
-        (
-            safe(r.partName) +
-            " " +
-            safe(r.failurePart)
-        )
-
-        .includes(keyword)
-
-    );
-
-}
-
-/**
- * Estatísticas
- */
 export function getHistoryStatistics(reports = []) {
+  const rows = Array.isArray(reports) ? reports : [];
+  const uniqueCount = (field) =>
+    new Set(rows.map((row) => safeText(row?.[field])).filter(Boolean)).size;
 
-    if (!Array.isArray(reports)) {
-
-        return {
-
-            totalReports: 0,
-            equipments: 0,
-            machines: 0,
-            lines: 0
-
-        };
-
-    }
-
-    return {
-
-        totalReports: reports.length,
-
-        equipments: new Set(
-            reports.map(r => safe(r.equipment))
-        ).size,
-
-        machines: new Set(
-            reports.map(r => safe(r.machineName))
-        ).size,
-
-        lines: new Set(
-            reports.map(r => safe(r.lineName))
-        ).size
-
-    };
-
+  return {
+    totalReports: rows.length,
+    equipments: uniqueCount("equipment"),
+    machines: uniqueCount("machineName"),
+    lines: uniqueCount("lineName"),
+  };
 }

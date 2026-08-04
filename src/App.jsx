@@ -2619,7 +2619,9 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
       return () => controller.abort();
     }
 
-    setDisplayValue(original);
+    setDisplayValue(
+      language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
+    );
 
     translateJapaneseLongText(original, controller.signal, language)
       .then((translated) => {
@@ -2668,7 +2670,9 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
       return () => controller.abort();
     }
 
-    setDisplayValue(original);
+    setDisplayValue(
+      language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
+    );
 
     translateJapaneseLongText(original, controller.signal, language)
       .then((translated) => {
@@ -2770,26 +2774,33 @@ function splitTranslationText(value = "", maxLength = 1200) {
 }
 
 async function translateJapaneseChunk(text, targetLanguage = "en", signal) {
-  if (!text || !containsJapaneseText(text)) return text;
+  const original = String(text ?? "");
+  if (!original || !containsJapaneseText(original)) return original;
 
-  const url = new URL(MIYAMA_TRANSLATE_ENDPOINT);
-  // 標準Google Cloud等の独自URLを設定した場合にも、既存パラメータを壊しません。
-  if (!url.searchParams.has("client")) url.searchParams.set("client", "gtx");
-  if (!url.searchParams.has("sl")) url.searchParams.set("sl", "ja");
-  url.searchParams.set("tl", targetLanguage === "es" ? "es" : "en");
-  if (!url.searchParams.has("dt")) url.searchParams.set("dt", "t");
-  url.searchParams.append("q", text);
+  const response = await fetch("/api/translate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text: original,
+      targetLanguage: targetLanguage === "es" ? "es" : "en",
+    }),
+    signal,
+  });
 
-  const response = await fetch(url.toString(), { method: "GET", signal });
-  if (!response.ok) throw new Error(`Translation HTTP ${response.status}`);
-  const data = await response.json();
-
-  if (Array.isArray(data) && Array.isArray(data[0])) {
-    return data[0].map((part) => (Array.isArray(part) ? part[0] || "" : "")).join("");
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("Translation server returned an invalid response.");
   }
 
-  // VITE_TRANSLATION_API_URLで独自APIを使う場合の一般的な返却形式にも対応。
-  return data?.translatedText || data?.translation || data?.data?.translations?.[0]?.translatedText || text;
+  if (!response.ok) {
+    throw new Error(data?.error || `Translation HTTP ${response.status}`);
+  }
+
+  return String(data?.translatedText || original);
 }
 
 async function translateJapaneseLongText(value, signal, targetLanguage = "en") {
@@ -2910,6 +2921,10 @@ export default function App() {
   const [newReport, setNewReport] = useState(null);
   const [whyAiLoading, setWhyAiLoading] = useState(false);
   const [whyAiError, setWhyAiError] = useState("");
+  const [historyAiQuestion, setHistoryAiQuestion] = useState("");
+  const [historyAiAnswer, setHistoryAiAnswer] = useState("");
+  const [historyAiLoading, setHistoryAiLoading] = useState(false);
+  const [historyAiError, setHistoryAiError] = useState("");
   const [newCalendarEvent, setNewCalendarEvent] = useState(null);
   const [editingCalendarEventId, setEditingCalendarEventId] = useState(null);
   const [newPlannedWork, setNewPlannedWork] = useState(null);
@@ -2924,6 +2939,65 @@ export default function App() {
     cost: false,
     other: false,
   });
+
+  useEffect(() => {
+    if (!newReport) {
+      setSimilarProblems([]);
+      return undefined;
+    }
+
+    const equipment = String(newReport.equipment || "").trim();
+    const lineName = String(newReport.lineName || "").trim();
+    const phenomenon = String(newReport.phenomenon || "").trim();
+    const troublePoint = String(newReport.troublePoint || "").trim();
+
+    if (!equipment && !lineName && !phenomenon && !troublePoint) {
+      setSimilarProblems([]);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      try {
+        const matches = searchHistory(
+          {
+            equipment,
+            lineName,
+            machineName: newReport.machineName || "",
+            phenomenon,
+            troublePoint,
+            why1: newReport.why1 || "",
+            why2: newReport.why2 || "",
+            why3: newReport.why3 || "",
+            action: newReport.action || "",
+            replacedPart: newReport.replacedPart || "",
+          },
+          reports,
+          {
+            limit: 12,
+            minimumScore: 12,
+          }
+        );
+
+        setSimilarProblems(matches);
+      } catch (error) {
+        console.error("MIYAMA history search error:", error);
+        setSimilarProblems([]);
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    newReport?.equipment,
+    newReport?.lineName,
+    newReport?.phenomenon,
+    newReport?.troublePoint,
+    newReport?.why1,
+    newReport?.why2,
+    newReport?.why3,
+    newReport?.action,
+    newReport?.replacedPart,
+    reports,
+  ]);
 
   useEffect(() => {
     loadAll();
@@ -3384,10 +3458,22 @@ export default function App() {
   }
 
   function startNewReport() {
+    setWhyAiLoading(false);
+    setWhyAiError("");
+    setHistoryAiQuestion("");
+    setHistoryAiAnswer("");
+    setHistoryAiError("");
+    setSimilarProblems([]);
     setNewReport(createBlankReport());
   }
 
   function cancelNewReport() {
+    setWhyAiLoading(false);
+    setWhyAiError("");
+    setHistoryAiQuestion("");
+    setHistoryAiAnswer("");
+    setHistoryAiError("");
+    setSimilarProblems([]);
     setNewReport(null);
   }
 
@@ -3832,6 +3918,7 @@ export default function App() {
     return sorted.filter((r) =>
       containsAll(
         [
+          r.id,
           r.createdAt,
           r.maintenanceType,
           r.groupName,
@@ -4815,6 +4902,129 @@ Rules:
       }
     }
 
+    async function askHistoryMaintenanceAI() {
+      const question = String(historyAiQuestion || "").trim();
+      const phenomenon = String(newReport.phenomenon || "").trim();
+      const troublePoint = String(newReport.troublePoint || "").trim();
+
+      if (!phenomenon && !troublePoint) {
+        setHistoryAiError(
+          appLanguage === "es"
+            ? "Escriba primero el síntoma o el punto de la falla."
+            : appLanguage === "en"
+              ? "Enter the failure symptom or failure point first."
+              : "先に不具合現象または不具合箇所を入力してください。"
+        );
+        return;
+      }
+
+      const responseLanguage =
+        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+
+      const historyRows = similarProblems.slice(0, 8);
+      const historyContext = historyRows.length
+        ? historyRows
+            .map((item, index) => {
+              const calc = calculateReport(item);
+              const cause = item.why3 || item.why2 || item.why1 || "";
+              const parts = [
+                item.replacedPart,
+                item.partName1,
+                item.partName2,
+                item.partName3,
+              ]
+                .filter(Boolean)
+                .join(", ");
+
+              return [
+                `Case ${index + 1}`,
+                `Similarity: ${item.similarity || 0}%`,
+                `Date: ${item.createdAt || item.reportCreatedDate || item.troubleDateTime || ""}`,
+                `Equipment: ${item.equipment || ""}`,
+                `Line: ${item.lineName || ""}`,
+                `Symptom: ${item.phenomenon || ""}`,
+                `Failure point: ${item.troublePoint || ""}`,
+                `Previous cause: ${cause}`,
+                `Previous action: ${item.action || ""}`,
+                `Recurrence prevention: ${item.recurrencePrevention || ""}`,
+                `Replaced parts: ${parts}`,
+                `Downtime hours: ${calc.stopTimeHours || 0}`,
+              ].join("\n");
+            })
+            .join("\n\n---\n\n")
+        : "No sufficiently similar previous report was found.";
+
+      setHistoryAiLoading(true);
+      setHistoryAiError("");
+      setHistoryAiAnswer("");
+
+      try {
+        const result = await askMiyamaAI({
+          language: responseLanguage,
+          machine: newReport.equipment || "",
+          context: [
+            `CURRENT PROBLEM`,
+            `Equipment: ${newReport.equipment || ""}`,
+            `Line: ${newReport.lineName || ""}`,
+            `Failure symptom: ${phenomenon}`,
+            `Failure point: ${troublePoint}`,
+            "",
+            `SIMILAR PREVIOUS CASES FROM THE FACTORY HISTORY`,
+            historyContext,
+          ].join("\n"),
+          message: `Answer this maintenance question using the factory history above:
+
+${question || "How should we diagnose and repair this problem quickly?"}
+
+Required response structure:
+1. Most likely previous causes, ranked.
+2. What to check first, in a safe practical order.
+3. Previous corrective actions that solved similar cases.
+4. Parts that may need inspection or replacement.
+5. Important differences or missing evidence.
+6. Confidence level based only on the supplied history.
+
+Rules:
+- Write in ${responseLanguage}.
+- Clearly separate confirmed historical facts from hypotheses.
+- Do not claim that a cause is confirmed without physical verification.
+- Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical protections.
+- Keep the answer practical for an industrial maintenance technician.`,
+        });
+
+        setHistoryAiAnswer(String(result.answer || "").trim());
+      } catch (error) {
+        console.error("MIYAMA history AI error:", error);
+        setHistoryAiError(
+          appLanguage === "es"
+            ? `No fue posible consultar MIYAMA AI: ${error.message}`
+            : appLanguage === "en"
+              ? `Could not ask MIYAMA AI: ${error.message}`
+              : `MIYAMA AIへ質問できませんでした：${error.message}`
+        );
+      } finally {
+        setHistoryAiLoading(false);
+      }
+    }
+
+    function openPreviousReport(problem) {
+      if (!problem?.id) return;
+
+      setNewReport(null);
+      setSimilarProblems([]);
+      setHistoryAiQuestion("");
+      setHistoryAiAnswer("");
+      setHistoryAiError("");
+      setReportSearch(problem.id);
+      setPage("report");
+
+      window.setTimeout(() => {
+        document
+          .getElementById(`maintenance-report-${problem.id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 300);
+    }
+
     return (
       <div className="tableWrap" style={{ border: "2px solid #2563eb" }}>
         <div
@@ -4934,6 +5144,133 @@ Rules:
           <h3>🔗 リンク先</h3>
           <input value={newReport.linkUrl || ""} onChange={(e) => setReport("linkUrl", e.target.value)} placeholder="写真・図面・詳細資料リンク" />
         </Section>
+
+        <SimilarProblems
+          problems={similarProblems}
+          language={appLanguage}
+          onOpenReport={openPreviousReport}
+        />
+
+        <section
+          style={{
+            margin: "16px 0",
+            padding: "16px",
+            border: "1px solid #c4b5fd",
+            borderRadius: "16px",
+            background: "linear-gradient(135deg, #f5f3ff, #ffffff)",
+          }}
+        >
+          <h2 style={{ margin: "0 0 8px", fontSize: "22px" }}>
+            🤖 {appLanguage === "es"
+              ? "Preguntar a MIYAMA AI"
+              : appLanguage === "en"
+                ? "Ask MIYAMA AI"
+                : "MIYAMA AIへ質問"}
+          </h2>
+
+          <p style={{ margin: "0 0 12px", color: "#64748b", fontWeight: 700 }}>
+            {appLanguage === "es"
+              ? "La respuesta utilizará los casos anteriores mostrados arriba."
+              : appLanguage === "en"
+                ? "The answer will use the previous cases shown above."
+                : "上に表示された過去事例を使って回答します。"}
+          </p>
+
+          <textarea
+            value={historyAiQuestion}
+            onChange={(event) => setHistoryAiQuestion(event.target.value)}
+            placeholder={
+              appLanguage === "es"
+                ? "Ej.: ¿Cómo reparo esto? ¿Qué pieza debo revisar? ¿Ya ocurrió antes?"
+                : appLanguage === "en"
+                  ? "Example: How do I repair this? Which part should I inspect? Has this happened before?"
+                  : "例：どう直せばいい？どの部品を確認する？以前にも発生した？"
+            }
+            style={{ minHeight: "92px" }}
+          />
+
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "10px" }}>
+            <button
+              type="button"
+              className="primaryButton"
+              onClick={askHistoryMaintenanceAI}
+              disabled={historyAiLoading}
+              style={{ opacity: historyAiLoading ? 0.65 : 1 }}
+            >
+              <Bot size={18} />
+              {historyAiLoading
+                ? appLanguage === "es"
+                  ? "Analizando..."
+                  : appLanguage === "en"
+                    ? "Analyzing..."
+                    : "分析中..."
+                : appLanguage === "es"
+                  ? "Preguntar a MIYAMA AI"
+                  : appLanguage === "en"
+                    ? "Ask MIYAMA AI"
+                    : "MIYAMA AIへ質問"}
+            </button>
+
+            <button
+              type="button"
+              className="primaryButton"
+              onClick={() =>
+                setHistoryAiQuestion(
+                  appLanguage === "es"
+                    ? "¿Cómo puedo diagnosticar y reparar este problema rápidamente?"
+                    : appLanguage === "en"
+                      ? "How can I diagnose and repair this problem quickly?"
+                      : "この問題を早く診断して修理するにはどうすればいいですか？"
+                )
+              }
+            >
+              {appLanguage === "es"
+                ? "Usar pregunta rápida"
+                : appLanguage === "en"
+                  ? "Use quick question"
+                  : "簡単質問を入力"}
+            </button>
+          </div>
+
+          {historyAiError && (
+            <div
+              role="alert"
+              style={{
+                marginTop: "12px",
+                padding: "11px 13px",
+                borderRadius: "12px",
+                background: "#fee2e2",
+                color: "#991b1b",
+                fontWeight: 700,
+              }}
+            >
+              {historyAiError}
+            </div>
+          )}
+
+          {historyAiAnswer && (
+            <div
+              style={{
+                marginTop: "14px",
+                padding: "14px",
+                border: "1px solid #ddd6fe",
+                borderRadius: "14px",
+                background: "#ffffff",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.65,
+              }}
+            >
+              <strong>
+                {appLanguage === "es"
+                  ? "Respuesta de MIYAMA AI"
+                  : appLanguage === "en"
+                    ? "MIYAMA AI Answer"
+                    : "MIYAMA AI回答"}
+              </strong>
+              <div style={{ marginTop: "8px" }}>{historyAiAnswer}</div>
+            </div>
+          )}
+        </section>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="why" title="🔍 不具合原因・なぜなぜ分析">
           <div
@@ -7007,7 +7344,12 @@ function renderHome() {
     const show = (key) => reportViewMode === "all" || reportViewMode === key;
 
     return (
-      <div className="tableWrap reportCardShell" key={row.id} style={{ marginTop: "20px", "--report-accent": reportAccent }}>
+      <div
+        id={`maintenance-report-${sourceRow.id}`}
+        className="tableWrap reportCardShell"
+        key={row.id}
+        style={{ marginTop: "20px", "--report-accent": reportAccent }}
+      >
         <div style={{ border: `2px solid ${reportAccent}`, borderRadius: "16px", overflow: "visible", background: "#fff", marginBottom: "14px" }}>
           <div className="reportTopCompact" style={{ display: "flex", flexWrap: "wrap", borderBottom: "2px solid #0f172a", width: "100%", boxSizing: "border-box" }}>
             <div className="reportTitleCompact" style={{ padding: "16px", textAlign: "center", flex: "1 1 520px", minWidth: "280px" }}>
