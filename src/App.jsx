@@ -2898,7 +2898,6 @@ export default function App() {
   const [newReport, setNewReport] = useState(null);
   const [whyAiLoading, setWhyAiLoading] = useState(false);
   const [whyAiError, setWhyAiError] = useState("");
-
   const [newCalendarEvent, setNewCalendarEvent] = useState(null);
   const [editingCalendarEventId, setEditingCalendarEventId] = useState(null);
   const [newPlannedWork, setNewPlannedWork] = useState(null);
@@ -7111,10 +7110,53 @@ function renderHome() {
         )}
 
         {show("trouble") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="trouble" title="⚠️ 不具合内容">
-            <h3>🚨 不具合現象</h3><textarea value={row.phenomenon || ""} onChange={(e) => setRow("phenomenon", e.target.value)} />
-            <h3>📍 不具合箇所</h3><textarea value={row.troublePoint || ""} onChange={(e) => setRow("troublePoint", e.target.value)} />
-            <h3>🔗 リンク先</h3><input value={row.linkUrl || ""} onChange={(e) => setRow("linkUrl", e.target.value)} />
+          <Section
+            openSections={openSections}
+            toggleSection={toggleSection}
+            sectionKey="trouble"
+            title={
+              appLanguage === "es"
+                ? "⚠️ Detalles de la falla"
+                : appLanguage === "en"
+                  ? "⚠️ Failure Details"
+                  : "⚠️ 不具合内容"
+            }
+          >
+            <h3>
+              {appLanguage === "es"
+                ? "🚨 Síntoma de la falla"
+                : appLanguage === "en"
+                  ? "🚨 Failure Symptom"
+                  : "🚨 不具合現象"}
+            </h3>
+            <textarea
+              value={row.phenomenon || ""}
+              onChange={(e) => setRow("phenomenon", e.target.value)}
+            />
+
+            <h3>
+              {appLanguage === "es"
+                ? "📍 Punto de la falla"
+                : appLanguage === "en"
+                  ? "📍 Failure Point"
+                  : "📍 不具合箇所"}
+            </h3>
+            <textarea
+              value={row.troublePoint || ""}
+              onChange={(e) => setRow("troublePoint", e.target.value)}
+            />
+
+            <h3>
+              {appLanguage === "es"
+                ? "🔗 Enlace"
+                : appLanguage === "en"
+                  ? "🔗 Link"
+                  : "🔗 リンク先"}
+            </h3>
+            <input
+              value={row.linkUrl || ""}
+              onChange={(e) => setRow("linkUrl", e.target.value)}
+            />
           </Section>
         )}
 
