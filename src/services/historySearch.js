@@ -1,18 +1,15 @@
 // ==========================================================
 // MIYAMA AI
-// Busca Inteligente no Histórico
+// History Search V2
 // Desenvolvido para MIYAMA Maintenance
 // ==========================================================
 
 import { getTopMatches } from "../utils/similarity";
 
 /**
- * Procura os problemas mais parecidos
- * @param {Object} currentProblem Problema atual
- * @param {Array} reports Lista completa de relatórios
- * @returns {Array}
+ * Pesquisa inteligente
  */
-export function searchHistory(currentProblem, reports = []) {
+export function searchHistory(currentProblem = {}, reports = []) {
 
     if (!Array.isArray(reports))
         return [];
@@ -22,18 +19,25 @@ export function searchHistory(currentProblem, reports = []) {
 }
 
 /**
- * Pesquisa por texto livre
+ * Valor seguro
+ */
+function safe(value) {
+    return String(value ?? "").toLowerCase();
+}
+
+/**
+ * Pesquisa texto livre
  */
 export function searchByText(text = "", reports = []) {
 
-    const keyword = text.toLowerCase().trim();
+    const keyword = safe(text).trim();
 
     if (!keyword)
         return [];
 
     return reports.filter(report => {
 
-        return [
+        const content = [
 
             report.equipment,
             report.machineName,
@@ -46,85 +50,125 @@ export function searchByText(text = "", reports = []) {
             report.why3,
             report.memo,
             report.partName,
-            report.failurePart
+            report.failurePart,
+            report.owner,
+            report.worker
 
         ]
-            .join(" ")
-            .toLowerCase()
-            .includes(keyword);
+            .map(safe)
+            .join(" ");
+
+        return content.includes(keyword);
 
     });
 
 }
 
 /**
- * Pesquisa por equipamento
+ * Pesquisa equipamento
  */
-export function searchEquipment(equipment, reports = []) {
+export function searchEquipment(equipment = "", reports = []) {
+
+    const keyword = safe(equipment);
 
     return reports.filter(r =>
-
-        (r.equipment || "")
-            .toLowerCase()
-            .includes(equipment.toLowerCase())
-
+        safe(r.equipment).includes(keyword)
     );
 
 }
 
 /**
- * Pesquisa por fenômeno
+ * Pesquisa máquina
  */
-export function searchPhenomenon(text, reports = []) {
+export function searchMachine(machine = "", reports = []) {
+
+    const keyword = safe(machine);
 
     return reports.filter(r =>
-
-        (r.phenomenon || "")
-            .toLowerCase()
-            .includes(text.toLowerCase())
-
+        safe(r.machineName).includes(keyword)
     );
 
 }
 
 /**
- * Pesquisa por peça
+ * Pesquisa linha
  */
-export function searchPart(text, reports = []) {
+export function searchLine(line = "", reports = []) {
+
+    const keyword = safe(line);
+
+    return reports.filter(r =>
+        safe(r.lineName).includes(keyword)
+    );
+
+}
+
+/**
+ * Pesquisa fenômeno
+ */
+export function searchPhenomenon(text = "", reports = []) {
+
+    const keyword = safe(text);
+
+    return reports.filter(r =>
+        safe(r.phenomenon).includes(keyword)
+    );
+
+}
+
+/**
+ * Pesquisa peça
+ */
+export function searchPart(text = "", reports = []) {
+
+    const keyword = safe(text);
 
     return reports.filter(r =>
 
         (
-            (r.partName || "") +
+            safe(r.partName) +
             " " +
-            (r.failurePart || "")
+            safe(r.failurePart)
         )
-            .toLowerCase()
-            .includes(text.toLowerCase())
+
+        .includes(keyword)
 
     );
 
 }
 
 /**
- * Estatísticas do histórico
+ * Estatísticas
  */
 export function getHistoryStatistics(reports = []) {
+
+    if (!Array.isArray(reports)) {
+
+        return {
+
+            totalReports: 0,
+            equipments: 0,
+            machines: 0,
+            lines: 0
+
+        };
+
+    }
 
     return {
 
         totalReports: reports.length,
 
         equipments: new Set(
-            reports.map(r => r.equipment)
+            reports.map(r => safe(r.equipment))
         ).size,
 
         machines: new Set(
-            reports.map(r => r.machineName)
+            reports.map(r => safe(r.machineName))
         ).size,
 
         lines: new Set(
-            reports.map(r => r.lineName)
+            reports.map(r => safe(r.lineName))
         ).size
 
     };

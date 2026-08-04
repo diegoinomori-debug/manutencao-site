@@ -26,6 +26,8 @@ import {
 import "./index.css";
 import { db } from "./firebase";
 import { askMiyamaAI } from "./services/miyamaAI";
+import { searchHistory } from "./services/historySearch";
+import SimilarProblems from "./components/SimilarProblems";
 
 import {
   collection,
@@ -2828,6 +2830,7 @@ export default function App() {
   const [parts, setParts] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [reports, setReports] = useState([]);
+  const [similarProblems, setSimilarProblems] = useState([]);
   const [plannedWorks, setPlannedWorks] = useState([]);
 
   // 編集中の報告書はローカル下書きで保持します。
@@ -2986,7 +2989,11 @@ export default function App() {
       const { id, ...plainDraft } = draft;
       const reportToSave = sanitizeReportDates(plainDraft);
       await updateDoc(doc(db, "maintenanceReports", reportId), reportToSave);
-      setReports((current) => current.map((item) => (item.id === reportId ? { ...item, ...reportToSave } : item)));
+      setReports((current) =>
+        current.map((item) =>
+          item.id === reportId ? { ...item, ...reportToSave } : item
+        )
+      );
       setReportDirty((current) => ({ ...current, [reportId]: false }));
       alert("保存しました。");
     } catch (error) {

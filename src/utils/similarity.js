@@ -1,24 +1,25 @@
 // ======================================================
 // MIYAMA AI
 // similarity.js
-// Desenvolvido para o Sistema MIYAMA Maintenance
+// Versão 2.0
 // ======================================================
 
 // Normaliza texto
 function normalize(text = "") {
-    return String(text)
+    return String(text ?? "")
         .toLowerCase()
-        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) =>
+        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c =>
             String.fromCharCode(c.charCodeAt(0) - 65248)
         )
         .replace(/[^\w\u3040-\u30ff\u3400-\u9fff]+/g, " ")
+        .replace(/\s+/g, " ")
         .trim();
 }
 
-// Divide palavras
+// Separa palavras
 function words(text = "") {
     return normalize(text)
-        .split(/\s+/)
+        .split(" ")
         .filter(Boolean);
 }
 
@@ -28,70 +29,79 @@ function jaccard(a = "", b = "") {
     const A = new Set(words(a));
     const B = new Set(words(b));
 
+    if (A.size === 0 && B.size === 0)
+        return 1;
+
     if (A.size === 0 || B.size === 0)
         return 0;
 
-    let same = 0;
+    let intersection = 0;
 
-    A.forEach(w => {
-        if (B.has(w))
-            same++;
-    });
+    for (const word of A) {
+        if (B.has(word))
+            intersection++;
+    }
 
-    const total = new Set([...A, ...B]).size;
+    const union = new Set([...A, ...B]).size;
 
-    return same / total;
+    return union === 0 ? 0 : intersection / union;
 }
 
-// Similaridade entre dois relatórios
-export function calculateSimilarity(problem, report){
+// Obtém valor de forma segura
+function value(obj, field) {
+    return obj?.[field] ?? "";
+}
+
+// Calcula a similaridade entre dois problemas
+export function calculateSimilarity(problem = {}, report = {}) {
+
+    const weights = {
+        equipment: 25,
+        lineName: 10,
+        machineName: 10,
+        phenomenon: 20,
+        troublePoint: 10,
+        why1: 5,
+        why2: 5,
+        why3: 5,
+        action: 10
+    };
 
     let score = 0;
 
-    score += jaccard(problem.equipment, report.equipment) * 25;
+    Object.entries(weights).forEach(([field, weight]) => {
 
-    score += jaccard(problem.lineName, report.lineName) * 10;
+        score +=
+            jaccard(
+                value(problem, field),
+                value(report, field)
+            ) * weight;
 
-    score += jaccard(problem.machineName, report.machineName) * 10;
-
-    score += jaccard(problem.phenomenon, report.phenomenon) * 20;
-
-    score += jaccard(problem.troublePoint, report.troublePoint) * 10;
-
-    score += jaccard(problem.why1, report.why1) * 5;
-
-    score += jaccard(problem.why2, report.why2) * 5;
-
-    score += jaccard(problem.why3, report.why3) * 5;
-
-    score += jaccard(problem.action, report.action) * 10;
+    });
 
     return Math.round(score);
-
 }
 
 // Ordena pela similaridade
-export function sortBySimilarity(problem, reports){
+export function sortBySimilarity(problem = {}, reports = []) {
+
+    if (!Array.isArray(reports))
+        return [];
 
     return reports
-        .map(report=>({
-
+        .map(report => ({
             ...report,
-
             similarity: calculateSimilarity(problem, report)
-
         }))
-        .sort((a,b)=>b.similarity-a.similarity);
+        .sort((a, b) => b.similarity - a.similarity);
 
 }
 
-// Retorna somente os melhores casos
-export function getTopMatches(problem, reports, limit = 10){
+// Retorna somente os melhores
+export function getTopMatches(problem = {}, reports = [], limit = 10) {
 
     return sortBySimilarity(problem, reports)
-
-        .filter(r=>r.similarity>20)
-
-        .slice(0,limit);
+        .filter(item => item.similarity >= 20)
+        .slice(0, limit);
 
 }
