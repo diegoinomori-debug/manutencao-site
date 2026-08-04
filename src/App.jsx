@@ -2457,6 +2457,128 @@ function ImeSafeTextarea({ value = "", onCommit, onChange, ...props }) {
 }
 
 
+function AsyncTranslatedText({ text = "", language = "ja", as: Tag = "span", ...props }) {
+  const original = String(text ?? "");
+  const [displayText, setDisplayText] = useState(original);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    if (language !== "en" || !containsJapaneseText(original)) {
+      setDisplayText(original);
+      return () => controller.abort();
+    }
+
+    setDisplayText(original);
+
+    translateJapaneseLongText(original, controller.signal)
+      .then((translated) => {
+        if (!cancelled) setDisplayText(translated || original);
+      })
+      .catch((error) => {
+        if (!cancelled && error?.name !== "AbortError") {
+          console.warn("Field translation failed:", error);
+          setDisplayText(original);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [original, language]);
+
+  return <Tag {...props}>{displayText}</Tag>;
+}
+
+function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = "", ...props }) {
+  const original = String(value ?? "");
+  const [displayValue, setDisplayValue] = useState(original);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    if (language !== "en" || !containsJapaneseText(original)) {
+      setDisplayValue(original);
+      return () => controller.abort();
+    }
+
+    setDisplayValue(original);
+
+    translateJapaneseLongText(original, controller.signal)
+      .then((translated) => {
+        if (!cancelled) setDisplayValue(translated || original);
+      })
+      .catch((error) => {
+        if (!cancelled && error?.name !== "AbortError") {
+          console.warn("Input display translation failed:", error);
+          setDisplayValue(original);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [original, language]);
+
+  return (
+    <input
+      {...props}
+      value={displayValue}
+      placeholder={placeholder}
+      readOnly
+      title={language === "en" ? "Switch to Japanese to edit the original data." : undefined}
+    />
+  );
+}
+
+function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder = "", ...props }) {
+  const original = String(value ?? "");
+  const [displayValue, setDisplayValue] = useState(original);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    if (language !== "en" || !containsJapaneseText(original)) {
+      setDisplayValue(original);
+      return () => controller.abort();
+    }
+
+    setDisplayValue(original);
+
+    translateJapaneseLongText(original, controller.signal)
+      .then((translated) => {
+        if (!cancelled) setDisplayValue(translated || original);
+      })
+      .catch((error) => {
+        if (!cancelled && error?.name !== "AbortError") {
+          console.warn("Textarea display translation failed:", error);
+          setDisplayValue(original);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [original, language]);
+
+  return (
+    <textarea
+      {...props}
+      value={displayValue}
+      placeholder={placeholder}
+      readOnly
+      title={language === "en" ? "Switch to Japanese to edit the original data." : undefined}
+    />
+  );
+}
+
+
 // ===== V15 Firebase長文の表示翻訳（日本語 → 英語） =====
 // Firebaseの原文は変更せず、AI検索結果に表示する長文だけを翻訳します。
 // 翻訳結果はブラウザにキャッシュし、同じ文章を何度も通信しません。
@@ -5273,15 +5395,24 @@ function renderHome() {
                     </span>
                   </div>
 
-                  <h2 data-no-translate="true" style={{ fontSize: "30px", margin: "0 0 8px", color: "#0f172a" }}>
-                    {row.equipment || row.lineName || (appLanguage === "en" ? "Equipment not entered" : "設備名なし")}
-                  </h2>
-                  <p data-no-translate="true" style={{ fontSize: "20px", margin: "0 0 6px", color: "#2563eb", fontWeight: "800" }}>
-                    {row.sectionName || row.equipment2Name || row.partName || (appLanguage === "en" ? "Part not entered" : "部位未入力")}
-                  </p>
-                  <p data-no-translate="true" style={{ fontSize: "18px", margin: 0, color: "#475569", whiteSpace: "pre-wrap" }}>
-                    {row.maintenanceDetail || (appLanguage === "en" ? "Details not entered" : "内容未入力")}
-                  </p>
+                  <AsyncTranslatedText
+                    as="h2"
+                    language={appLanguage}
+                    text={row.equipment || row.lineName || (appLanguage === "en" ? "Equipment not entered" : "設備名なし")}
+                    style={{ fontSize: "30px", margin: "0 0 8px", color: "#0f172a" }}
+                  />
+                  <AsyncTranslatedText
+                    as="p"
+                    language={appLanguage}
+                    text={row.sectionName || row.equipment2Name || row.partName || (appLanguage === "en" ? "Part not entered" : "部位未入力")}
+                    style={{ fontSize: "20px", margin: "0 0 6px", color: "#2563eb", fontWeight: "800" }}
+                  />
+                  <AsyncTranslatedText
+                    as="p"
+                    language={appLanguage}
+                    text={row.maintenanceDetail || (appLanguage === "en" ? "Details not entered" : "内容未入力")}
+                    style={{ fontSize: "18px", margin: 0, color: "#475569", whiteSpace: "pre-wrap" }}
+                  />
                 </div>
 
                 <div style={{ minWidth: "220px", textAlign: "right" }}>
@@ -5296,8 +5427,8 @@ function renderHome() {
                 <div className="reportSummaryItem"><span>🧭 {appLanguage === "en" ? "Maintenance Mode" : "保全方式"}</span><strong>{normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" ? (appLanguage === "en" ? "Production-Based Maintenance" : "定量保全（生産数）") : (appLanguage === "en" ? "Time-Based Maintenance (Days)" : "定期保全（日数）")}</strong></div>
                 {normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" ? (
                   <>
-                    <div className="reportSummaryItem"><span>📦 保全サイクル</span><strong>{row.cycleProductionCount ? `${Number(row.cycleProductionCount || 0).toLocaleString()}回` : "未入力"}</strong></div>
-                    <div className="reportSummaryItem"><span>📊 1日平均生産数</span><strong>{row.dailyAverageProduction ? `${Number(row.dailyAverageProduction || 0).toLocaleString()}個/日` : "生産数DB未登録"}</strong></div>
+                    <div className="reportSummaryItem"><span>📦 {appLanguage === "en" ? "Maintenance Cycle" : "保全サイクル"}</span><strong>{row.cycleProductionCount ? `${Number(row.cycleProductionCount || 0).toLocaleString()}${appLanguage === "en" ? " cycles" : "回"}` : (appLanguage === "en" ? "Not entered" : "未入力")}</strong></div>
+                    <div className="reportSummaryItem"><span>📊 {appLanguage === "en" ? "Daily Average Production" : "1日平均生産数"}</span><strong>{row.dailyAverageProduction ? `${Number(row.dailyAverageProduction || 0).toLocaleString()} ${appLanguage === "en" ? "pcs/day" : "個/日"}` : (appLanguage === "en" ? "Production DB not registered" : "生産数DB未登録")}</strong></div>
                     <div className="reportSummaryItem"><span>⏳ 残り回数</span><strong>{row.productionRemain === "" ? "未入力" : `${Number(row.productionRemain || 0).toLocaleString()}回`}</strong></div>
                   </>
                 ) : (
@@ -5317,13 +5448,42 @@ function renderHome() {
                     {typeOptions.filter((type) => type !== "全て").map((type) => <option key={type} value={type}>{translateMiyamaText(type, appLanguage)}</option>)}
                   </select>
                 </label>
-                <label>🏭 {appLanguage === "en" ? "Equipment" : "設備名"}<ImeSafeInput list="maintenance-equipment-list" value={row.equipment || ""} onCommit={(value) => updateField("parts", row.id, "equipment", value)} placeholder={appLanguage === "en" ? "Select from the list or enter manually" : "一覧から選択、または日本語で手入力"} /></label>
-                <label>📦 {appLanguage === "en" ? "Part Name" : "部品名"}<ImeSafeInput value={row.sectionName || row.equipment2Name || row.partName || ""} onCommit={(value) => updateField("parts", row.id, "sectionName", value)} placeholder={appLanguage === "en" ? "Example: Rivet transfer unit ②" : "例：リベット切出し吸着②"} /></label>
+                <label>🏭 {appLanguage === "en" ? "Equipment" : "設備名"}
+                  {appLanguage === "en" ? (
+                    <TranslatedReadOnlyInput
+                      language={appLanguage}
+                      value={row.equipment || ""}
+                      placeholder="Equipment not entered"
+                    />
+                  ) : (
+                    <ImeSafeInput
+                      list="maintenance-equipment-list"
+                      value={row.equipment || ""}
+                      onCommit={(value) => updateField("parts", row.id, "equipment", value)}
+                      placeholder="一覧から選択、または日本語で手入力"
+                    />
+                  )}
+                </label>
+                <label>📦 {appLanguage === "en" ? "Part Name" : "部品名"}
+                  {appLanguage === "en" ? (
+                    <TranslatedReadOnlyInput
+                      language={appLanguage}
+                      value={row.sectionName || row.equipment2Name || row.partName || ""}
+                      placeholder="Part not entered"
+                    />
+                  ) : (
+                    <ImeSafeInput
+                      value={row.sectionName || row.equipment2Name || row.partName || ""}
+                      onCommit={(value) => updateField("parts", row.id, "sectionName", value)}
+                      placeholder="例：リベット切出し吸着②"
+                    />
+                  )}
+                </label>
 
                 {normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" ? (
                   <>
-                    <label>📦 保全サイクル<input type="number" min="1" value={row.cycleProductionCount || ""} onChange={(e) => updateMaintenanceSchedule(row, { cycleProductionCount: e.target.value ? Number(e.target.value) : "" })} placeholder="例：100000" /><small style={{color:"#64748b",fontWeight:700}}>この部品は何回使用できますか？</small></label>
-                    <label>📊 1日平均生産数<input className="readOnlyCalc" value={row.dailyAverageProduction ? `${Number(row.dailyAverageProduction || 0).toLocaleString()}個/日` : "生産数DB未登録"} readOnly /><small style={{color:"#64748b",fontWeight:700}}>生産数DBから自動計算</small></label>
+                    <label>📦 {appLanguage === "en" ? "Maintenance Cycle" : "保全サイクル"}<input type="number" min="1" value={row.cycleProductionCount || ""} onChange={(e) => updateMaintenanceSchedule(row, { cycleProductionCount: e.target.value ? Number(e.target.value) : "" })} placeholder={appLanguage === "en" ? "Example: 100000" : "例：100000"} /><small style={{color:"#64748b",fontWeight:700}}>{appLanguage === "en" ? "How many cycles can this part be used?" : "この部品は何回使用できますか？"}</small></label>
+                    <label>📊 {appLanguage === "en" ? "Daily Average Production" : "1日平均生産数"}<input className="readOnlyCalc" value={row.dailyAverageProduction ? `${Number(row.dailyAverageProduction || 0).toLocaleString()} ${appLanguage === "en" ? "pcs/day" : "個/日"}` : (appLanguage === "en" ? "Production DB not registered" : "生産数DB未登録")} readOnly /><small style={{color:"#64748b",fontWeight:700}}>{appLanguage === "en" ? "Automatically calculated from the Production DB" : "生産数DBから自動計算"}</small></label>
                   </>
                 ) : (
                   <label>📅 {appLanguage === "en" ? "Maintenance Interval (Days)" : "保全周期（日）"}<input type="number" min="1" value={row.cycle || ""} onChange={(e) => updateMaintenanceSchedule(row, { cycle: e.target.value ? Number(e.target.value) : "" })} placeholder={appLanguage === "en" ? "Example: 30" : "例：30"} /><small style={{color:"#64748b",fontWeight:700}}>{appLanguage === "en" ? "How often should this maintenance be performed?" : "何日ごとに実施しますか？"}</small></label>
@@ -5338,15 +5498,24 @@ function renderHome() {
 
               <div style={{ marginTop: "12px" }}>
                 <label style={{ fontWeight: "700" }}>📝 {appLanguage === "en" ? "Memo" : "メモ"}
-                  <ImeSafeTextarea
-                    style={{ minHeight: "90px", fontSize: "16px" }}
-                    value={row.note || row.maintenanceDetail || ""}
-                    onCommit={async (value) => {
-                      await updateField("parts", row.id, "note", value);
-                      await updateField("parts", row.id, "maintenanceDetail", value);
-                    }}
-                    placeholder={appLanguage === "en" ? "Replacement reason, cautions, or shop-floor notes" : "交換理由・注意点・現場メモなど（日本語入力対応）"}
-                  />
+                  {appLanguage === "en" ? (
+                    <TranslatedReadOnlyTextarea
+                      language={appLanguage}
+                      style={{ minHeight: "90px", fontSize: "16px" }}
+                      value={row.note || row.maintenanceDetail || ""}
+                      placeholder="Replacement reason, cautions, or shop-floor notes"
+                    />
+                  ) : (
+                    <ImeSafeTextarea
+                      style={{ minHeight: "90px", fontSize: "16px" }}
+                      value={row.note || row.maintenanceDetail || ""}
+                      onCommit={async (value) => {
+                        await updateField("parts", row.id, "note", value);
+                        await updateField("parts", row.id, "maintenanceDetail", value);
+                      }}
+                      placeholder="交換理由・注意点・現場メモなど（日本語入力対応）"
+                    />
+                  )}
                 </label>
               </div>
 
@@ -6268,6 +6437,12 @@ function renderHome() {
                   updateField("parts", row.id, "note", e.target.value);
                 }}
               />
+
+              {appLanguage === "en" && (
+                <div style={{ marginTop: "10px", color: "#64748b", fontSize: "13px", fontWeight: 700 }}>
+                  Displayed Japanese database text is translated into English. Switch to Japanese to edit the original stored values.
+                </div>
+              )}
 
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
                 <button className="primaryButton" onClick={() => smartFillSpare(row)}>🤖 AI補完</button>
