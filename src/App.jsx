@@ -56,12 +56,26 @@ function parseLocalDate(dateString) {
   const match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (!match) return null;
 
-  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const d = new Date(year, month - 1, day);
   d.setHours(0, 0, 0, 0);
+
+  if (
+    d.getFullYear() !== year ||
+    d.getMonth() !== month - 1 ||
+    d.getDate() !== day
+  ) {
+    return null;
+  }
+
   return d;
 }
 
-const today = parseLocalDate(toLocalDateText());
+function getTodayLocalDate() {
+  return parseLocalDate(toLocalDateText());
+}
 
 function addDays(dateString, days) {
   if (!dateString || days === undefined || days === null || days === "") return "";
@@ -75,7 +89,7 @@ function diffDays(dateString) {
   if (!dateString) return "";
   const target = parseLocalDate(dateString);
   if (!target) return "";
-  return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+  return Math.ceil((target - getTodayLocalDate()) / (1000 * 60 * 60 * 24));
 }
 
 function getStatus(daysLeft) {
@@ -275,6 +289,12 @@ function normalizeDateTime(value) {
     const dd = String(match[3]).padStart(2, "0");
     const hh = String(match[4] || "0").padStart(2, "0");
     const mi = String(match[5] || "0").padStart(2, "0");
+
+    const validDate = parseLocalDate(`${yyyy}-${mm}-${dd}`);
+    const hourNumber = Number(hh);
+    const minuteNumber = Number(mi);
+    if (!validDate || hourNumber > 23 || minuteNumber > 59) return "";
+
     return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
   }
 
@@ -619,9 +639,13 @@ function calculateSmartMaintenanceByDailyProduction(part = {}, dailyProductions 
     ? validDailyRows.filter((row) => row.date >= lastDate && row.date <= todayText())
     : [];
 
-  const last30 = validDailyRows.filter((row) => row.date >= addDays(todayText(), -30) && row.date <= todayText());
+  const last30Start = addDays(todayText(), -29);
+  const last30 = validDailyRows.filter((row) => row.date >= last30Start && row.date <= todayText());
   const total30 = last30.reduce((sum, row) => sum + row.quantity, 0);
-  const dailyAverageFromDb = last30.length > 0 ? Math.round(total30 / last30.length) : 0;
+  const distinctProductionDays = new Set(last30.map((row) => row.date)).size;
+  const dailyAverageFromDb = distinctProductionDays > 0
+    ? Math.round(total30 / distinctProductionDays)
+    : 0;
   const manualDailyAverage = toNumber(part.dailyAverageProduction, 0);
   const dailyAverageProduction = dailyAverageFromDb || manualDailyAverage;
 
@@ -1223,50 +1247,85 @@ function shouldSkipLanguageNode(parent) {
   return false;
 }
 
-function applyMiyamaLanguage(language = "ja") {
+async function applyMiyamaLanguage(language = "ja", signal) {
   if (typeof document === "undefined") return;
+
   const root = document.querySelector(".page");
   if (!root) return;
 
   const selectedLanguage = MIYAMA_LANGUAGES[language] ? language : "ja";
   root.setAttribute("data-language", selectedLanguage);
 
+  const translateAttribute = (element, attributeName) => {
+    const currentValue = element.getAttribute(attributeName) || "";
+    const nextValue = translateMiyamaText(currentValue, selectedLanguage);
+    if (currentValue !== nextValue) element.setAttribute(attributeName, nextValue);
+  };
+
+  const textNodes = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
       if (shouldSkipLanguageNode(parent)) return NodeFilter.FILTER_REJECT;
-      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if (!node.nodeValue?.trim()) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
 
-  const nodes = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode);
-  nodes.forEach((node) => {
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+  textNodes.forEach((node) => {
     const nextText = translateMiyamaText(node.nodeValue, selectedLanguage);
     if (node.nodeValue !== nextText) node.nodeValue = nextText;
   });
 
-  root.querySelectorAll("input[placeholder], textarea[placeholder]").forEach((el) => {
-    const nextText = translateMiyamaText(el.placeholder, selectedLanguage);
-    if (el.placeholder !== nextText) el.placeholder = nextText;
+  root.querySelectorAll("input[placeholder], textarea[placeholder]").forEach((element) => {
+    translateAttribute(element, "placeholder");
   });
+  root.querySelectorAll("[title]").forEach((element) => translateAttribute(element, "title"));
+  root.querySelectorAll("[aria-label]").forEach((element) => translateAttribute(element, "aria-label"));
 
-  root.querySelectorAll("[title]").forEach((el) => {
-    const nextText = translateMiyamaText(el.getAttribute("title") || "", selectedLanguage);
-    if (el.getAttribute("title") !== nextText) el.setAttribute("title", nextText);
-  });
+  if (selectedLanguage !== "en") return;
 
-  root.querySelectorAll("[aria-label]").forEach((el) => {
-    const nextText = translateMiyamaText(el.getAttribute("aria-label") || "", selectedLanguage);
-    if (el.getAttribute("aria-label") !== nextText) el.setAttribute("aria-label", nextText);
-  });
+  const remainingNodes = textNodes.filter((node) => containsJapaneseText(node.nodeValue));
+  const uniqueTexts = [...new Set(
+    remainingNodes.map((node) => node.nodeValue.trim()).filter(Boolean)
+  )];
 
-  // Translate read-only calculated values only. Editable DB fields are not changed,
-  // so the original Firebase data remains safe and is not accidentally saved in English.
-  root.querySelectorAll("input[readonly], input[disabled]").forEach((el) => {
-    const nextText = translateMiyamaText(el.value, selectedLanguage);
-    if (el.value !== nextText) el.value = nextText;
+  const translatedByOriginal = {};
+  const concurrency = 3;
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < uniqueTexts.length) {
+      if (signal?.aborted) return;
+
+      const currentIndex = cursor;
+      cursor += 1;
+      const original = uniqueTexts[currentIndex];
+
+      try {
+        translatedByOriginal[original] = await translateJapaneseLongText(original, signal);
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          console.warn("Display translation failed:", error);
+        }
+        translatedByOriginal[original] = original;
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, uniqueTexts.length) }, worker));
+  if (signal?.aborted) return;
+
+  remainingNodes.forEach((node) => {
+    const original = node.nodeValue.trim();
+    const translated = translatedByOriginal[original];
+    if (!translated || translated === original) return;
+
+    const leading = node.nodeValue.match(/^\s*/)?.[0] || "";
+    const trailing = node.nodeValue.match(/\s*$/)?.[0] || "";
+    node.nodeValue = `${leading}${translated}${trailing}`;
   });
 }
 
@@ -2290,34 +2349,57 @@ function Section({ sectionKey, title, children, openSections, toggleSection }) {
 function ImeSafeInput({ value = "", onCommit, onChange, ...props }) {
   const [localValue, setLocalValue] = useState(value ?? "");
   const composingRef = useRef(false);
+  const lastCommittedRef = useRef(String(value ?? ""));
 
   useEffect(() => {
-    if (!composingRef.current) setLocalValue(value ?? "");
+    if (!composingRef.current) {
+      const nextValue = String(value ?? "");
+      setLocalValue(nextValue);
+      lastCommittedRef.current = nextValue;
+    }
   }, [value]);
 
   const commit = (nextValue) => {
-    setLocalValue(nextValue);
-    if (onCommit) onCommit(nextValue);
-    else if (onChange) onChange({ target: { value: nextValue } });
+    const normalized = String(nextValue ?? "");
+    setLocalValue(normalized);
+
+    if (normalized === lastCommittedRef.current) return;
+    lastCommittedRef.current = normalized;
+
+    if (onCommit) {
+      Promise.resolve(onCommit(normalized)).catch((error) => {
+        console.error("IME input save error:", error);
+      });
+    } else if (onChange) {
+      onChange({ target: { value: normalized } });
+    }
   };
 
   return (
     <input
       {...props}
       value={localValue}
-      onCompositionStart={() => { composingRef.current = true; }}
-      onCompositionEnd={(e) => {
+      onCompositionStart={(event) => {
+        composingRef.current = true;
+        props.onCompositionStart?.(event);
+      }}
+      onCompositionEnd={(event) => {
         composingRef.current = false;
-        commit(e.currentTarget.value);
-      }}
-      onChange={(e) => {
-        const nextValue = e.target.value;
+        const nextValue = event.currentTarget.value;
         setLocalValue(nextValue);
-        if (!composingRef.current && props.type === "number") commit(nextValue);
+        props.onCompositionEnd?.(event);
       }}
-      onBlur={(e) => {
-        if (!composingRef.current) commit(e.currentTarget.value);
-        if (props.onBlur) props.onBlur(e);
+      onChange={(event) => {
+        const nextValue = event.target.value;
+        setLocalValue(nextValue);
+
+        if (!composingRef.current && props.type === "number") {
+          commit(nextValue);
+        }
+      }}
+      onBlur={(event) => {
+        if (!composingRef.current) commit(event.currentTarget.value);
+        props.onBlur?.(event);
       }}
     />
   );
@@ -2326,30 +2408,49 @@ function ImeSafeInput({ value = "", onCommit, onChange, ...props }) {
 function ImeSafeTextarea({ value = "", onCommit, onChange, ...props }) {
   const [localValue, setLocalValue] = useState(value ?? "");
   const composingRef = useRef(false);
+  const lastCommittedRef = useRef(String(value ?? ""));
 
   useEffect(() => {
-    if (!composingRef.current) setLocalValue(value ?? "");
+    if (!composingRef.current) {
+      const nextValue = String(value ?? "");
+      setLocalValue(nextValue);
+      lastCommittedRef.current = nextValue;
+    }
   }, [value]);
 
   const commit = (nextValue) => {
-    setLocalValue(nextValue);
-    if (onCommit) onCommit(nextValue);
-    else if (onChange) onChange({ target: { value: nextValue } });
+    const normalized = String(nextValue ?? "");
+    setLocalValue(normalized);
+
+    if (normalized === lastCommittedRef.current) return;
+    lastCommittedRef.current = normalized;
+
+    if (onCommit) {
+      Promise.resolve(onCommit(normalized)).catch((error) => {
+        console.error("IME textarea save error:", error);
+      });
+    } else if (onChange) {
+      onChange({ target: { value: normalized } });
+    }
   };
 
   return (
     <textarea
       {...props}
       value={localValue}
-      onCompositionStart={() => { composingRef.current = true; }}
-      onCompositionEnd={(e) => {
-        composingRef.current = false;
-        commit(e.currentTarget.value);
+      onCompositionStart={(event) => {
+        composingRef.current = true;
+        props.onCompositionStart?.(event);
       }}
-      onChange={(e) => setLocalValue(e.target.value)}
-      onBlur={(e) => {
-        if (!composingRef.current) commit(e.currentTarget.value);
-        if (props.onBlur) props.onBlur(e);
+      onCompositionEnd={(event) => {
+        composingRef.current = false;
+        setLocalValue(event.currentTarget.value);
+        props.onCompositionEnd?.(event);
+      }}
+      onChange={(event) => setLocalValue(event.target.value)}
+      onBlur={(event) => {
+        if (!composingRef.current) commit(event.currentTarget.value);
+        props.onBlur?.(event);
       }}
     />
   );
@@ -2566,11 +2667,22 @@ export default function App() {
     }
 
     localStorage.setItem("miyamaLanguage", safeLanguage);
-    const timer = window.setTimeout(() => {
-      window.requestAnimationFrame(() => applyMiyamaLanguage(safeLanguage));
-    }, 80);
 
-    return () => window.clearTimeout(timer);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        applyMiyamaLanguage(safeLanguage, controller.signal).catch((error) => {
+          if (error?.name !== "AbortError") {
+            console.error("Language application error:", error);
+          }
+        });
+      });
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [
     appLanguage,
     page,
@@ -2630,7 +2742,7 @@ export default function App() {
   }
 
   async function loadAll() {
-    await Promise.all([
+    const results = await Promise.allSettled([
       loadParts(),
       loadCalendar(),
       loadReports(),
@@ -2638,6 +2750,13 @@ export default function App() {
       loadProductionLogs(),
       loadDailyProductions(),
     ]);
+
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        const names = ["parts", "calendar", "maintenanceReports", "plannedWorks", "productionLogs", "dailyProductions"];
+        console.error(`Failed to load ${names[index]}:`, result.reason);
+      }
+    });
   }
 
   async function loadParts() {
