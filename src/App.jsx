@@ -2485,7 +2485,8 @@ export default function App() {
     return MIYAMA_LANGUAGES[savedLanguage] ? savedLanguage : "ja";
   });
   const [globalSearch, setGlobalSearch] = useState("");
-  const [globalVisibleCount, setGlobalVisibleCount] = useState(20);
+  const GLOBAL_RESULTS_PER_PAGE = 20;
+  const [globalPage, setGlobalPage] = useState(1);
   const [reportSearch, setReportSearch] = useState("");
   const [spareSearch, setSpareSearch] = useState("");
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
@@ -3637,14 +3638,23 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appLanguage, visibleAiResults]);
 
+  const globalTotalPages = Math.max(1, Math.ceil(globalResults.length / GLOBAL_RESULTS_PER_PAGE));
+  const safeGlobalPage = Math.min(globalPage, globalTotalPages);
+  const globalPageStart = (safeGlobalPage - 1) * GLOBAL_RESULTS_PER_PAGE;
+  const globalPageEnd = Math.min(globalPageStart + GLOBAL_RESULTS_PER_PAGE, globalResults.length);
+
   const visibleGlobalResults = useMemo(
-    () => globalResults.slice(0, globalVisibleCount),
-    [globalResults, globalVisibleCount]
+    () => globalResults.slice(globalPageStart, globalPageEnd),
+    [globalResults, globalPageStart, globalPageEnd]
   );
 
   useEffect(() => {
-    setGlobalVisibleCount(20);
+    setGlobalPage(1);
   }, [globalSearch]);
+
+  useEffect(() => {
+    if (globalPage > globalTotalPages) setGlobalPage(globalTotalPages);
+  }, [globalPage, globalTotalPages]);
 
   useEffect(() => {
     if (appLanguage !== "en" || visibleGlobalResults.length === 0) {
@@ -3830,7 +3840,8 @@ export default function App() {
               <p style={{ color: "#b45309", fontWeight: 700 }}>{globalTranslationError}</p>
             )}
             {visibleGlobalResults.map((item, index) => {
-              const translationKey = makeAiTranslationItemKey(item, index);
+              const absoluteIndex = globalPageStart + index;
+              const translationKey = makeAiTranslationItemKey(item, absoluteIndex);
               const translated = aiResultTranslations[translationKey];
               const displayTitle = appLanguage === "en" && translated?.title ? translated.title : item.title;
               const displayText = appLanguage === "en" && translated?.text ? translated.text : item.text;
@@ -3855,16 +3866,130 @@ export default function App() {
                 </div>
               );
             })}
-            {globalResults.length > visibleGlobalResults.length && (
-              <button
-                className="primaryButton"
-                style={{ marginTop: "16px" }}
-                onClick={() => setGlobalVisibleCount((current) => Math.min(current + 20, globalResults.length))}
+            {globalResults.length > 0 && (
+              <div
+                style={{
+                  marginTop: "18px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "10px",
+                }}
+                onClick={(event) => event.stopPropagation()}
               >
-                {appLanguage === "en"
-                  ? `Show 20 more (${visibleGlobalResults.length}/${globalResults.length})`
-                  : `さらに20件表示（${visibleGlobalResults.length}/${globalResults.length}）`}
-              </button>
+                <div style={{ color: "#64748b", fontWeight: 700 }}>
+                  {appLanguage === "en"
+                    ? `Showing ${globalPageStart + 1}-${globalPageEnd} of ${globalResults.length} results`
+                    : `${globalPageStart + 1}～${globalPageEnd}件 / 全${globalResults.length}件`}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={safeGlobalPage === 1}
+                    onClick={() => setGlobalPage(1)}
+                    style={{ opacity: safeGlobalPage === 1 ? 0.45 : 1 }}
+                  >
+                    {appLanguage === "en" ? "<< First" : "<< 最初"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={safeGlobalPage === 1}
+                    onClick={() => setGlobalPage((current) => Math.max(1, current - 1))}
+                    style={{ opacity: safeGlobalPage === 1 ? 0.45 : 1 }}
+                  >
+                    {appLanguage === "en" ? "< Previous" : "< 前へ"}
+                  </button>
+
+                  {(() => {
+                    const pages = [];
+                    const addPage = (pageNumber) => {
+                      if (pageNumber >= 1 && pageNumber <= globalTotalPages && !pages.includes(pageNumber)) {
+                        pages.push(pageNumber);
+                      }
+                    };
+
+                    addPage(1);
+                    for (let pageNumber = safeGlobalPage - 2; pageNumber <= safeGlobalPage + 2; pageNumber += 1) {
+                      addPage(pageNumber);
+                    }
+                    addPage(globalTotalPages);
+                    pages.sort((a, b) => a - b);
+
+                    const controls = [];
+                    pages.forEach((pageNumber, index) => {
+                      if (index > 0 && pageNumber - pages[index - 1] > 1) {
+                        controls.push(
+                          <span key={`ellipsis-${pageNumber}`} style={{ padding: "0 2px", fontWeight: 800 }}>
+                            ...
+                          </span>
+                        );
+                      }
+
+                      controls.push(
+                        <button
+                          key={pageNumber}
+                          type="button"
+                          onClick={() => setGlobalPage(pageNumber)}
+                          aria-current={safeGlobalPage === pageNumber ? "page" : undefined}
+                          style={{
+                            minWidth: "42px",
+                            minHeight: "42px",
+                            padding: "8px 12px",
+                            borderRadius: "12px",
+                            border: safeGlobalPage === pageNumber ? "2px solid #1d4ed8" : "1px solid #cbd5e1",
+                            background: safeGlobalPage === pageNumber ? "#2563eb" : "#ffffff",
+                            color: safeGlobalPage === pageNumber ? "#ffffff" : "#0f172a",
+                            fontWeight: 900,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    });
+
+                    return controls;
+                  })()}
+
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={safeGlobalPage === globalTotalPages}
+                    onClick={() => setGlobalPage((current) => Math.min(globalTotalPages, current + 1))}
+                    style={{ opacity: safeGlobalPage === globalTotalPages ? 0.45 : 1 }}
+                  >
+                    {appLanguage === "en" ? "Next >" : "次へ >"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={safeGlobalPage === globalTotalPages}
+                    onClick={() => setGlobalPage(globalTotalPages)}
+                    style={{ opacity: safeGlobalPage === globalTotalPages ? 0.45 : 1 }}
+                  >
+                    {appLanguage === "en" ? "Last >>" : "最後 >>"}
+                  </button>
+                </div>
+
+                <div style={{ fontWeight: 800 }}>
+                  {appLanguage === "en"
+                    ? `Page ${safeGlobalPage} of ${globalTotalPages}`
+                    : `${safeGlobalPage} / ${globalTotalPages} ページ`}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -8354,7 +8479,7 @@ function renderHome() {
         const all = `${item.type} ${item.title} ${item.date} ${item.text}`.toLowerCase();
         const score = keywords.reduce((s, k) => s + (all.includes(k) ? 2 : 0), 0);
         return { ...item, score };
-      }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
+      }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
 
       const topEquip = topByEquipment();
       const wantsStock = q.includes("在庫") || q.includes("stock") || q.includes("部品不足") || q.includes("欠品");
