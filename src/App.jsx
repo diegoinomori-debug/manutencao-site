@@ -2355,6 +2355,118 @@ function ImeSafeTextarea({ value = "", onCommit, onChange, ...props }) {
   );
 }
 
+
+// ===== V15 Firebase長文の表示翻訳（日本語 → 英語） =====
+// Firebaseの原文は変更せず、AI検索結果に表示する長文だけを翻訳します。
+// 翻訳結果はブラウザにキャッシュし、同じ文章を何度も通信しません。
+const MIYAMA_LONG_TRANSLATION_CACHE_KEY = "miyamaLongTranslationCacheV1";
+const MIYAMA_TRANSLATE_ENDPOINT =
+  import.meta.env.VITE_TRANSLATION_API_URL ||
+  "https://translate.googleapis.com/translate_a/single";
+
+function containsJapaneseText(value = "") {
+  return /[ぁ-んァ-ン一-龯々〆ヵヶ]/.test(String(value || ""));
+}
+
+function makeLongTranslationKey(value = "") {
+  const text = String(value || "");
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${text.length}_${(hash >>> 0).toString(36)}`;
+}
+
+function readLongTranslationCache() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MIYAMA_LONG_TRANSLATION_CACHE_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLongTranslationCache(cache = {}) {
+  try {
+    const entries = Object.entries(cache);
+    // localStorageが大きくなり過ぎないよう、最新800件まで保存します。
+    const limited = Object.fromEntries(entries.slice(-800));
+    localStorage.setItem(MIYAMA_LONG_TRANSLATION_CACHE_KEY, JSON.stringify(limited));
+  } catch (error) {
+    console.warn("Translation cache could not be saved:", error);
+  }
+}
+
+function splitTranslationText(value = "", maxLength = 1200) {
+  const text = String(value || "").trim();
+  if (!text) return [];
+  if (text.length <= maxLength) return [text];
+
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > maxLength) {
+    let cut = Math.max(
+      remaining.lastIndexOf("。", maxLength),
+      remaining.lastIndexOf("\n", maxLength),
+      remaining.lastIndexOf(" ", maxLength)
+    );
+    if (cut < Math.floor(maxLength * 0.5)) cut = maxLength;
+    else cut += 1;
+    chunks.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut);
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
+async function translateJapaneseChunkToEnglish(text, signal) {
+  if (!text || !containsJapaneseText(text)) return text;
+
+  const url = new URL(MIYAMA_TRANSLATE_ENDPOINT);
+  // 標準Google Cloud等の独自URLを設定した場合にも、既存パラメータを壊しません。
+  if (!url.searchParams.has("client")) url.searchParams.set("client", "gtx");
+  if (!url.searchParams.has("sl")) url.searchParams.set("sl", "ja");
+  if (!url.searchParams.has("tl")) url.searchParams.set("tl", "en");
+  if (!url.searchParams.has("dt")) url.searchParams.set("dt", "t");
+  url.searchParams.append("q", text);
+
+  const response = await fetch(url.toString(), { method: "GET", signal });
+  if (!response.ok) throw new Error(`Translation HTTP ${response.status}`);
+  const data = await response.json();
+
+  if (Array.isArray(data) && Array.isArray(data[0])) {
+    return data[0].map((part) => (Array.isArray(part) ? part[0] || "" : "")).join("");
+  }
+
+  // VITE_TRANSLATION_API_URLで独自APIを使う場合の一般的な返却形式にも対応。
+  return data?.translatedText || data?.translation || data?.data?.translations?.[0]?.translatedText || text;
+}
+
+async function translateJapaneseLongText(value, signal) {
+  const original = String(value || "");
+  if (!original || !containsJapaneseText(original)) return original;
+
+  const cacheKey = makeLongTranslationKey(original);
+  const cache = readLongTranslationCache();
+  if (cache[cacheKey]) return cache[cacheKey];
+
+  const chunks = splitTranslationText(original);
+  const translatedChunks = [];
+  for (const chunk of chunks) {
+    translatedChunks.push(await translateJapaneseChunkToEnglish(chunk, signal));
+  }
+
+  const translated = translatedChunks.join("");
+  cache[cacheKey] = translated;
+  writeLongTranslationCache(cache);
+  return translated;
+}
+
+function makeAiTranslationItemKey(item = {}, index = 0) {
+  return makeLongTranslationKey(`${index}|${item.category || ""}|${item.date || ""}|${item.title || ""}|${item.text || ""}`);
+}
+
 export default function App() {
   const [parts, setParts] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
@@ -2387,6 +2499,10 @@ export default function App() {
   const [ocrCandidates, setOcrCandidates] = useState([]);
   const [aiSearch, setAiSearch] = useState("");
   const [aiAnswer, setAiAnswer] = useState("");
+  const [aiVisibleCount, setAiVisibleCount] = useState(20);
+  const [aiResultTranslations, setAiResultTranslations] = useState({});
+  const [aiTranslationLoading, setAiTranslationLoading] = useState(false);
+  const [aiTranslationError, setAiTranslationError] = useState("");
   const [miyamaAiQuestion, setMiyamaAiQuestion] = useState("");
   const [miyamaAiAnswer, setMiyamaAiAnswer] = useState("MIYAMA AIへようこそ。設備名・部品名・不具合内容・費用・予定などを質問してください。");
   const [productionLogs, setProductionLogs] = useState([]);
@@ -3451,6 +3567,72 @@ export default function App() {
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score);
   }, [aiSearch, reports, maintenanceRows, spareRows, calendarEvents, plannedWorks]);
+
+
+  const visibleAiResults = useMemo(
+    () => aiResults.slice(0, aiVisibleCount),
+    [aiResults, aiVisibleCount]
+  );
+
+  useEffect(() => {
+    setAiVisibleCount(20);
+  }, [aiSearch]);
+
+  useEffect(() => {
+    if (appLanguage !== "en" || visibleAiResults.length === 0) {
+      setAiTranslationLoading(false);
+      setAiTranslationError("");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    async function translateVisibleResults() {
+      setAiTranslationLoading(true);
+      setAiTranslationError("");
+      try {
+        // 2件ずつ処理して翻訳サービスとブラウザへの負荷を抑えます。
+        for (let start = 0; start < visibleAiResults.length; start += 2) {
+          const group = visibleAiResults.slice(start, start + 2);
+          const translatedGroup = await Promise.all(
+            group.map(async (item, offset) => {
+              const realIndex = start + offset;
+              const key = makeAiTranslationItemKey(item, realIndex);
+              if (aiResultTranslations[key]) return [key, aiResultTranslations[key]];
+
+              const [title, text] = await Promise.all([
+                translateJapaneseLongText(item.title || "", controller.signal),
+                translateJapaneseLongText(item.text || "", controller.signal),
+              ]);
+              return [key, { title, text }];
+            })
+          );
+
+          if (cancelled) return;
+          setAiResultTranslations((current) => ({
+            ...current,
+            ...Object.fromEntries(translatedGroup),
+          }));
+        }
+      } catch (error) {
+        if (error?.name !== "AbortError" && !cancelled) {
+          console.error("Long text translation failed:", error);
+          setAiTranslationError("Automatic translation could not be loaded. The original Japanese text is being displayed.");
+        }
+      } finally {
+        if (!cancelled) setAiTranslationLoading(false);
+      }
+    }
+
+    translateVisibleResults();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  // aiResultTranslationsは依存配列に入れません。追加のたびに通信を再開始しないためです。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appLanguage, visibleAiResults]);
 
   function makeAiAnswer() {
     if (!aiSearch.trim()) {
@@ -6497,13 +6679,45 @@ function renderHome() {
         <h3 style={{ marginTop: "24px" }}>関連データ一覧：{aiResults.length}件</h3>
         {aiResults.length === 0 && aiSearch && <p>該当する履歴が見つかりません。</p>}
 
-        {aiResults.map((item, index) => (
-          <div key={index} className="calendarEditCard" style={{ cursor: "pointer" }} onClick={() => setPage(item.page)}>
-            <b>{item.category} / {item.date}</b>
-            <h3>{item.title}</h3>
-            <p>{item.text || "-"}</p>
-          </div>
-        ))}
+        {appLanguage === "en" && aiTranslationLoading && (
+          <p style={{ fontWeight: 700 }}>🌐 Translating the displayed reports...</p>
+        )}
+        {appLanguage === "en" && aiTranslationError && (
+          <p style={{ color: "#b45309", fontWeight: 700 }}>{aiTranslationError}</p>
+        )}
+
+        {visibleAiResults.map((item, index) => {
+          const translationKey = makeAiTranslationItemKey(item, index);
+          const translated = aiResultTranslations[translationKey];
+          const displayTitle = appLanguage === "en" && translated?.title ? translated.title : item.title;
+          const displayText = appLanguage === "en" && translated?.text ? translated.text : item.text;
+
+          return (
+            <div key={translationKey} className="calendarEditCard" style={{ cursor: "pointer" }} onClick={() => setPage(item.page)}>
+              <b>{item.category} / {item.date}</b>
+              <h3>{displayTitle}</h3>
+              <p style={{ whiteSpace: "pre-wrap" }}>{displayText || "-"}</p>
+              {appLanguage === "en" && translated && containsJapaneseText(item.text) && (
+                <details onClick={(event) => event.stopPropagation()} style={{ marginTop: "10px" }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 700 }}>Show original Japanese</summary>
+                  <p style={{ whiteSpace: "pre-wrap", color: "#64748b" }}>{item.text || "-"}</p>
+                </details>
+              )}
+            </div>
+          );
+        })}
+
+        {aiResults.length > visibleAiResults.length && (
+          <button
+            className="primaryButton"
+            style={{ marginTop: "16px" }}
+            onClick={() => setAiVisibleCount((current) => Math.min(current + 20, aiResults.length))}
+          >
+            {appLanguage === "en"
+              ? `Show 20 more (${visibleAiResults.length}/${aiResults.length})`
+              : `さらに20件表示（${visibleAiResults.length}/${aiResults.length}）`}
+          </button>
+        )}
       </div>
     );
   }
