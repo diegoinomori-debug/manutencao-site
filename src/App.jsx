@@ -2911,6 +2911,10 @@ export default function App() {
   const [productionAiAnswer, setProductionAiAnswer] = useState("生産状況AIへようこそ。停止理由・設備名・アラームNo・改善案などを質問してください。");
   const [aiLevel, setAiLevel] = useState("");
   const [autoReportInput, setAutoReportInput] = useState("");
+  const [autoReportAiLoading, setAutoReportAiLoading] = useState(false);
+  const [autoReportAiAnswer, setAutoReportAiAnswer] = useState("");
+  const [autoReportAiError, setAutoReportAiError] = useState("");
+  const [autoReportHistoryMessage, setAutoReportHistoryMessage] = useState("");
   const [analyticsPeriod, setAnalyticsPeriod] = useState("all");
   const [analyticsBaseDate, setAnalyticsBaseDate] = useState(todayText());
   const [reportViewMode, setReportViewMode] = useState("summary");
@@ -4231,62 +4235,243 @@ export default function App() {
     );
   }
 
-  async function createAutoReport() {
-    const input = autoReportInput.trim();
-    if (!input) {
-      alert("内容を入力してください。例：78-60 ロードセル異常 荷重確認");
-      return;
-    }
+  function buildAutoReportDraft(inputText = autoReportInput) {
+    const input = String(inputText || "").trim();
+    if (!input) return null;
 
     const words = input.split(/\s+/);
     const equipment = words[0] || "";
 
     let phenomenon = `${input} の不具合が発生。`;
-    let why1 = "設備または部品に異常が発生したため。";
-    let why2 = "原因箇所の確認が必要なため。";
-    let why3 = "再発防止のため、発生条件と処置内容の記録が必要なため。";
-    let action = "現象確認、原因調査、関係部品の確認を実施。必要に応じて調整・交換・清掃を行う。";
-    let recurrencePrevention = "同様の異常が再発しないよう、点検項目追加と発生条件の記録を行う。";
-    let note = "Maintenance AI 自動作成のため、内容を確認して必要に応じて修正してください。";
+    let troublePoint = words.slice(1).join(" ") || input;
+    let why1 = "設備または部品に異常が発生した可能性があるため。";
+    let why2 = "原因箇所の点検と発生条件の確認が必要なため。";
+    let why3 = "劣化、位置ズレ、汚れ、配線不良などの根本要因を現物確認する必要があるため。";
+    let action = "現象確認、原因調査、関係部品の点検を実施。安全を確認した上で、必要に応じて調整・交換・清掃を行う。";
+    let recurrencePrevention = "発生条件と処置結果を記録し、定期点検項目へ追加して再発傾向を確認する。";
+    let replacedPart = "";
+    let note = "MIYAMA AIの下書きです。現物確認後に原因・処置・交換部品を修正してから保存してください。";
 
     if (input.includes("ロードセル")) {
       phenomenon = "ロードセルの異常が発生し、荷重値の確認が必要な状態。";
-      why1 = "ロードセル信号または荷重値に異常が発生したため。";
-      why2 = "配線、コネクタ、取付状態、またはロードセル本体の不具合が考えられるため。";
-      why3 = "経年劣化、過負荷、振動、接触不良により検出値が不安定になった可能性があるため。";
-      action = "ロードセルの表示値確認、配線・コネクタ確認、取付状態確認を実施。必要に応じてロードセル交換または再調整を行う。";
-      recurrencePrevention = "定期保全時にロードセル値の確認、配線固定状態の確認、異常傾向の記録を行う。";
-    } else if (input.includes("センサー")) {
-      phenomenon = "センサー異常により設備動作が不安定、または検出不良が発生。";
-      why1 = "センサー信号が正常に入っていないため。";
-      why2 = "センサー位置ズレ、汚れ、断線、コネクタ接触不良が考えられるため。";
-      why3 = "振動や経年劣化により検出状態が悪化した可能性があるため。";
-      action = "センサー清掃、位置調整、配線確認、I/O確認を実施。必要に応じてセンサー交換を行う。";
-      recurrencePrevention = "定期保全にセンサー清掃・位置確認を追加し、固定状態を定期確認する。";
+      troublePoint = "ロードセル、取付部、配線、コネクタ、アンプ設定";
+      why1 = "ロードセル信号または荷重値に異常が発生した可能性があるため。";
+      why2 = "配線、コネクタ、取付状態、ゼロ点、またはロードセル本体に異常がある可能性があるため。";
+      why3 = "経年劣化、過負荷、振動、接触不良などにより検出値が不安定になった可能性があるため。";
+      action = "表示値、ゼロ点、配線、コネクタ、取付状態を順番に確認し、必要に応じて再調整またはロードセル交換を行う。";
+      recurrencePrevention = "定期保全に荷重値、ゼロ点、配線固定、コネクタ状態の確認を追加し、傾向値を記録する。";
+      replacedPart = "ロードセル（確認後）";
+    } else if (input.includes("センサー") || input.includes("光電")) {
+      phenomenon = "センサーの検出不良により設備動作が完了しない、または誤判定が発生。";
+      troublePoint = "センサー、検出位置、反射板、配線、コネクタ、PLC入力";
+      why1 = "センサー信号が正常に入力されていない可能性があるため。";
+      why2 = "位置ズレ、汚れ、遮光、断線、コネクタ接触不良などが考えられるため。";
+      why3 = "振動、固定不足、経年劣化、周辺環境の変化により検出状態が悪化した可能性があるため。";
+      action = "センサー表示、検出物、位置、汚れ、配線、PLC入力を確認し、清掃・位置調整・再学習・交換を判断する。";
+      recurrencePrevention = "清掃、固定状態、検出余裕度、配線状態を定期点検へ追加する。";
+      replacedPart = "センサーまたはケーブル（確認後）";
+    } else if (input.includes("シリンダ") || input.includes("エア")) {
+      phenomenon = "シリンダ動作不良、速度低下、またはエア漏れが発生。";
+      troublePoint = "シリンダ、電磁弁、スピードコントローラ、配管、継手、圧力";
+      why1 = "必要な推力またはストロークが得られていない可能性があるため。";
+      why2 = "エア漏れ、圧力不足、電磁弁不良、摺動抵抗の増加などが考えられるため。";
+      why3 = "シール劣化、異物混入、給油不足、配管劣化などが進行した可能性があるため。";
+      action = "安全停止後、圧力、漏れ、電磁弁出力、速度調整、ロッド状態を確認し、必要に応じて部品交換を行う。";
+      recurrencePrevention = "漏れ点検、作動時間、速度、配管状態を定期点検へ追加する。";
+      replacedPart = "シリンダ、電磁弁、継手（確認後）";
     }
 
-    if (aiResults[0]) {
-      note += `\n\n関連履歴あり：${aiResults[0].category} / ${aiResults[0].date} / ${aiResults[0].title}`;
+    const historicalMatches = searchHistory(
+      {
+        equipment,
+        lineName: "",
+        phenomenon,
+        troublePoint,
+        why1,
+        why2,
+        why3,
+        action,
+        replacedPart,
+      },
+      reports,
+      { limit: 12, minimumScore: 10 }
+    );
+
+    if (historicalMatches[0]) {
+      const best = historicalMatches[0];
+      note += `\n\n最も近い過去事例：${best.createdAt || best.reportCreatedDate || ""} / ${best.equipment || ""} / ${best.phenomenon || ""}`;
     }
 
-    await addDoc(collection(db, "maintenanceReports"), {
+    return {
       ...createBlankReport(),
       maintenanceType: "突発保全",
-      functionDownRate: "100",
+      functionDownRate: 100,
       equipment,
       phenomenon,
+      troublePoint,
       why1,
       why2,
       why3,
       action,
       recurrencePrevention,
-      outflowPrevention: "同様の異常が他設備で発生していないか確認する。",
+      outflowPrevention: "同様の異常が他設備・他工程で発生していないか横展開確認を行う。",
+      replacedPart,
       note,
+    };
+  }
+
+  function createAutoReport() {
+    const draft = buildAutoReportDraft();
+    if (!draft) {
+      alert(
+        appLanguage === "es"
+          ? "Escriba una descripción breve del problema."
+          : appLanguage === "en"
+            ? "Enter a short description of the problem."
+            : "内容を入力してください。例：78-60 ロードセル異常 荷重確認"
+      );
+      return;
+    }
+
+    setAutoReportAiAnswer("");
+    setAutoReportAiError("");
+    setHistoryAiQuestion("");
+    setHistoryAiAnswer("");
+    setHistoryAiError("");
+    setNewReport(draft);
+
+    const matches = searchHistory(draft, reports, {
+      limit: 12,
+      minimumScore: 10,
+    });
+    setSimilarProblems(matches);
+    setAutoReportHistoryMessage(
+      appLanguage === "es"
+        ? `Se encontraron ${matches.length} casos similares. Revise el borrador abajo.`
+        : appLanguage === "en"
+          ? `${matches.length} similar cases were found. Review the draft below.`
+          : `類似事例が${matches.length}件見つかりました。下の下書きを確認してください。`
+    );
+  }
+
+  function searchAutoReportProblems() {
+    const draft = newReport || buildAutoReportDraft();
+    if (!draft) {
+      alert(
+        appLanguage === "es"
+          ? "Escriba primero el problema."
+          : appLanguage === "en"
+            ? "Enter the problem first."
+            : "先に問題内容を入力してください。"
+      );
+      return;
+    }
+
+    if (!newReport) setNewReport(draft);
+
+    const matches = searchHistory(draft, reports, {
+      limit: 12,
+      minimumScore: 8,
     });
 
-    setAutoReportInput("");
-    await loadReports();
-    setPage("report");
+    setSimilarProblems(matches);
+    setAutoReportHistoryMessage(
+      appLanguage === "es"
+        ? `${matches.length} casos similares encontrados en el historial.`
+        : appLanguage === "en"
+          ? `${matches.length} similar cases found in the history.`
+          : `履歴から類似事例を${matches.length}件見つけました。`
+    );
+  }
+
+  async function askAutoReportAI() {
+    const draft = newReport || buildAutoReportDraft();
+    const question = String(autoReportInput || "").trim();
+
+    if (!draft || !question) {
+      setAutoReportAiError(
+        appLanguage === "es"
+          ? "Escriba primero el problema."
+          : appLanguage === "en"
+            ? "Enter the problem first."
+            : "先に問題内容を入力してください。"
+      );
+      return;
+    }
+
+    if (!newReport) setNewReport(draft);
+
+    const matches = searchHistory(draft, reports, {
+      limit: 8,
+      minimumScore: 8,
+    });
+    setSimilarProblems(matches);
+
+    const historyContext = matches.length
+      ? matches.map((item, index) => {
+          const calc = calculateReport(item);
+          return [
+            `Case ${index + 1}`,
+            `Similarity: ${item.similarity || 0}%`,
+            `Date: ${item.createdAt || item.reportCreatedDate || item.troubleDateTime || ""}`,
+            `Equipment: ${item.equipment || ""}`,
+            `Symptom: ${item.phenomenon || ""}`,
+            `Failure point: ${item.troublePoint || ""}`,
+            `Cause: ${item.why3 || item.why2 || item.why1 || ""}`,
+            `Action: ${item.action || ""}`,
+            `Parts: ${[item.replacedPart, item.partName1, item.partName2, item.partName3].filter(Boolean).join(", ")}`,
+            `Downtime: ${calc.stopTimeHours || 0} hours`,
+          ].join("\n");
+        }).join("\n\n---\n\n")
+      : "No sufficiently similar previous report was found.";
+
+    setAutoReportAiLoading(true);
+    setAutoReportAiError("");
+    setAutoReportAiAnswer("");
+
+    try {
+      const responseLanguage =
+        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+
+      const result = await askMiyamaAI({
+        language: responseLanguage,
+        machine: draft.equipment || "",
+        context: [
+          "CURRENT PROBLEM",
+          `Equipment: ${draft.equipment || ""}`,
+          `Symptom: ${draft.phenomenon || ""}`,
+          `Failure point: ${draft.troublePoint || ""}`,
+          "",
+          "SIMILAR FACTORY HISTORY",
+          historyContext,
+        ].join("\n"),
+        message: `Analyze this maintenance problem and answer in ${responseLanguage}.
+
+Required structure:
+1. Most likely causes ranked.
+2. Safe checks in practical order.
+3. Corrective actions used in similar previous cases.
+4. Parts to inspect or replace.
+5. Evidence still required before confirming the cause.
+6. Confidence based only on the supplied history.
+
+Do not present a hypothesis as a confirmed cause.
+Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical protections.`,
+      });
+
+      setAutoReportAiAnswer(String(result.answer || "").trim());
+    } catch (error) {
+      console.error("Auto report MIYAMA AI error:", error);
+      setAutoReportAiError(
+        appLanguage === "es"
+          ? `No fue posible consultar MIYAMA AI: ${error.message}`
+          : appLanguage === "en"
+            ? `Could not ask MIYAMA AI: ${error.message}`
+            : `MIYAMA AIへ質問できませんでした：${error.message}`
+      );
+    } finally {
+      setAutoReportAiLoading(false);
+    }
   }
 
   function renderGlobalSearchBox() {
@@ -7971,10 +8156,100 @@ function renderHome() {
         <button className="primaryButton" onClick={makeAiAnswer}><Bot size={16} /> AI分析</button>
 
         <div className="calendarEditCard" style={{ marginTop: "20px" }}>
-          <h3>🤖 AI自動報告書作成</h3>
-          <p>短く入力すると、保全作業報告書を自動で作成します。</p>
-          <textarea value={autoReportInput} onChange={(e) => setAutoReportInput(e.target.value)} placeholder="例：78-60 ロードセル異常 荷重確認 配線確認" />
-          <button className="primaryButton" onClick={createAutoReport}>報告書を自動作成</button>
+          <h3>🤖 AI保全アシスタント</h3>
+          <p>
+            短く入力すると、同じ画面で報告書の下書き作成・過去事例検索・MIYAMA AIへの質問ができます。
+            自動保存はしません。内容を確認してから保存してください。
+          </p>
+
+          <textarea
+            value={autoReportInput}
+            onChange={(e) => setAutoReportInput(e.target.value)}
+            placeholder="例：78-60 箱替え動作が完了しない 光電センサー確認"
+            style={{ minHeight: "110px" }}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+              gap: "10px",
+              marginTop: "12px",
+            }}
+          >
+            <button type="button" className="primaryButton" onClick={createAutoReport}>
+              📝 報告書の下書きを作成
+            </button>
+
+            <button type="button" className="primaryButton" onClick={searchAutoReportProblems}>
+              🔎 類似問題を検索
+            </button>
+
+            <button
+              type="button"
+              className="primaryButton"
+              onClick={askAutoReportAI}
+              disabled={autoReportAiLoading}
+              style={{ opacity: autoReportAiLoading ? 0.65 : 1 }}
+            >
+              <Bot size={17} />
+              {autoReportAiLoading ? "分析中..." : "MIYAMA AIへ質問"}
+            </button>
+          </div>
+
+          {autoReportHistoryMessage && (
+            <div
+              style={{
+                marginTop: "12px",
+                padding: "10px 12px",
+                borderRadius: "12px",
+                background: "#eff6ff",
+                color: "#1e40af",
+                fontWeight: 800,
+              }}
+            >
+              {autoReportHistoryMessage}
+            </div>
+          )}
+
+          {autoReportAiError && (
+            <div
+              role="alert"
+              style={{
+                marginTop: "12px",
+                padding: "10px 12px",
+                borderRadius: "12px",
+                background: "#fee2e2",
+                color: "#991b1b",
+                fontWeight: 800,
+              }}
+            >
+              {autoReportAiError}
+            </div>
+          )}
+
+          {autoReportAiAnswer && (
+            <div
+              style={{
+                marginTop: "14px",
+                padding: "14px",
+                border: "1px solid #c4b5fd",
+                borderRadius: "14px",
+                background: "#faf5ff",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.65,
+              }}
+            >
+              <strong>🤖 MIYAMA AI回答</strong>
+              <div style={{ marginTop: "8px" }}>{autoReportAiAnswer}</div>
+            </div>
+          )}
+
+          {newReport && (
+            <div style={{ marginTop: "18px" }}>
+              <ReportDraftForm />
+            </div>
+          )}
         </div>
 
         {aiLevel && (
@@ -9623,12 +9898,102 @@ function renderHome() {
             <h3 style={{ marginTop: "18px" }}>⚡ よく使う質問</h3>
             <div className="quickQuestionGrid">{quickQuestions.map((q) => (<button key={q} type="button" onClick={() => { setMiyamaAiQuestion(q); searchSite(q); }}>{q}</button>))}</div>
 
-            <div className="calendarEditCard" style={{ marginTop: "18px" }}>
-              <h3>📝 AI自動報告書作成</h3>
-              <p>短く入力すると、保全作業報告書を自動で作成します。検索・分析・報告書作成の機能をここに統合しました。</p>
-              <textarea value={autoReportInput} onChange={(e) => setAutoReportInput(e.target.value)} placeholder="例：78-60 ロードセル異常 荷重確認 配線確認" />
-              <button className="primaryButton" onClick={createAutoReport}>報告書を自動作成</button>
+        <div className="calendarEditCard" style={{ marginTop: "18px" }}>
+          <h3>🤖 AI保全アシスタント</h3>
+          <p>
+            短く入力すると、同じ画面で報告書の下書き作成・過去事例検索・MIYAMA AIへの質問ができます。
+            自動保存はしません。内容を確認してから保存してください。
+          </p>
+
+          <textarea
+            value={autoReportInput}
+            onChange={(e) => setAutoReportInput(e.target.value)}
+            placeholder="例：78-60 箱替え動作が完了しない 光電センサー確認"
+            style={{ minHeight: "110px" }}
+          />
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+              gap: "10px",
+              marginTop: "12px",
+            }}
+          >
+            <button type="button" className="primaryButton" onClick={createAutoReport}>
+              📝 報告書の下書きを作成
+            </button>
+
+            <button type="button" className="primaryButton" onClick={searchAutoReportProblems}>
+              🔎 類似問題を検索
+            </button>
+
+            <button
+              type="button"
+              className="primaryButton"
+              onClick={askAutoReportAI}
+              disabled={autoReportAiLoading}
+              style={{ opacity: autoReportAiLoading ? 0.65 : 1 }}
+            >
+              <Bot size={17} />
+              {autoReportAiLoading ? "分析中..." : "MIYAMA AIへ質問"}
+            </button>
+          </div>
+
+          {autoReportHistoryMessage && (
+            <div
+              style={{
+                marginTop: "12px",
+                padding: "10px 12px",
+                borderRadius: "12px",
+                background: "#eff6ff",
+                color: "#1e40af",
+                fontWeight: 800,
+              }}
+            >
+              {autoReportHistoryMessage}
             </div>
+          )}
+
+          {autoReportAiError && (
+            <div
+              role="alert"
+              style={{
+                marginTop: "12px",
+                padding: "10px 12px",
+                borderRadius: "12px",
+                background: "#fee2e2",
+                color: "#991b1b",
+                fontWeight: 800,
+              }}
+            >
+              {autoReportAiError}
+            </div>
+          )}
+
+          {autoReportAiAnswer && (
+            <div
+              style={{
+                marginTop: "14px",
+                padding: "14px",
+                border: "1px solid #c4b5fd",
+                borderRadius: "14px",
+                background: "#faf5ff",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.65,
+              }}
+            >
+              <strong>🤖 MIYAMA AI回答</strong>
+              <div style={{ marginTop: "8px" }}>{autoReportAiAnswer}</div>
+            </div>
+          )}
+
+          {newReport && (
+            <div style={{ marginTop: "18px" }}>
+              <ReportDraftForm />
+            </div>
+          )}
+        </div>
           </div>
           <div className="tableWrap"><h2>📌 AI回答</h2><div className="aiAnswerBox">{miyamaAiAnswer}</div></div>
         </div>
