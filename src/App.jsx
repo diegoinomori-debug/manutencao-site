@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import "./index.css";
 import { db } from "./firebase";
+import { askMiyamaAI } from "./services/miyamaAI";
 
 import {
   collection,
@@ -743,7 +744,8 @@ function downloadTextFile(filename, content, mime = "text/plain;charset=utf-8") 
 // V11 removes Thai and prevents broken partial translations such as 区Minutes / 鈴Thu / このDay.
 const MIYAMA_LANGUAGES = {
   ja: "🇯🇵 日本語",
-  en: "US English",
+  en: "🇺🇸 English",
+  es: "🇪🇸 Español",
 };
 
 const MIYAMA_TRANSLATIONS = {
@@ -1069,7 +1071,117 @@ const MIYAMA_TRANSLATIONS = {
     "個/日": "pcs/day",
     "個": "pcs",
     "円": "yen"
-  }
+  },
+
+  es: {
+    "ホーム": "Inicio",
+    "MIYAMA AI": "MIYAMA AI",
+    "保全報告書": "Informes de mantenimiento",
+    "保全修理報告書": "Informes de reparación",
+    "保全作業報告書": "Informe de trabajo de mantenimiento",
+    "修理報告書": "Informe de reparación",
+    "定期保全": "Mantenimiento por tiempo",
+    "定量保全": "Mantenimiento por producción",
+    "生産数DB": "Base de datos de producción",
+    "予備品管理": "Repuestos",
+    "カレンダー": "Calendario",
+    "保全分析": "Análisis de mantenimiento",
+    "CSV分析": "Análisis CSV",
+    "計画工事": "Trabajo planificado",
+    "AI統合検索": "Búsqueda unificada con IA",
+    "言語": "Idioma",
+    "日本語": "Japonés",
+    "英語": "Inglés",
+    "検索": "Buscar",
+    "再読込": "Recargar",
+    "削除": "Eliminar",
+    "保存": "Guardar",
+    "保存確認": "Guardar / Confirmar",
+    "保存して閉じる": "Guardar y cerrar",
+    "追加": "Agregar",
+    "選択": "Seleccionar",
+    "印刷": "Imprimir",
+    "ダウンロード": "Descargar",
+    "キャンセル": "Cancelar",
+    "基本情報・設備情報": "Información básica y del equipo",
+    "作成日": "Fecha de creación",
+    "保全分類": "Clasificación de mantenimiento",
+    "グループ名": "Nombre del grupo",
+    "ライン名": "Nombre de la línea",
+    "設備名": "Equipo",
+    "作業者": "Técnico",
+    "時間・停止時間（自動計算）": "Tiempo y parada (cálculo automático)",
+    "不具合発生日時": "Fecha y hora de la falla",
+    "保全作業開始日時": "Inicio del mantenimiento",
+    "保全作業完了日時": "Fin del mantenimiento",
+    "生産開始日時": "Reinicio de producción",
+    "停止除外時間": "Tiempo excluido de parada",
+    "機能低下": "Reducción de función",
+    "停止時間": "Tiempo de parada",
+    "不具合内容": "Detalles de la falla",
+    "不具合現象": "Síntoma de la falla",
+    "不具合箇所": "Punto de la falla",
+    "リンク先": "Enlace",
+    "不具合原因・なぜなぜ分析": "Causa y análisis de los 3 porqués",
+    "なぜなぜ分析": "Análisis de los 3 porqués",
+    "なぜ1": "Por qué 1",
+    "なぜ2": "Por qué 2",
+    "なぜ3": "Por qué 3",
+    "処置内容": "Acción correctiva",
+    "再発防止・流出防止・変化点": "Prevención de recurrencia, escape y cambios",
+    "再発防止": "Prevención de recurrencia",
+    "再発防止・残工事": "Prevención de recurrencia / trabajo pendiente",
+    "流出防止": "Prevención de escape",
+    "変化点ランク": "Rango del punto de cambio",
+    "承認": "Aprobación",
+    "点検": "Inspección",
+    "作成": "Creación",
+    "承認ステータス": "Estado de aprobación",
+    "下書き": "Borrador",
+    "点検待ち": "Pendiente de inspección",
+    "承認待ち": "Pendiente de aprobación",
+    "承認済み": "Aprobado",
+    "差戻し": "Devuelto",
+    "Excel取込": "Importado desde Excel",
+    "必要": "Necesario",
+    "不要": "No necesario",
+    "未実施": "No realizado",
+    "実施完了": "Completado",
+    "正常": "Normal",
+    "交換超過": "Reemplazo vencido",
+    "交換間近": "Reemplazo próximo",
+    "未入力": "Sin datos",
+    "修理": "Reparación",
+    "交換": "Reemplazo",
+    "給油": "Lubricación",
+    "清掃": "Limpieza",
+    "調整": "Ajuste",
+    "校正": "Calibración",
+    "確認": "Verificación",
+    "保全": "Mantenimiento",
+    "メモ": "Nota",
+    "備考": "Observaciones",
+    "原因": "Causa",
+    "推定原因": "Causa probable",
+    "対策": "Contramedida",
+    "担当者": "Responsable",
+    "次回実施日": "Próxima fecha",
+    "前回実施日": "Última fecha",
+    "残り日数": "Días restantes",
+    "部品名": "Nombre de la pieza",
+    "保全方式": "Modo de mantenimiento",
+    "保全種類": "Tipo de mantenimiento",
+    "保全周期（日）": "Intervalo de mantenimiento (días)",
+    "定期保全（日数）": "Mantenimiento por tiempo (días)",
+    "定量保全（生産数）": "Mantenimiento por producción",
+    "交換完了": "Completado",
+    "定期保全から外す": "Quitar del mantenimiento",
+    "さらに20件表示": "Mostrar 20 más",
+    "データがありません。": "No hay datos.",
+    "生成中": "Generando",
+    "3つのなぜを生成": "Generar 3 porqués"
+  },
+
 };
 
 // Words below caused broken translations inside names or Japanese phrases.
@@ -1285,7 +1397,7 @@ async function applyMiyamaLanguage(language = "ja", signal) {
   root.querySelectorAll("[title]").forEach((element) => translateAttribute(element, "title"));
   root.querySelectorAll("[aria-label]").forEach((element) => translateAttribute(element, "aria-label"));
 
-  if (selectedLanguage !== "en") return;
+  if (selectedLanguage === "ja") return;
 
   const remainingNodes = textNodes.filter((node) => containsJapaneseText(node.nodeValue));
   const uniqueTexts = [...new Set(
@@ -1305,7 +1417,7 @@ async function applyMiyamaLanguage(language = "ja", signal) {
       const original = uniqueTexts[currentIndex];
 
       try {
-        translatedByOriginal[original] = await translateJapaneseLongText(original, signal);
+        translatedByOriginal[original] = await translateJapaneseLongText(original, signal, selectedLanguage);
       } catch (error) {
         if (error?.name !== "AbortError") {
           console.warn("Display translation failed:", error);
@@ -2472,7 +2584,7 @@ function AsyncTranslatedText({ text = "", language = "ja", as: Tag = "span", ...
 
     setDisplayText(original);
 
-    translateJapaneseLongText(original, controller.signal)
+    translateJapaneseLongText(original, controller.signal, language)
       .then((translated) => {
         if (!cancelled) setDisplayText(translated || original);
       })
@@ -2507,7 +2619,7 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
 
     setDisplayValue(original);
 
-    translateJapaneseLongText(original, controller.signal)
+    translateJapaneseLongText(original, controller.signal, language)
       .then((translated) => {
         if (!cancelled) setDisplayValue(translated || original);
       })
@@ -2550,7 +2662,7 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
 
     setDisplayValue(original);
 
-    translateJapaneseLongText(original, controller.signal)
+    translateJapaneseLongText(original, controller.signal, language)
       .then((translated) => {
         if (!cancelled) setDisplayValue(translated || original);
       })
@@ -2643,14 +2755,14 @@ function splitTranslationText(value = "", maxLength = 1200) {
   return chunks;
 }
 
-async function translateJapaneseChunkToEnglish(text, signal) {
+async function translateJapaneseChunk(text, targetLanguage = "en", signal) {
   if (!text || !containsJapaneseText(text)) return text;
 
   const url = new URL(MIYAMA_TRANSLATE_ENDPOINT);
   // 標準Google Cloud等の独自URLを設定した場合にも、既存パラメータを壊しません。
   if (!url.searchParams.has("client")) url.searchParams.set("client", "gtx");
   if (!url.searchParams.has("sl")) url.searchParams.set("sl", "ja");
-  if (!url.searchParams.has("tl")) url.searchParams.set("tl", "en");
+  url.searchParams.set("tl", targetLanguage === "es" ? "es" : "en");
   if (!url.searchParams.has("dt")) url.searchParams.set("dt", "t");
   url.searchParams.append("q", text);
 
@@ -2666,18 +2778,18 @@ async function translateJapaneseChunkToEnglish(text, signal) {
   return data?.translatedText || data?.translation || data?.data?.translations?.[0]?.translatedText || text;
 }
 
-async function translateJapaneseLongText(value, signal) {
+async function translateJapaneseLongText(value, signal, targetLanguage = "en") {
   const original = String(value || "");
   if (!original || !containsJapaneseText(original)) return original;
 
-  const cacheKey = makeLongTranslationKey(original);
+  const cacheKey = makeLongTranslationKey(`${targetLanguage}|${original}`);
   const cache = readLongTranslationCache();
   if (cache[cacheKey]) return cache[cacheKey];
 
   const chunks = splitTranslationText(original);
   const translatedChunks = [];
   for (const chunk of chunks) {
-    translatedChunks.push(await translateJapaneseChunkToEnglish(chunk, signal));
+    translatedChunks.push(await translateJapaneseChunk(chunk, targetLanguage, signal));
   }
 
   const translated = translatedChunks.join("");
@@ -2688,6 +2800,28 @@ async function translateJapaneseLongText(value, signal) {
 
 function makeAiTranslationItemKey(item = {}, index = 0) {
   return makeLongTranslationKey(`${index}|${item.category || ""}|${item.date || ""}|${item.title || ""}|${item.text || ""}`);
+}
+
+
+function extractJsonObject(text = "") {
+  const source = String(text || "").trim();
+  if (!source) throw new Error("A IA retornou uma resposta vazia.");
+
+  const withoutFence = source
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(withoutFence);
+  } catch {
+    const firstBrace = withoutFence.indexOf("{");
+    const lastBrace = withoutFence.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      return JSON.parse(withoutFence.slice(firstBrace, lastBrace + 1));
+    }
+    throw new Error("Não foi possível interpretar a resposta da IA.");
+  }
 }
 
 export default function App() {
@@ -3847,8 +3981,8 @@ export default function App() {
               if (aiResultTranslations[key]) return [key, aiResultTranslations[key]];
 
               const [title, text] = await Promise.all([
-                translateJapaneseLongText(item.title || "", controller.signal),
-                translateJapaneseLongText(item.text || "", controller.signal),
+                translateJapaneseLongText(item.title || "", controller.signal, appLanguage),
+                translateJapaneseLongText(item.text || "", controller.signal, appLanguage),
               ]);
               return [key, { title, text }];
             })
@@ -3919,8 +4053,8 @@ export default function App() {
               const key = makeAiTranslationItemKey(item, realIndex);
               if (aiResultTranslations[key]) return [key, aiResultTranslations[key]];
               const [title, text] = await Promise.all([
-                translateJapaneseLongText(item.title || "", controller.signal),
-                translateJapaneseLongText(item.text || "", controller.signal),
+                translateJapaneseLongText(item.title || "", controller.signal, appLanguage),
+                translateJapaneseLongText(item.text || "", controller.signal, appLanguage),
               ]);
               return [key, { title, text }];
             })
@@ -4572,8 +4706,96 @@ const handleBulkReportExcelUpload = async (e) => {
   function ReportDraftForm() {
     if (!newReport) return null;
 
+    const [whyAiLoading, setWhyAiLoading] = useState(false);
+    const [whyAiError, setWhyAiError] = useState("");
+
     const calc = calculateReport(newReport);
     const setReport = (field, value) => setNewReport((current) => ({ ...current, [field]: value }));
+
+    async function generateThreeWhys() {
+      const phenomenon = String(newReport.phenomenon || "").trim();
+      const troublePoint = String(newReport.troublePoint || "").trim();
+
+      if (!phenomenon && !troublePoint) {
+        setWhyAiError(
+          appLanguage === "es"
+            ? "Escriba primero el síntoma o el punto de la falla."
+            : appLanguage === "en"
+              ? "Enter the failure symptom or failure point first."
+              : "先に不具合現象または不具合箇所を入力してください。"
+        );
+        return;
+      }
+
+      const responseLanguage =
+        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+
+      setWhyAiLoading(true);
+      setWhyAiError("");
+
+      try {
+        const context = [
+          `Equipment: ${newReport.equipment || ""}`,
+          `Line: ${newReport.lineName || ""}`,
+          `Failure symptom: ${phenomenon}`,
+          `Failure point: ${troublePoint}`,
+          `Current action: ${newReport.action || ""}`,
+        ].join("\n");
+
+        const result = await askMiyamaAI({
+          language: responseLanguage,
+          machine: newReport.equipment || "",
+          context,
+          message: `Create exactly three connected Why-Why steps for this industrial maintenance failure.
+
+Return ONLY valid JSON. Do not use Markdown and do not add explanations outside the JSON.
+
+Required JSON structure:
+{
+  "why1": "direct reason the symptom occurred",
+  "why2": "reason why Why 1 occurred",
+  "why3": "deeper probable root cause behind Why 2",
+  "action": "safe corrective action to verify and perform",
+  "recurrencePrevention": "practical recurrence-prevention action"
+}
+
+Rules:
+- Use exactly 3 whys, no Why 4 or Why 5.
+- Write in ${responseLanguage}.
+- Preserve machine codes, model numbers, alarm numbers, part numbers, and filenames.
+- Do not invent a confirmed cause. Use wording such as probable, possible, or requires verification when evidence is insufficient.
+- Never recommend bypassing guards, safety circuits, interlocks, lockout/tagout, or electrical protections.`,
+        });
+
+        const parsed = extractJsonObject(result.answer);
+        const required = ["why1", "why2", "why3"];
+        if (required.some((key) => !String(parsed[key] || "").trim())) {
+          throw new Error("A resposta da IA não contém os três porquês.");
+        }
+
+        setNewReport((current) => ({
+          ...current,
+          why1: String(parsed.why1 || "").trim(),
+          why2: String(parsed.why2 || "").trim(),
+          why3: String(parsed.why3 || "").trim(),
+          action: String(parsed.action || current.action || "").trim(),
+          recurrencePrevention: String(
+            parsed.recurrencePrevention || current.recurrencePrevention || ""
+          ).trim(),
+        }));
+      } catch (error) {
+        console.error("3 Whys AI error:", error);
+        setWhyAiError(
+          appLanguage === "es"
+            ? `No se pudieron generar los 3 porqués: ${error.message}`
+            : appLanguage === "en"
+              ? `Could not generate the 3 Whys: ${error.message}`
+              : `3つのなぜを生成できませんでした：${error.message}`
+        );
+      } finally {
+        setWhyAiLoading(false);
+      }
+    }
 
     return (
       <div className="tableWrap" style={{ border: "2px solid #2563eb" }}>
@@ -4696,10 +4918,78 @@ const handleBulkReportExcelUpload = async (e) => {
         </Section>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="why" title="🔍 不具合原因・なぜなぜ分析">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+              marginBottom: "14px",
+              padding: "12px",
+              border: "1px solid #bfdbfe",
+              borderRadius: "14px",
+              background: "#eff6ff",
+            }}
+          >
+            <button
+              type="button"
+              className="primaryButton"
+              onClick={generateThreeWhys}
+              disabled={whyAiLoading}
+              style={{ opacity: whyAiLoading ? 0.65 : 1 }}
+            >
+              <Bot size={18} />
+              {whyAiLoading
+                ? appLanguage === "es"
+                  ? "Generando..."
+                  : appLanguage === "en"
+                    ? "Generating..."
+                    : "生成中..."
+                : appLanguage === "es"
+                  ? "Generar 3 porqués"
+                  : appLanguage === "en"
+                    ? "Generate 3 Whys"
+                    : "3つのなぜを生成"}
+            </button>
+
+            <span style={{ color: "#475569", fontSize: "13px", fontWeight: 700 }}>
+              {appLanguage === "es"
+                ? "La IA completa solo 3 porqués, acción correctiva y prevención. Revise antes de guardar."
+                : appLanguage === "en"
+                  ? "AI fills only 3 Whys, corrective action, and prevention. Review before saving."
+                  : "AIは3つのなぜ・処置内容・再発防止のみを作成します。保存前に確認してください。"}
+            </span>
+          </div>
+
+          {whyAiError && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: "12px",
+                padding: "10px 12px",
+                borderRadius: "12px",
+                background: "#fee2e2",
+                color: "#991b1b",
+                fontWeight: 700,
+              }}
+            >
+              {whyAiError}
+            </div>
+          )}
+
           {[1, 2, 3].map((num) => (
-            <label key={num}>なぜ{num}<textarea value={newReport[`why${num}`] || ""} onChange={(e) => setReport(`why${num}`, e.target.value)} /></label>
+            <label key={num}>
+              {appLanguage === "es" ? `Por qué ${num}` : appLanguage === "en" ? `Why ${num}` : `なぜ${num}`}
+              <textarea
+                value={newReport[`why${num}`] || ""}
+                onChange={(e) => setReport(`why${num}`, e.target.value)}
+              />
+            </label>
           ))}
-          <h3>🛠️ 処置内容</h3>
+
+          <h3>
+            🛠️ {appLanguage === "es" ? "Acción correctiva" : appLanguage === "en" ? "Corrective Action" : "処置内容"}
+          </h3>
           <textarea value={newReport.action || ""} onChange={(e) => setReport("action", e.target.value)} />
         </Section>
 
