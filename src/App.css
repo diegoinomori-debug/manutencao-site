@@ -182,3 +182,85 @@
     border-right-color: var(--border);
   }
 }
+
+/* ===== Maintenance AI Logo ===== */
+
+.javaLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 25px;
+}
+
+.javaLogoIcon {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #005bea, #00c6fb);
+  color: white;
+  font-size: 42px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.javaLogo h1 {
+  margin: 0;
+  font-size: 42px;
+  color: #003366;
+}
+
+.javaLogo p {
+  margin: 4px 0 0;
+  font-size: 18px;
+  color: #666;
+}
+
+.tableWrap {
+  background: white;
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+/* MIYAMA Maintenance - CSS complementar seguro
+   Pode colar em src/App.css ou no final de src/index.css */
+
+.moneyText {
+  display:inline-block;
+  white-space:nowrap !important;
+  word-break:keep-all !important;
+  overflow-wrap:normal !important;
+  font-variant-numeric:tabular-nums;
+}
+
+.card {
+  overflow:hidden;
+}
+
+.card .moneyText {
+  font-size:clamp(24px, 2.4vw, 34px) !important;
+  line-height:1.12 !important;
+}
+
+@media (max-width: 520px) {
+  .card .moneyText {
+    font-size:22px !important;
+  }
+}
+
+.editBtn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.editBtn:hover {
+  background: #1d4ed8;
+}
