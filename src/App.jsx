@@ -1525,6 +1525,38 @@ textarea { min-height:96px !important; white-space:pre-wrap; }
   white-space: pre-wrap;
   line-height: 1.65;
 }
+.miyamaAiPremiumHero {
+  background:
+    radial-gradient(circle at top left, rgba(96,165,250,.36), transparent 35%),
+    linear-gradient(135deg,#0f172a 0%,#172554 55%,#1d4ed8 100%) !important;
+  color:#ffffff !important;
+  border:1px solid rgba(255,255,255,.18) !important;
+  box-shadow:0 24px 60px rgba(15,23,42,.28) !important;
+  border-radius:26px !important;
+  overflow:hidden !important;
+}
+.miyamaAiPremiumHero h1,
+.miyamaAiPremiumHero h2,
+.miyamaAiPremiumHero h3,
+.miyamaAiPremiumHero strong,
+.miyamaAiPremiumHero span,
+.miyamaAiPremiumHero p,
+.miyamaAiPremiumHero div {
+  color:#ffffff !important;
+  opacity:1 !important;
+}
+.miyamaAiPremiumHero > div:last-child > div {
+  background:rgba(255,255,255,.13) !important;
+  border:1px solid rgba(255,255,255,.18) !important;
+  box-shadow:0 8px 22px rgba(15,23,42,.16);
+}
+.miyamaAiPremiumHero > div:last-child > div span {
+  color:#dbeafe !important;
+}
+@media (max-width:700px) {
+  .miyamaAiPremiumHero { padding:20px !important; }
+}
+
 .deleteButton { background:#fee2e2 !important; color:#b91c1c !important; }
 
 .tabs {
@@ -9974,11 +10006,125 @@ Requirements:
       }
     }
 
+    const aiUi = {
+      ja: {
+        heroSubtitle: "社内履歴を無料で検索するMIYAMA AIと、より深い分析を行うOpenAIを1つの画面で使えます。",
+        reports: "報告書",
+        maintenanceItems: "保全項目",
+        registeredParts: "登録部品",
+        plannedWorks: "計画工事",
+        localTitle: "MIYAMA AI ローカル",
+        localSubtitle: "無料 — システム内に保存されたデータだけを検索します。",
+        localPlaceholder: "例：この問題は以前発生した？最も停止時間が長い設備は？在庫切れの部品は？",
+        localSearch: "履歴を検索",
+        clear: "クリア",
+        localResult: "ローカル検索結果",
+        localEmpty: "社内履歴を検索する質問を入力してください。",
+        openAiTitle: "OpenAI — 高度分析",
+        openAiSubtitle: "有料 — OpenAI APIキーと利用枠を使用します。",
+        openAiPlaceholder: "例：この不具合を早く診断する方法は？最初に確認すべき部品は？",
+        askOpenAi: "OpenAIへ質問",
+        analyzing: "分析中...",
+        openAiResult: "OpenAI回答",
+        openAiEmpty: "高度分析の回答がここに表示されます。",
+        quickTitle: "ローカルAIへのクイック質問",
+        assistantTitle: "報告書アシスタント",
+        assistantSubtitle: "この画面のまま、報告書の下書き作成・類似事例検索・履歴を使った質問ができます。",
+        assistantPlaceholder: "例：78-60 箱替え動作が完了しない。光電センサーを確認",
+        createDraft: "下書きを作成",
+        findSimilar: "類似事例を検索",
+        askHistory: "履歴を使って質問",
+      },
+      en: {
+        heroSubtitle: "Use MIYAMA AI to search your internal history for free, or OpenAI for deeper analysis.",
+        reports: "Reports",
+        maintenanceItems: "Maintenance Items",
+        registeredParts: "Registered Parts",
+        plannedWorks: "Planned Work",
+        localTitle: "MIYAMA AI Local",
+        localSubtitle: "Free — searches only the data saved in your system.",
+        localPlaceholder: "Example: Has this problem happened before? Which machine has the most downtime? Which parts are out of stock?",
+        localSearch: "Search History",
+        clear: "Clear",
+        localResult: "Local Result",
+        localEmpty: "Enter a question to search the internal history.",
+        openAiTitle: "OpenAI — Advanced Analysis",
+        openAiSubtitle: "Paid — uses your OpenAI API key and quota.",
+        openAiPlaceholder: "Example: How can I diagnose this failure quickly? Which part should I inspect first?",
+        askOpenAi: "Ask OpenAI",
+        analyzing: "Analyzing...",
+        openAiResult: "OpenAI Answer",
+        openAiEmpty: "The advanced answer will appear here.",
+        quickTitle: "Quick Questions for Local AI",
+        assistantTitle: "Report Assistant",
+        assistantSubtitle: "Create a draft, search similar cases, and ask using history without leaving this page.",
+        assistantPlaceholder: "Example: 78-60 box change does not complete; check the photoelectric sensor",
+        createDraft: "Create Draft",
+        findSimilar: "Find Similar Cases",
+        askHistory: "Ask Using History",
+      },
+      es: {
+        heroSubtitle: "Use MIYAMA AI para buscar gratuitamente en el historial interno u OpenAI para análisis más profundos.",
+        reports: "Informes",
+        maintenanceItems: "Elementos de mantenimiento",
+        registeredParts: "Piezas registradas",
+        plannedWorks: "Trabajos planificados",
+        localTitle: "MIYAMA AI Local",
+        localSubtitle: "Gratis — busca solamente los datos guardados en su sistema.",
+        localPlaceholder: "Ej.: ¿Este problema ya ocurrió? ¿Qué máquina tiene más tiempo de parada? ¿Qué piezas están sin stock?",
+        localSearch: "Buscar en el historial",
+        clear: "Limpiar",
+        localResult: "{aiUi.localResult}",
+        localEmpty: "Escriba una pregunta para buscar en el historial interno.",
+        openAiTitle: "OpenAI — Análisis avanzado",
+        openAiSubtitle: "De pago — usa su clave y cuota de OpenAI.",
+        openAiPlaceholder: "Ej.: ¿Cómo diagnosticar rápidamente esta falla? ¿Qué pieza debo revisar primero?",
+        askOpenAi: "Preguntar a OpenAI",
+        analyzing: "Analizando...",
+        openAiResult: "Respuesta de OpenAI",
+        openAiEmpty: "La respuesta avanzada aparecerá aquí.",
+        quickTitle: "Preguntas rápidas para la IA local",
+        assistantTitle: "Asistente de informe",
+        assistantSubtitle: "Cree un borrador, busque casos similares y consulte usando el historial sin salir de esta página.",
+        assistantPlaceholder: "Ej.: 78-60 el cambio de caja no termina; revisar el sensor fotoeléctrico",
+        createDraft: "Crear borrador",
+        findSimilar: "Buscar casos similares",
+        askHistory: "Preguntar usando el historial",
+      },
+    }[appLanguage] || {
+      heroSubtitle: "",
+      reports: "",
+      maintenanceItems: "",
+      registeredParts: "",
+      plannedWorks: "",
+      localTitle: "",
+      localSubtitle: "",
+      localPlaceholder: "",
+      localSearch: "",
+      clear: "",
+      localResult: "",
+      localEmpty: "",
+      openAiTitle: "",
+      openAiSubtitle: "",
+      openAiPlaceholder: "",
+      askOpenAi: "",
+      analyzing: "",
+      openAiResult: "",
+      openAiEmpty: "",
+      quickTitle: "",
+      assistantTitle: "",
+      assistantSubtitle: "",
+      assistantPlaceholder: "",
+      createDraft: "",
+      findSimilar: "",
+      askHistory: "",
+    };
+
     const quickQuestions = ["一番生産を止めている問題は？", "突発工事を減らすには？", "計画工事にするべき問題は？", "対策しても再発する原因は？", "停止時間が多い設備ランキング", "在庫なしは何件？", "期限超過の定期保全を教えて", "来週交換予定の部品は？"];
     return (
       <>
         <div
-          className="tableWrap"
+          className="miyamaAiPremiumHero"
           style={{
             padding: "28px",
             borderRadius: "26px",
@@ -10009,8 +10155,7 @@ Requirements:
                 MIYAMA AI
               </h1>
               <p style={{ margin: "7px 0 0", color: "#dbeafe", maxWidth: "900px", lineHeight: 1.65 }}>
-                Uma central inteligente para consultar o histórico interno gratuitamente ou usar a
-                OpenAI para análises mais profundas.
+                {aiUi.heroSubtitle}
               </p>
             </div>
           </div>
@@ -10024,10 +10169,10 @@ Requirements:
             }}
           >
             {[
-              ["📚", `${reports.length}`, "Relatórios"],
-              ["🔧", `${maintenanceRows.length}`, "Itens de manutenção"],
-              ["📦", `${spareRows.length}`, "Peças cadastradas"],
-              ["🏗️", `${plannedWorks.length}`, "Trabalhos planejados"],
+              ["📚", `${reports.length}`, aiUi.reports],
+              ["🔧", `${maintenanceRows.length}`, aiUi.maintenanceItems],
+              ["📦", `${spareRows.length}`, aiUi.registeredParts],
+              ["🏗️", `${plannedWorks.length}`, aiUi.plannedWorks],
             ].map(([icon, value, label]) => (
               <div
                 key={label}
@@ -10081,9 +10226,9 @@ Requirements:
                 📚
               </div>
               <div>
-                <h2 style={{ margin: 0 }}>MIYAMA AI Local</h2>
+                <h2 style={{ margin: 0 }}>{aiUi.localTitle}</h2>
                 <p style={{ margin: "4px 0 0", color: "#64748b" }}>
-                  Gratuito — pesquisa somente os dados salvos no seu sistema.
+                  {aiUi.localSubtitle}
                 </p>
               </div>
             </div>
@@ -10091,7 +10236,7 @@ Requirements:
             <textarea
               value={miyamaAiQuestion}
               onChange={(event) => setMiyamaAiQuestion(event.target.value)}
-              placeholder="Ex.: Esse problema já aconteceu? Qual máquina para mais? Quais peças estão sem estoque?"
+              placeholder={aiUi.localPlaceholder}
               style={{
                 minHeight: "150px",
                 marginTop: "18px",
@@ -10103,16 +10248,16 @@ Requirements:
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
               <button className="primaryButton" onClick={() => searchSite()}>
-                <Search size={17} /> Pesquisar no histórico
+                <Search size={17} /> {aiUi.localSearch}
               </button>
               <button
                 className="deleteButton"
                 onClick={() => {
                   setMiyamaAiQuestion("");
-                  setMiyamaAiAnswer("Digite uma pergunta para pesquisar no histórico interno.");
+                  setMiyamaAiAnswer(aiUi.localEmpty);
                 }}
               >
-                <X size={16} /> Limpar
+                <X size={16} /> {aiUi.clear}
               </button>
             </div>
 
@@ -10159,9 +10304,9 @@ Requirements:
                 ✨
               </div>
               <div>
-                <h2 style={{ margin: 0 }}>OpenAI — Análise avançada</h2>
+                <h2 style={{ margin: 0 }}>{aiUi.openAiTitle}</h2>
                 <p style={{ margin: "4px 0 0", color: "#64748b" }}>
-                  Pago — usa sua chave e quota da OpenAI.
+                  {aiUi.openAiSubtitle}
                 </p>
               </div>
             </div>
@@ -10169,7 +10314,7 @@ Requirements:
             <textarea
               value={paidAiQuestion}
               onChange={(event) => setPaidAiQuestion(event.target.value)}
-              placeholder="Ex.: Como diagnosticar rapidamente esta falha? Qual peça devo verificar primeiro?"
+              placeholder={aiUi.openAiPlaceholder}
               style={{
                 minHeight: "150px",
                 marginTop: "18px",
@@ -10190,7 +10335,7 @@ Requirements:
                 }}
               >
                 <Bot size={17} />
-                {paidAiLoading ? "Analisando..." : "Perguntar à OpenAI"}
+                {paidAiLoading ? aiUi.analyzing : aiUi.askOpenAi}
               </button>
               <button
                 className="deleteButton"
@@ -10233,15 +10378,15 @@ Requirements:
               }}
             >
               <strong style={{ display: "block", marginBottom: "8px", color: "#6d28d9" }}>
-                Resposta da OpenAI
+                {aiUi.openAiResult}
               </strong>
-              {paidAiAnswer || "A resposta avançada aparecerá aqui."}
+              {paidAiAnswer || aiUi.openAiEmpty}
             </div>
           </section>
         </div>
 
         <section className="tableWrap" style={{ marginTop: "18px", borderRadius: "24px" }}>
-          <h2 style={{ marginTop: 0 }}>⚡ Perguntas rápidas para a IA local</h2>
+          <h2 style={{ marginTop: 0 }}>⚡ {aiUi.quickTitle}</h2>
           <div className="quickQuestionGrid">
             {quickQuestions.map((question) => (
               <button
@@ -10259,15 +10404,15 @@ Requirements:
         </section>
 
         <section className="tableWrap" style={{ marginTop: "18px", borderRadius: "24px" }}>
-          <h2 style={{ marginTop: 0 }}>🛠️ Assistente de relatório</h2>
+          <h2 style={{ marginTop: 0 }}>🛠️ {aiUi.assistantTitle}</h2>
           <p style={{ color: "#64748b", lineHeight: 1.6 }}>
-            Crie um rascunho, procure ocorrências parecidas e consulte a IA sem sair desta tela.
+            {aiUi.assistantSubtitle}
           </p>
 
           <textarea
             value={autoReportInput}
             onChange={(event) => setAutoReportInput(event.target.value)}
-            placeholder="Ex.: 78-60 troca de caixa não conclui; verificar sensor fotoelétrico"
+            placeholder={aiUi.assistantPlaceholder}
             style={{ minHeight: "110px", marginTop: "10px" }}
           />
 
@@ -10280,10 +10425,10 @@ Requirements:
             }}
           >
             <button type="button" className="primaryButton" onClick={createAutoReport}>
-              📝 Criar rascunho
+              📝 {aiUi.createDraft}
             </button>
             <button type="button" className="primaryButton" onClick={searchAutoReportProblems}>
-              🔎 Procurar casos semelhantes
+              🔎 {aiUi.findSimilar}
             </button>
             <button
               type="button"
@@ -10293,7 +10438,7 @@ Requirements:
               style={{ opacity: autoReportAiLoading ? 0.65 : 1 }}
             >
               <Bot size={17} />
-              {autoReportAiLoading ? "Analisando..." : "Perguntar usando o histórico"}
+              {autoReportAiLoading ? aiUi.analyzing : aiUi.askHistory}
             </button>
           </div>
 
