@@ -5147,34 +5147,34 @@ function renderHome() {
                 <div style={{ flex: "1 1 520px" }}>
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "10px" }}>
                     <span style={{ padding: "8px 14px", borderRadius: "999px", fontWeight: "900", background: typeColor(row.maintenanceType || "交換") }}>
-                      {typeIcon(row.maintenanceType || "交換")} {row.maintenanceType || "交換"}
+                      {typeIcon(row.maintenanceType || "交換")} {translateMiyamaText(row.maintenanceType || "交換", appLanguage)}
                     </span>
                     <span style={{ padding: "8px 14px", borderRadius: "999px", fontWeight: "900", ...urgencyStyle(row) }}>
-                      {urgencyLabel(row)}
+                      {translateMiyamaText(urgencyLabel(row), appLanguage)}
                     </span>
                   </div>
 
-                  <h2 style={{ fontSize: "30px", margin: "0 0 8px", color: "#0f172a" }}>
-                    {row.equipment || row.lineName || "設備名なし"}
+                  <h2 data-no-translate="true" style={{ fontSize: "30px", margin: "0 0 8px", color: "#0f172a" }}>
+                    {row.equipment || row.lineName || (appLanguage === "en" ? "Equipment not entered" : "設備名なし")}
                   </h2>
-                  <p style={{ fontSize: "20px", margin: "0 0 6px", color: "#2563eb", fontWeight: "800" }}>
-                    {row.sectionName || row.equipment2Name || row.partName || "部位未入力"}
+                  <p data-no-translate="true" style={{ fontSize: "20px", margin: "0 0 6px", color: "#2563eb", fontWeight: "800" }}>
+                    {row.sectionName || row.equipment2Name || row.partName || (appLanguage === "en" ? "Part not entered" : "部位未入力")}
                   </p>
-                  <p style={{ fontSize: "18px", margin: 0, color: "#475569", whiteSpace: "pre-wrap" }}>
-                    {row.maintenanceDetail || "内容未入力"}
+                  <p data-no-translate="true" style={{ fontSize: "18px", margin: 0, color: "#475569", whiteSpace: "pre-wrap" }}>
+                    {row.maintenanceDetail || (appLanguage === "en" ? "Details not entered" : "内容未入力")}
                   </p>
                 </div>
 
                 <div style={{ minWidth: "220px", textAlign: "right" }}>
-                  <div style={{ fontSize: "14px", color: "#64748b" }}>次回実施日</div>
-                  <div style={{ fontSize: "24px", fontWeight: "900" }}>{row.nextDate || "未入力"}</div>
-                  <div style={{ fontSize: "14px", color: "#64748b", marginTop: "8px" }}>前回実施日</div>
-                  <div style={{ fontSize: "18px", fontWeight: "700" }}>{normalizeMaintenanceDateInput(row.lastDate) || "未入力"}</div>
+                  <div style={{ fontSize: "14px", color: "#64748b" }}>{appLanguage === "en" ? "Next Due Date" : "次回実施日"}</div>
+                  <div style={{ fontSize: "24px", fontWeight: "900" }}>{row.nextDate || (appLanguage === "en" ? "Not entered" : "未入力")}</div>
+                  <div style={{ fontSize: "14px", color: "#64748b", marginTop: "8px" }}>{appLanguage === "en" ? "Last Done Date" : "前回実施日"}</div>
+                  <div style={{ fontSize: "18px", fontWeight: "700" }}>{normalizeMaintenanceDateInput(row.lastDate) || (appLanguage === "en" ? "Not entered" : "未入力")}</div>
                 </div>
               </div>
 
               <div className="reportSummaryGrid" style={{ marginTop: "14px" }}>
-                <div className="reportSummaryItem"><span>🧭 保全方式</span><strong>{normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" ? "定量保全（生産数）" : "定期保全（日数）"}</strong></div>
+                <div className="reportSummaryItem"><span>🧭 {appLanguage === "en" ? "Maintenance Mode" : "保全方式"}</span><strong>{normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" ? (appLanguage === "en" ? "Production-Based Maintenance" : "定量保全（生産数）") : (appLanguage === "en" ? "Time-Based Maintenance (Days)" : "定期保全（日数）")}</strong></div>
                 {normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" ? (
                   <>
                     <div className="reportSummaryItem"><span>📦 保全サイクル</span><strong>{row.cycleProductionCount ? `${Number(row.cycleProductionCount || 0).toLocaleString()}回` : "未入力"}</strong></div>
@@ -5182,24 +5182,24 @@ function renderHome() {
                     <div className="reportSummaryItem"><span>⏳ 残り回数</span><strong>{row.productionRemain === "" ? "未入力" : `${Number(row.productionRemain || 0).toLocaleString()}回`}</strong></div>
                   </>
                 ) : (
-                  <div className="reportSummaryItem"><span>📅 保全周期（日）</span><strong>{row.cycle ? `${Number(row.cycle || 0).toLocaleString()}日` : "未入力"}</strong></div>
+                  <div className="reportSummaryItem"><span>📅 {appLanguage === "en" ? "Maintenance Interval (Days)" : "保全周期（日）"}</span><strong>{row.cycle ? `${Number(row.cycle || 0).toLocaleString()}${appLanguage === "en" ? " days" : "日"}` : (appLanguage === "en" ? "Not entered" : "未入力")}</strong></div>
                 )}
               </div>
 
               <div className="reportGrid" style={{ marginTop: "18px" }}>
-                <label>🧭 保全方式
+                <label>🧭 {appLanguage === "en" ? "Maintenance Mode" : "保全方式"}
                   <select value={normalizeMaintenanceMode(row.maintenanceMode, row)} onChange={(e) => updateMaintenanceSchedule(row, { maintenanceMode: e.target.value })}>
-                    <option value="定期保全">定期保全（日数）</option>
-                    <option value="定量保全">定量保全（生産数）</option>
+                    <option value="定期保全">{appLanguage === "en" ? "Time-Based Maintenance (Days)" : "定期保全（日数）"}</option>
+                    <option value="定量保全">{appLanguage === "en" ? "Production-Based Maintenance" : "定量保全（生産数）"}</option>
                   </select>
                 </label>
-                <label>🔧 保全種類
+                <label>🔧 {appLanguage === "en" ? "Maintenance Type" : "保全種類"}
                   <select value={row.maintenanceType || "交換"} onChange={(e) => updateField("parts", row.id, "maintenanceType", e.target.value)}>
-                    {typeOptions.filter((type) => type !== "全て").map((type) => <option key={type} value={type}>{type}</option>)}
+                    {typeOptions.filter((type) => type !== "全て").map((type) => <option key={type} value={type}>{translateMiyamaText(type, appLanguage)}</option>)}
                   </select>
                 </label>
-                <label>🏭 設備名<ImeSafeInput list="maintenance-equipment-list" value={row.equipment || ""} onCommit={(value) => updateField("parts", row.id, "equipment", value)} placeholder="一覧から選択、または日本語で手入力" /></label>
-                <label>📦 部品名<ImeSafeInput value={row.sectionName || row.equipment2Name || row.partName || ""} onCommit={(value) => updateField("parts", row.id, "sectionName", value)} placeholder="例：リベット切出し吸着②" /></label>
+                <label>🏭 {appLanguage === "en" ? "Equipment" : "設備名"}<ImeSafeInput list="maintenance-equipment-list" value={row.equipment || ""} onCommit={(value) => updateField("parts", row.id, "equipment", value)} placeholder={appLanguage === "en" ? "Select from the list or enter manually" : "一覧から選択、または日本語で手入力"} /></label>
+                <label>📦 {appLanguage === "en" ? "Part Name" : "部品名"}<ImeSafeInput value={row.sectionName || row.equipment2Name || row.partName || ""} onCommit={(value) => updateField("parts", row.id, "sectionName", value)} placeholder={appLanguage === "en" ? "Example: Rivet transfer unit ②" : "例：リベット切出し吸着②"} /></label>
 
                 {normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" ? (
                   <>
@@ -5207,18 +5207,18 @@ function renderHome() {
                     <label>📊 1日平均生産数<input className="readOnlyCalc" value={row.dailyAverageProduction ? `${Number(row.dailyAverageProduction || 0).toLocaleString()}個/日` : "生産数DB未登録"} readOnly /><small style={{color:"#64748b",fontWeight:700}}>生産数DBから自動計算</small></label>
                   </>
                 ) : (
-                  <label>📅 保全周期（日）<input type="number" min="1" value={row.cycle || ""} onChange={(e) => updateMaintenanceSchedule(row, { cycle: e.target.value ? Number(e.target.value) : "" })} placeholder="例：30" /><small style={{color:"#64748b",fontWeight:700}}>何日ごとに実施しますか？</small></label>
+                  <label>📅 {appLanguage === "en" ? "Maintenance Interval (Days)" : "保全周期（日）"}<input type="number" min="1" value={row.cycle || ""} onChange={(e) => updateMaintenanceSchedule(row, { cycle: e.target.value ? Number(e.target.value) : "" })} placeholder={appLanguage === "en" ? "Example: 30" : "例：30"} /><small style={{color:"#64748b",fontWeight:700}}>{appLanguage === "en" ? "How often should this maintenance be performed?" : "何日ごとに実施しますか？"}</small></label>
                 )}
 
-                <label>📆 前回実施日<input type="date" min="2000-01-01" max="2099-12-31" value={normalizeMaintenanceDateInput(row.lastDate)} onChange={(e) => updateMaintenanceSchedule(row, { lastDate: e.target.value })} /></label>
-                <label>👤 担当者<ImeSafeInput value={row.owner || ""} onCommit={(value) => updateField("parts", row.id, "owner", value)} placeholder="担当者名を入力" /></label>
-                <label>🧮 次回実施日<input className="readOnlyCalc" value={row.nextDate || ""} readOnly /></label>
-                <label>⏳ 残り日数<input className="readOnlyCalc" value={row.daysLeft === "" ? "未入力" : `${row.daysLeft}日`} readOnly /></label>
+                <label>📆 {appLanguage === "en" ? "Last Done Date" : "前回実施日"}<input type="date" min="2000-01-01" max="2099-12-31" value={normalizeMaintenanceDateInput(row.lastDate)} onChange={(e) => updateMaintenanceSchedule(row, { lastDate: e.target.value })} /></label>
+                <label>👤 {appLanguage === "en" ? "Owner" : "担当者"}<ImeSafeInput value={row.owner || ""} onCommit={(value) => updateField("parts", row.id, "owner", value)} placeholder={appLanguage === "en" ? "Enter owner name" : "担当者名を入力"} /></label>
+                <label>🧮 {appLanguage === "en" ? "Next Due Date" : "次回実施日"}<input className="readOnlyCalc" value={row.nextDate || ""} readOnly /></label>
+                <label>⏳ {appLanguage === "en" ? "Days Left" : "残り日数"}<input className="readOnlyCalc" value={row.daysLeft === "" ? (appLanguage === "en" ? "Not entered" : "未入力") : `${row.daysLeft}${appLanguage === "en" ? " days" : "日"}`} readOnly /></label>
                 {normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" && <label>📦 残り回数<input className="readOnlyCalc" value={row.productionRemain === "" ? "未入力" : `${Number(row.productionRemain || 0).toLocaleString()}回`} readOnly /></label>}
               </div>
 
               <div style={{ marginTop: "12px" }}>
-                <label style={{ fontWeight: "700" }}>📝 メモ
+                <label style={{ fontWeight: "700" }}>📝 {appLanguage === "en" ? "Memo" : "メモ"}
                   <ImeSafeTextarea
                     style={{ minHeight: "90px", fontSize: "16px" }}
                     value={row.note || row.maintenanceDetail || ""}
@@ -5226,15 +5226,15 @@ function renderHome() {
                       await updateField("parts", row.id, "note", value);
                       await updateField("parts", row.id, "maintenanceDetail", value);
                     }}
-                    placeholder="交換理由・注意点・現場メモなど（日本語入力対応）"
+                    placeholder={appLanguage === "en" ? "Replacement reason, cautions, or shop-floor notes" : "交換理由・注意点・現場メモなど（日本語入力対応）"}
                   />
                 </label>
               </div>
 
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
-                <button className="primaryButton" onClick={() => completeMaintenanceRow(row)}>✅ 交換完了</button>
-                <button className="primaryButton" onClick={() => saveMaintenanceSchedule(row)}>💾 保存確認</button>
-                <button className="deleteButton" onClick={() => updateField("parts", row.id, "isMaintenanceTarget", false)}>🗑 定期保全から外す</button>
+                <button className="primaryButton" onClick={() => completeMaintenanceRow(row)}>✅ {appLanguage === "en" ? "Completed" : "交換完了"}</button>
+                <button className="primaryButton" onClick={() => saveMaintenanceSchedule(row)}>💾 {appLanguage === "en" ? "Save / Confirm" : "保存確認"}</button>
+                <button className="deleteButton" onClick={() => updateField("parts", row.id, "isMaintenanceTarget", false)}>🗑 {appLanguage === "en" ? "Remove from Maintenance" : "定期保全から外す"}</button>
               </div>
             </div>
           ))}
