@@ -1512,6 +1512,19 @@ textarea { min-height:96px !important; white-space:pre-wrap; }
   justify-content:center;
 }
 .primaryButton { background:linear-gradient(135deg,#2563eb,#1d4ed8) !important; }
+.quickQuestionGrid button {
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.quickQuestionGrid button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(37,99,235,.12);
+  border-color: #93c5fd !important;
+}
+.aiAnswerBox {
+  min-height: 140px;
+  white-space: pre-wrap;
+  line-height: 1.65;
+}
 .deleteButton { background:#fee2e2 !important; color:#b91c1c !important; }
 
 .tabs {
@@ -2892,6 +2905,10 @@ export default function App() {
   const [aiTranslationError, setAiTranslationError] = useState("");
   const [miyamaAiQuestion, setMiyamaAiQuestion] = useState("");
   const [miyamaAiAnswer, setMiyamaAiAnswer] = useState("MIYAMA AIへようこそ。設備名・部品名・不具合内容・費用・予定などを質問してください。");
+  const [paidAiQuestion, setPaidAiQuestion] = useState("");
+  const [paidAiAnswer, setPaidAiAnswer] = useState("");
+  const [paidAiLoading, setPaidAiLoading] = useState(false);
+  const [paidAiError, setPaidAiError] = useState("");
   const [productionLogs, setProductionLogs] = useState([]);
   const [dailyProductions, setDailyProductions] = useState([]);
   const [dailyProductionDraft, setDailyProductionDraft] = useState({ date: "", equipment: "", quantity: "", note: "" });
@@ -9883,51 +9900,391 @@ function renderHome() {
       setMiyamaAiAnswer(answer);
     }
 
+    async function askPaidMiyamaAI(questionText = paidAiQuestion) {
+      const question = String(questionText || "").trim();
+
+      if (!question) {
+        setPaidAiError(
+          appLanguage === "es"
+            ? "Escriba una pregunta."
+            : appLanguage === "en"
+              ? "Enter a question."
+              : "質問を入力してください。"
+        );
+        return;
+      }
+
+      const recentReports = reports.slice(0, 20).map((report, index) => [
+        `Report ${index + 1}`,
+        `Equipment: ${report.equipment || ""}`,
+        `Line: ${report.lineName || ""}`,
+        `Symptom: ${report.phenomenon || ""}`,
+        `Failure point: ${report.troublePoint || ""}`,
+        `Cause: ${report.why3 || report.why2 || report.why1 || ""}`,
+        `Action: ${report.action || ""}`,
+        `Part: ${report.replacedPart || report.partName1 || ""}`,
+      ].join("\n")).join("\n\n---\n\n");
+
+      const responseLanguage =
+        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+
+      setPaidAiLoading(true);
+      setPaidAiError("");
+      setPaidAiAnswer("");
+
+      try {
+        const result = await askMiyamaAI({
+          language: responseLanguage,
+          machine: "",
+          context: [
+            "MIYAMA MAINTENANCE SYSTEM SUMMARY",
+            `Maintenance reports: ${reports.length}`,
+            `Time-based maintenance items: ${maintenanceRows.length}`,
+            `Spare parts: ${spareRows.length}`,
+            `Planned works: ${plannedWorks.length}`,
+            "",
+            "RECENT MAINTENANCE REPORTS",
+            recentReports || "No recent report available.",
+          ].join("\n"),
+          message: `Answer the user's maintenance question:
+
+${question}
+
+Requirements:
+- Answer in ${responseLanguage}.
+- Use the supplied factory information when relevant.
+- Separate historical facts from hypotheses.
+- Give safe, practical checks in order.
+- Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical protections.
+- If information is insufficient, say what must be checked physically.`,
+        });
+
+        setPaidAiAnswer(String(result.answer || "").trim());
+      } catch (error) {
+        console.error("Paid MIYAMA AI error:", error);
+        setPaidAiError(
+          appLanguage === "es"
+            ? `No fue posible consultar la IA de OpenAI: ${error.message}`
+            : appLanguage === "en"
+              ? `Could not query OpenAI: ${error.message}`
+              : `OpenAIへ質問できませんでした：${error.message}`
+        );
+      } finally {
+        setPaidAiLoading(false);
+      }
+    }
+
     const quickQuestions = ["一番生産を止めている問題は？", "突発工事を減らすには？", "計画工事にするべき問題は？", "対策しても再発する原因は？", "停止時間が多い設備ランキング", "在庫なしは何件？", "期限超過の定期保全を教えて", "来週交換予定の部品は？"];
     return (
       <>
-        <div className="tableWrap miyamaAiHero"><h1>🤖 MIYAMA AI</h1><p>AI検索・保全AI・生産停止AI・予備品AI・計画工事AIを1つに統合しました。保全報告書、CSVアラーム、定期保全、予備品、カレンダー、計画工事をまとめて検索・分析します。</p></div>
-        <div className="miyamaAiShell">
-          <div className="tableWrap">
-            <h2>💬 質問する</h2>
-            <textarea className="miyamaAiInput" value={miyamaAiQuestion} onChange={(e) => setMiyamaAiQuestion(e.target.value)} placeholder="例：A05自動機で一番悪い問題は？ / 突発工事を減らすには？ / 停止時間が多い設備は？ / 在庫なしは何件？ / 来週の予定は？" />
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
-              <button className="primaryButton" onClick={() => searchSite()}><Bot size={16} /> MIYAMA AIで分析</button>
-              <button className="deleteButton" onClick={() => { setMiyamaAiQuestion(""); setMiyamaAiAnswer("質問を入力してください。"); }}><X size={16} /> クリア</button>
+        <div
+          className="tableWrap"
+          style={{
+            padding: "28px",
+            borderRadius: "26px",
+            background:
+              "radial-gradient(circle at top left, rgba(59,130,246,.28), transparent 34%), linear-gradient(135deg,#0f172a,#172554 52%,#1d4ed8)",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,.16)",
+            boxShadow: "0 24px 60px rgba(15,23,42,.25)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            <div
+              style={{
+                width: "56px",
+                height: "56px",
+                borderRadius: "18px",
+                display: "grid",
+                placeItems: "center",
+                background: "rgba(255,255,255,.14)",
+                border: "1px solid rgba(255,255,255,.22)",
+                fontSize: "30px",
+              }}
+            >
+              🤖
             </div>
-            <h3 style={{ marginTop: "18px" }}>⚡ よく使う質問</h3>
-            <div className="quickQuestionGrid">{quickQuestions.map((q) => (<button key={q} type="button" onClick={() => { setMiyamaAiQuestion(q); searchSite(q); }}>{q}</button>))}</div>
+            <div>
+              <h1 style={{ margin: 0, fontSize: "clamp(30px,4vw,48px)", color: "#fff" }}>
+                MIYAMA AI
+              </h1>
+              <p style={{ margin: "7px 0 0", color: "#dbeafe", maxWidth: "900px", lineHeight: 1.65 }}>
+                Uma central inteligente para consultar o histórico interno gratuitamente ou usar a
+                OpenAI para análises mais profundas.
+              </p>
+            </div>
+          </div>
 
-        <div className="calendarEditCard" style={{ marginTop: "18px" }}>
-          <h3>🤖 AI保全アシスタント</h3>
-          <p>
-            短く入力すると、同じ画面で報告書の下書き作成・過去事例検索・MIYAMA AIへの質問ができます。
-            自動保存はしません。内容を確認してから保存してください。
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+              gap: "10px",
+              marginTop: "22px",
+            }}
+          >
+            {[
+              ["📚", `${reports.length}`, "Relatórios"],
+              ["🔧", `${maintenanceRows.length}`, "Itens de manutenção"],
+              ["📦", `${spareRows.length}`, "Peças cadastradas"],
+              ["🏗️", `${plannedWorks.length}`, "Trabalhos planejados"],
+            ].map(([icon, value, label]) => (
+              <div
+                key={label}
+                style={{
+                  padding: "14px",
+                  borderRadius: "16px",
+                  background: "rgba(255,255,255,.1)",
+                  border: "1px solid rgba(255,255,255,.14)",
+                  backdropFilter: "blur(10px)",
+                }}
+              >
+                <div style={{ fontSize: "20px" }}>{icon}</div>
+                <strong style={{ display: "block", fontSize: "24px", marginTop: "4px" }}>
+                  {value}
+                </strong>
+                <span style={{ color: "#bfdbfe", fontSize: "13px" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(360px,1fr))",
+            gap: "18px",
+            marginTop: "18px",
+          }}
+        >
+          <section
+            className="tableWrap"
+            style={{
+              borderRadius: "24px",
+              padding: "22px",
+              background: "linear-gradient(180deg,#ffffff,#f8fafc)",
+              border: "1px solid #dbeafe",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "14px",
+                  display: "grid",
+                  placeItems: "center",
+                  background: "#dbeafe",
+                  fontSize: "22px",
+                }}
+              >
+                📚
+              </div>
+              <div>
+                <h2 style={{ margin: 0 }}>MIYAMA AI Local</h2>
+                <p style={{ margin: "4px 0 0", color: "#64748b" }}>
+                  Gratuito — pesquisa somente os dados salvos no seu sistema.
+                </p>
+              </div>
+            </div>
+
+            <textarea
+              value={miyamaAiQuestion}
+              onChange={(event) => setMiyamaAiQuestion(event.target.value)}
+              placeholder="Ex.: Esse problema já aconteceu? Qual máquina para mais? Quais peças estão sem estoque?"
+              style={{
+                minHeight: "150px",
+                marginTop: "18px",
+                padding: "16px",
+                borderRadius: "18px",
+                background: "#fff",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
+              <button className="primaryButton" onClick={() => searchSite()}>
+                <Search size={17} /> Pesquisar no histórico
+              </button>
+              <button
+                className="deleteButton"
+                onClick={() => {
+                  setMiyamaAiQuestion("");
+                  setMiyamaAiAnswer("Digite uma pergunta para pesquisar no histórico interno.");
+                }}
+              >
+                <X size={16} /> Limpar
+              </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "16px",
+                borderRadius: "18px",
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.65,
+                minHeight: "150px",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: "8px", color: "#1d4ed8" }}>
+                Resultado local
+              </strong>
+              {miyamaAiAnswer}
+            </div>
+          </section>
+
+          <section
+            className="tableWrap"
+            style={{
+              borderRadius: "24px",
+              padding: "22px",
+              background: "linear-gradient(180deg,#ffffff,#faf5ff)",
+              border: "1px solid #ddd6fe",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "14px",
+                  display: "grid",
+                  placeItems: "center",
+                  background: "#ede9fe",
+                  fontSize: "22px",
+                }}
+              >
+                ✨
+              </div>
+              <div>
+                <h2 style={{ margin: 0 }}>OpenAI — Análise avançada</h2>
+                <p style={{ margin: "4px 0 0", color: "#64748b" }}>
+                  Pago — usa sua chave e quota da OpenAI.
+                </p>
+              </div>
+            </div>
+
+            <textarea
+              value={paidAiQuestion}
+              onChange={(event) => setPaidAiQuestion(event.target.value)}
+              placeholder="Ex.: Como diagnosticar rapidamente esta falha? Qual peça devo verificar primeiro?"
+              style={{
+                minHeight: "150px",
+                marginTop: "18px",
+                padding: "16px",
+                borderRadius: "18px",
+                background: "#fff",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "12px" }}>
+              <button
+                className="primaryButton"
+                onClick={() => askPaidMiyamaAI()}
+                disabled={paidAiLoading}
+                style={{
+                  opacity: paidAiLoading ? 0.65 : 1,
+                  background: "linear-gradient(135deg,#7c3aed,#4f46e5)",
+                }}
+              >
+                <Bot size={17} />
+                {paidAiLoading ? "Analisando..." : "Perguntar à OpenAI"}
+              </button>
+              <button
+                className="deleteButton"
+                onClick={() => {
+                  setPaidAiQuestion("");
+                  setPaidAiAnswer("");
+                  setPaidAiError("");
+                }}
+              >
+                <X size={16} /> Limpar
+              </button>
+            </div>
+
+            {paidAiError && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: "14px",
+                  padding: "13px",
+                  borderRadius: "14px",
+                  background: "#fee2e2",
+                  color: "#991b1b",
+                  fontWeight: 700,
+                }}
+              >
+                {paidAiError}
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: "16px",
+                padding: "16px",
+                borderRadius: "18px",
+                background: "#f5f3ff",
+                border: "1px solid #ddd6fe",
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.65,
+                minHeight: "150px",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: "8px", color: "#6d28d9" }}>
+                Resposta da OpenAI
+              </strong>
+              {paidAiAnswer || "A resposta avançada aparecerá aqui."}
+            </div>
+          </section>
+        </div>
+
+        <section className="tableWrap" style={{ marginTop: "18px", borderRadius: "24px" }}>
+          <h2 style={{ marginTop: 0 }}>⚡ Perguntas rápidas para a IA local</h2>
+          <div className="quickQuestionGrid">
+            {quickQuestions.map((question) => (
+              <button
+                key={question}
+                type="button"
+                onClick={() => {
+                  setMiyamaAiQuestion(question);
+                  searchSite(question);
+                }}
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="tableWrap" style={{ marginTop: "18px", borderRadius: "24px" }}>
+          <h2 style={{ marginTop: 0 }}>🛠️ Assistente de relatório</h2>
+          <p style={{ color: "#64748b", lineHeight: 1.6 }}>
+            Crie um rascunho, procure ocorrências parecidas e consulte a IA sem sair desta tela.
           </p>
 
           <textarea
             value={autoReportInput}
-            onChange={(e) => setAutoReportInput(e.target.value)}
-            placeholder="例：78-60 箱替え動作が完了しない 光電センサー確認"
-            style={{ minHeight: "110px" }}
+            onChange={(event) => setAutoReportInput(event.target.value)}
+            placeholder="Ex.: 78-60 troca de caixa não conclui; verificar sensor fotoelétrico"
+            style={{ minHeight: "110px", marginTop: "10px" }}
           />
 
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
               gap: "10px",
               marginTop: "12px",
             }}
           >
             <button type="button" className="primaryButton" onClick={createAutoReport}>
-              📝 報告書の下書きを作成
+              📝 Criar rascunho
             </button>
-
             <button type="button" className="primaryButton" onClick={searchAutoReportProblems}>
-              🔎 類似問題を検索
+              🔎 Procurar casos semelhantes
             </button>
-
             <button
               type="button"
               className="primaryButton"
@@ -9936,7 +10293,7 @@ function renderHome() {
               style={{ opacity: autoReportAiLoading ? 0.65 : 1 }}
             >
               <Bot size={17} />
-              {autoReportAiLoading ? "分析中..." : "MIYAMA AIへ質問"}
+              {autoReportAiLoading ? "Analisando..." : "Perguntar usando o histórico"}
             </button>
           </div>
 
@@ -9944,11 +10301,11 @@ function renderHome() {
             <div
               style={{
                 marginTop: "12px",
-                padding: "10px 12px",
-                borderRadius: "12px",
+                padding: "11px 13px",
+                borderRadius: "14px",
                 background: "#eff6ff",
                 color: "#1e40af",
-                fontWeight: 800,
+                fontWeight: 700,
               }}
             >
               {autoReportHistoryMessage}
@@ -9957,14 +10314,13 @@ function renderHome() {
 
           {autoReportAiError && (
             <div
-              role="alert"
               style={{
                 marginTop: "12px",
-                padding: "10px 12px",
-                borderRadius: "12px",
+                padding: "11px 13px",
+                borderRadius: "14px",
                 background: "#fee2e2",
                 color: "#991b1b",
-                fontWeight: 800,
+                fontWeight: 700,
               }}
             >
               {autoReportAiError}
@@ -9976,15 +10332,14 @@ function renderHome() {
               style={{
                 marginTop: "14px",
                 padding: "14px",
-                border: "1px solid #c4b5fd",
-                borderRadius: "14px",
+                borderRadius: "16px",
                 background: "#faf5ff",
+                border: "1px solid #ddd6fe",
                 whiteSpace: "pre-wrap",
                 lineHeight: 1.65,
               }}
             >
-              <strong>🤖 MIYAMA AI回答</strong>
-              <div style={{ marginTop: "8px" }}>{autoReportAiAnswer}</div>
+              {autoReportAiAnswer}
             </div>
           )}
 
@@ -9993,10 +10348,7 @@ function renderHome() {
               <ReportDraftForm />
             </div>
           )}
-        </div>
-          </div>
-          <div className="tableWrap"><h2>📌 AI回答</h2><div className="aiAnswerBox">{miyamaAiAnswer}</div></div>
-        </div>
+        </section>
       </>
     );
   }
