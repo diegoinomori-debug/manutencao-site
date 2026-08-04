@@ -2579,7 +2579,7 @@ function AsyncTranslatedText({ text = "", language = "ja", as: Tag = "span", ...
     let cancelled = false;
     const controller = new AbortController();
 
-    if (language !== "en" || !containsJapaneseText(original)) {
+    if (language === "ja" || !containsJapaneseText(original)) {
       setDisplayText(original);
       return () => controller.abort();
     }
@@ -2614,7 +2614,7 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
     let cancelled = false;
     const controller = new AbortController();
 
-    if (language !== "en" || !containsJapaneseText(original)) {
+    if (language === "ja" || !containsJapaneseText(original)) {
       setDisplayValue(original);
       return () => controller.abort();
     }
@@ -2644,7 +2644,13 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
       value={displayValue}
       placeholder={placeholder}
       readOnly
-      title={language === "en" ? "Switch to Japanese to edit the original data." : undefined}
+      title={
+        language === "es"
+          ? "Cambie a japonés para editar los datos originales."
+          : language === "en"
+            ? "Switch to Japanese to edit the original data."
+            : undefined
+      }
     />
   );
 }
@@ -2657,7 +2663,7 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
     let cancelled = false;
     const controller = new AbortController();
 
-    if (language !== "en" || !containsJapaneseText(original)) {
+    if (language === "ja" || !containsJapaneseText(original)) {
       setDisplayValue(original);
       return () => controller.abort();
     }
@@ -2687,7 +2693,13 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
       value={displayValue}
       placeholder={placeholder}
       readOnly
-      title={language === "en" ? "Switch to Japanese to edit the original data." : undefined}
+      title={
+        language === "es"
+          ? "Cambie a japonés para editar los datos originales."
+          : language === "en"
+            ? "Switch to Japanese to edit the original data."
+            : undefined
+      }
     />
   );
 }
@@ -7001,7 +7013,12 @@ function renderHome() {
             <div className="reportTitleCompact" style={{ padding: "16px", textAlign: "center", flex: "1 1 520px", minWidth: "280px" }}>
               <h2 style={{ margin: 0 }}>📝 保全作業報告書</h2>
               <h3 style={{ margin: "8px 0 0" }}>{row.equipment || "設備名未入力"} / {row.lineName || "ライン未入力"}</h3>
-              <p style={{ margin: "8px 0 0", color: "#64748b" }}>{row.phenomenon || "不具合現象未入力"}</p>
+              <p style={{ margin: "8px 0 0", color: "#64748b" }}>
+                <AsyncTranslatedText
+                  text={row.phenomenon || "不具合現象未入力"}
+                  language={appLanguage}
+                />
+              </p>
             </div>
             <div className="reportApprovalCompact" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", borderLeft: 0, borderTop: "2px solid #0f172a", flex: "1 1 100%", minWidth: 0, maxWidth: "100%", width: "100%" }}>
               {[
@@ -7060,7 +7077,12 @@ function renderHome() {
         {reportViewMode === "summary" && (
           <div className="calendarEditCard" style={{ border: `2px solid ${reportAccent}`, marginTop: "14px" }}>
             <h3>📌 報告書概要</h3>
-            <p style={{ whiteSpace: "pre-wrap", color: "#475569" }}>{row.phenomenon || row.troublePoint || row.action || "概要未入力"}</p>
+            <AsyncTranslatedText
+              as="p"
+              text={row.phenomenon || row.troublePoint || row.action || "概要未入力"}
+              language={appLanguage}
+              style={{ whiteSpace: "pre-wrap", color: "#475569" }}
+            />
             <div className="reportSummaryGrid">
               <IconMetric icon="🏭" label="設備" value={row.equipment || row.lineName || "設備名未入力"} />
               <IconMetric icon="📅" label="作成日" value={row.createdAt || row.reportCreatedDate || "-"} />
@@ -7129,10 +7151,17 @@ function renderHome() {
                   ? "🚨 Failure Symptom"
                   : "🚨 不具合現象"}
             </h3>
-            <textarea
-              value={row.phenomenon || ""}
-              onChange={(e) => setRow("phenomenon", e.target.value)}
-            />
+            {appLanguage === "ja" ? (
+              <textarea
+                value={row.phenomenon || ""}
+                onChange={(e) => setRow("phenomenon", e.target.value)}
+              />
+            ) : (
+              <TranslatedReadOnlyTextarea
+                value={row.phenomenon || ""}
+                language={appLanguage}
+              />
+            )}
 
             <h3>
               {appLanguage === "es"
@@ -7141,10 +7170,17 @@ function renderHome() {
                   ? "📍 Failure Point"
                   : "📍 不具合箇所"}
             </h3>
-            <textarea
-              value={row.troublePoint || ""}
-              onChange={(e) => setRow("troublePoint", e.target.value)}
-            />
+            {appLanguage === "ja" ? (
+              <textarea
+                value={row.troublePoint || ""}
+                onChange={(e) => setRow("troublePoint", e.target.value)}
+              />
+            ) : (
+              <TranslatedReadOnlyTextarea
+                value={row.troublePoint || ""}
+                language={appLanguage}
+              />
+            )}
 
             <h3>
               {appLanguage === "es"
@@ -7161,12 +7197,56 @@ function renderHome() {
         )}
 
         {show("why") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="why" title="🔍 不具合原因・なぜなぜ分析">
+          <Section
+            openSections={openSections}
+            toggleSection={toggleSection}
+            sectionKey="why"
+            title={
+              appLanguage === "es"
+                ? "🔍 Causa y análisis de los 3 porqués"
+                : appLanguage === "en"
+                  ? "🔍 Cause and 3 Whys Analysis"
+                  : "🔍 不具合原因・なぜなぜ分析"
+            }
+          >
             {[1, 2, 3].map((num) => (
-              <label key={num}>なぜ{num}<textarea value={row[`why${num}`] || ""} onChange={(e) => setRow(`why${num}`, e.target.value)} /></label>
+              <label key={num}>
+                {appLanguage === "es"
+                  ? `Por qué ${num}`
+                  : appLanguage === "en"
+                    ? `Why ${num}`
+                    : `なぜ${num}`}
+                {appLanguage === "ja" ? (
+                  <textarea
+                    value={row[`why${num}`] || ""}
+                    onChange={(e) => setRow(`why${num}`, e.target.value)}
+                  />
+                ) : (
+                  <TranslatedReadOnlyTextarea
+                    value={row[`why${num}`] || ""}
+                    language={appLanguage}
+                  />
+                )}
+              </label>
             ))}
-            <h3>🛠️ 処置内容</h3>
-            <textarea value={row.action || ""} onChange={(e) => setRow("action", e.target.value)} />
+            <h3>
+              {appLanguage === "es"
+                ? "🛠️ Acción correctiva"
+                : appLanguage === "en"
+                  ? "🛠️ Corrective Action"
+                  : "🛠️ 処置内容"}
+            </h3>
+            {appLanguage === "ja" ? (
+              <textarea
+                value={row.action || ""}
+                onChange={(e) => setRow("action", e.target.value)}
+              />
+            ) : (
+              <TranslatedReadOnlyTextarea
+                value={row.action || ""}
+                language={appLanguage}
+              />
+            )}
           </Section>
         )}
 
@@ -7177,8 +7257,42 @@ function renderHome() {
               <label>🔄 変化点ランク<input value={row.changeRank || ""} onChange={(e) => setRow("changeRank", e.target.value)} /></label>
               <label>🔍 FP点検<input value={row.fpInspection || ""} onChange={(e) => setRow("fpInspection", e.target.value)} /></label>
             </div>
-            <h3>🛡️ 再発防止・残工事</h3><textarea value={row.recurrencePrevention || ""} onChange={(e) => setRow("recurrencePrevention", e.target.value)} />
-            <h3>🚧 流出防止</h3><textarea value={row.outflowPrevention || ""} onChange={(e) => setRow("outflowPrevention", e.target.value)} />
+            <h3>
+              {appLanguage === "es"
+                ? "🛡️ Prevención de recurrencia / trabajo pendiente"
+                : appLanguage === "en"
+                  ? "🛡️ Recurrence Prevention / Pending Work"
+                  : "🛡️ 再発防止・残工事"}
+            </h3>
+            {appLanguage === "ja" ? (
+              <textarea
+                value={row.recurrencePrevention || ""}
+                onChange={(e) => setRow("recurrencePrevention", e.target.value)}
+              />
+            ) : (
+              <TranslatedReadOnlyTextarea
+                value={row.recurrencePrevention || ""}
+                language={appLanguage}
+              />
+            )}
+            <h3>
+              {appLanguage === "es"
+                ? "🚧 Prevención de escape"
+                : appLanguage === "en"
+                  ? "🚧 Outflow Prevention"
+                  : "🚧 流出防止"}
+            </h3>
+            {appLanguage === "ja" ? (
+              <textarea
+                value={row.outflowPrevention || ""}
+                onChange={(e) => setRow("outflowPrevention", e.target.value)}
+              />
+            ) : (
+              <TranslatedReadOnlyTextarea
+                value={row.outflowPrevention || ""}
+                language={appLanguage}
+              />
+            )}
           </Section>
         )}
 
@@ -7227,7 +7341,11 @@ function renderHome() {
           <Section openSections={openSections} toggleSection={toggleSection} sectionKey="other" title="📷 写真・備考">
             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "maintenanceReports", row.id)} />
             {row.image && <img src={row.image} alt="" className="calendarPhoto" />}
-            <h3>📝 備考</h3><textarea value={row.note || ""} onChange={(e) => setRow("note", e.target.value)} />
+            <h3>📝 備考</h3>{appLanguage === "ja" ? (
+              <textarea value={row.note || ""} onChange={(e) => setRow("note", e.target.value)} />
+            ) : (
+              <TranslatedReadOnlyTextarea value={row.note || ""} language={appLanguage} />
+            )}
           </Section>
         )}
       </div>
