@@ -2502,6 +2502,8 @@ export default function App() {
   const [aiVisibleCount, setAiVisibleCount] = useState(20);
   const [aiResultTranslations, setAiResultTranslations] = useState({});
   const [aiTranslationLoading, setAiTranslationLoading] = useState(false);
+  const [globalTranslationLoading, setGlobalTranslationLoading] = useState(false);
+  const [globalTranslationError, setGlobalTranslationError] = useState("");
   const [aiTranslationError, setAiTranslationError] = useState("");
   const [miyamaAiQuestion, setMiyamaAiQuestion] = useState("");
   const [miyamaAiAnswer, setMiyamaAiAnswer] = useState("MIYAMA AIへようこそ。設備名・部品名・不具合内容・費用・予定などを質問してください。");
@@ -3634,6 +3636,64 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appLanguage, visibleAiResults]);
 
+  const visibleGlobalResults = useMemo(
+    () => globalResults.slice(0, 8),
+    [globalResults]
+  );
+
+  useEffect(() => {
+    if (appLanguage !== "en" || visibleGlobalResults.length === 0) {
+      setGlobalTranslationLoading(false);
+      setGlobalTranslationError("");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    async function translateGlobalResults() {
+      setGlobalTranslationLoading(true);
+      setGlobalTranslationError("");
+      try {
+        for (let start = 0; start < visibleGlobalResults.length; start += 2) {
+          const group = visibleGlobalResults.slice(start, start + 2);
+          const translatedGroup = await Promise.all(
+            group.map(async (item, offset) => {
+              const realIndex = start + offset;
+              const key = makeAiTranslationItemKey(item, realIndex);
+              if (aiResultTranslations[key]) return [key, aiResultTranslations[key]];
+              const [title, text] = await Promise.all([
+                translateJapaneseLongText(item.title || "", controller.signal),
+                translateJapaneseLongText(item.text || "", controller.signal),
+              ]);
+              return [key, { title, text }];
+            })
+          );
+
+          if (cancelled) return;
+          setAiResultTranslations((current) => ({
+            ...current,
+            ...Object.fromEntries(translatedGroup),
+          }));
+        }
+      } catch (error) {
+        if (error?.name !== "AbortError" && !cancelled) {
+          console.error("Global search translation failed:", error);
+          setGlobalTranslationError("Automatic translation could not be loaded. Original Japanese is displayed.");
+        }
+      } finally {
+        if (!cancelled) setGlobalTranslationLoading(false);
+      }
+    }
+
+    translateGlobalResults();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appLanguage, visibleGlobalResults]);
+
   function makeAiAnswer() {
     if (!aiSearch.trim()) {
       setAiLevel("");
@@ -3756,20 +3816,40 @@ export default function App() {
 
         {globalSearch && (
           <div style={{ marginTop: "16px" }}>
-            <h3>検索結果：{globalResults.length}件</h3>
-            {globalResults.length === 0 && <p>関連データが見つかりません。</p>}
-            {globalResults.slice(0, 8).map((item, index) => (
-              <div
-                key={index}
-                className="calendarEditCard"
-                style={{ cursor: "pointer" }}
-                onClick={() => setPage(item.page)}
-              >
-                <b>{item.category} / {item.date}</b>
-                <h3>{item.title}</h3>
-                <p>{item.text || "-"}</p>
-              </div>
-            ))}
+            <h3>{appLanguage === "en" ? `Search results: ${globalResults.length}` : `検索結果：${globalResults.length}件`}</h3>
+            {globalResults.length === 0 && <p>{appLanguage === "en" ? "No related data was found." : "関連データが見つかりません。"}</p>}
+            {appLanguage === "en" && globalTranslationLoading && (
+              <p style={{ fontWeight: 700 }}>🌐 Translating the displayed reports...</p>
+            )}
+            {appLanguage === "en" && globalTranslationError && (
+              <p style={{ color: "#b45309", fontWeight: 700 }}>{globalTranslationError}</p>
+            )}
+            {visibleGlobalResults.map((item, index) => {
+              const translationKey = makeAiTranslationItemKey(item, index);
+              const translated = aiResultTranslations[translationKey];
+              const displayTitle = appLanguage === "en" && translated?.title ? translated.title : item.title;
+              const displayText = appLanguage === "en" && translated?.text ? translated.text : item.text;
+
+              return (
+                <div
+                  key={translationKey}
+                  className="calendarEditCard"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setPage(item.page)}
+                >
+                  <b>{translateMiyamaText(item.category, appLanguage)} / {item.date}</b>
+                  <h3>{displayTitle}</h3>
+                  <p style={{ whiteSpace: "pre-wrap" }}>{displayText || "-"}</p>
+                  {appLanguage === "en" && translated && (containsJapaneseText(item.title) || containsJapaneseText(item.text)) && (
+                    <details onClick={(event) => event.stopPropagation()} style={{ marginTop: "10px" }}>
+                      <summary style={{ cursor: "pointer", fontWeight: 700 }}>Show original Japanese</summary>
+                      <h4>{item.title}</h4>
+                      <p style={{ whiteSpace: "pre-wrap", color: "#64748b" }}>{item.text || "-"}</p>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
