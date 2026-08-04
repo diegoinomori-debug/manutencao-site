@@ -2485,6 +2485,7 @@ export default function App() {
     return MIYAMA_LANGUAGES[savedLanguage] ? savedLanguage : "ja";
   });
   const [globalSearch, setGlobalSearch] = useState("");
+  const [globalVisibleCount, setGlobalVisibleCount] = useState(20);
   const [reportSearch, setReportSearch] = useState("");
   const [spareSearch, setSpareSearch] = useState("");
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
@@ -3637,9 +3638,13 @@ export default function App() {
   }, [appLanguage, visibleAiResults]);
 
   const visibleGlobalResults = useMemo(
-    () => globalResults.slice(0, 8),
-    [globalResults]
+    () => globalResults.slice(0, globalVisibleCount),
+    [globalResults, globalVisibleCount]
   );
+
+  useEffect(() => {
+    setGlobalVisibleCount(20);
+  }, [globalSearch]);
 
   useEffect(() => {
     if (appLanguage !== "en" || visibleGlobalResults.length === 0) {
@@ -3850,6 +3855,17 @@ export default function App() {
                 </div>
               );
             })}
+            {globalResults.length > visibleGlobalResults.length && (
+              <button
+                className="primaryButton"
+                style={{ marginTop: "16px" }}
+                onClick={() => setGlobalVisibleCount((current) => Math.min(current + 20, globalResults.length))}
+              >
+                {appLanguage === "en"
+                  ? `Show 20 more (${visibleGlobalResults.length}/${globalResults.length})`
+                  : `さらに20件表示（${visibleGlobalResults.length}/${globalResults.length}）`}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -8338,7 +8354,7 @@ function renderHome() {
         const all = `${item.type} ${item.title} ${item.date} ${item.text}`.toLowerCase();
         const score = keywords.reduce((s, k) => s + (all.includes(k) ? 2 : 0), 0);
         return { ...item, score };
-      }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
+      }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
 
       const topEquip = topByEquipment();
       const wantsStock = q.includes("在庫") || q.includes("stock") || q.includes("部品不足") || q.includes("欠品");
