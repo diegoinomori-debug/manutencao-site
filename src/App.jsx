@@ -2896,6 +2896,9 @@ export default function App() {
   const [workViewMode, setWorkViewMode] = useState("cards");
 
   const [newReport, setNewReport] = useState(null);
+  const [whyAiLoading, setWhyAiLoading] = useState(false);
+  const [whyAiError, setWhyAiError] = useState("");
+
   const [newCalendarEvent, setNewCalendarEvent] = useState(null);
   const [editingCalendarEventId, setEditingCalendarEventId] = useState(null);
   const [newPlannedWork, setNewPlannedWork] = useState(null);
@@ -4712,9 +4715,6 @@ const handleBulkReportExcelUpload = async (e) => {
 
   function ReportDraftForm() {
     if (!newReport) return null;
-
-    const [whyAiLoading, setWhyAiLoading] = useState(false);
-    const [whyAiError, setWhyAiError] = useState("");
 
     const calc = calculateReport(newReport);
     const setReport = (field, value) => setNewReport((current) => ({ ...current, [field]: value }));
