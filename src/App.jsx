@@ -24,10 +24,11 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import "./index.css";
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import { askMiyamaAI } from "./services/miyamaAI";
 import { searchHistory } from "./services/historySearch";
 import SimilarProblems from "./components/SimilarProblems";
+import LoginScreen from "./components/LoginScreen";
 
 import {
   collection,
@@ -36,7 +37,9 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  getDoc,
 } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 function toLocalDateText(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
@@ -2895,6 +2898,145 @@ function extractJsonObject(text = "") {
 }
 
 export default function App() {
+  const [authUser, setAuthUser] = useState(null);
+  const [authProfile, setAuthProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMessage, setAuthMessage] = useState("");
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setAuthLoading(true);
+      setAuthMessage("");
+
+      if (!user) {
+        setAuthUser(null);
+        setAuthProfile(null);
+        setAuthLoading(false);
+        return;
+      }
+
+      try {
+        const profileSnap = await getDoc(doc(db, "users", user.uid));
+
+        if (!profileSnap.exists()) {
+          setAuthMessage("このユーザーの権限設定がありません。管理者へ連絡してください。");
+          setAuthUser(null);
+          setAuthProfile(null);
+          await signOut(auth);
+          setAuthLoading(false);
+          return;
+        }
+
+        const profile = { id: profileSnap.id, ...profileSnap.data() };
+
+        if (profile.active === false) {
+          setAuthMessage("このユーザーは無効になっています。管理者へ連絡してください。");
+          setAuthUser(null);
+          setAuthProfile(null);
+          await signOut(auth);
+          setAuthLoading(false);
+          return;
+        }
+
+        setAuthUser(user);
+        setAuthProfile(profile);
+      } catch (error) {
+        console.error("User profile load error:", error);
+        setAuthMessage("ユーザー権限の読込に失敗しました。");
+        setAuthUser(null);
+        setAuthProfile(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "linear-gradient(135deg,#eff6ff,#f8fafc)"
+      }}>
+        <div style={{
+          padding: "28px",
+          borderRadius: "22px",
+          background: "#fff",
+          boxShadow: "0 20px 55px rgba(15,23,42,.12)",
+          fontWeight: 900
+        }}>
+          🔐 MIYAMA Maintenance — 読み込み中...
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser || !authProfile) {
+    return <LoginScreen message={authMessage} />;
+  }
+
+  return (
+    <MaintenanceApp
+      currentUser={authUser}
+      userProfile={authProfile}
+    />
+  );
+}
+
+function MaintenanceApp({ currentUser, userProfile }) {
+  const currentUserName =
+    String(
+      userProfile?.name ||
+      currentUser?.displayName ||
+      currentUser?.email ||
+      ""
+    ).trim();
+
+  const currentRole = String(userProfile?.role || "operator").toLowerCase();
+
+  const canInspect =
+    userProfile?.canInspect === true ||
+    ["inspector", "approver", "admin"].includes(currentRole);
+
+  const canApprove =
+    userProfile?.canApprove === true ||
+    ["approver", "admin"].includes(currentRole);
+
+  const isAdmin =
+    userProfile?.isAdmin === true ||
+    currentRole === "admin";
+
+  function roleLabel() {
+    if (currentRole === "admin") return "管理者 / Admin";
+    if (currentRole === "approver") return "承認者 / Approver";
+    if (currentRole === "inspector") return "点検者 / Inspector";
+    return "作業者 / Operator";
+  }
+
+  function approvalPermissionMessage(type) {
+    if (type === "approve") {
+      return appLanguage === "es"
+        ? "No tiene permiso para aprobar este informe."
+        : appLanguage === "en"
+          ? "You do not have permission to approve this report."
+          : "この報告書を承認する権限がありません。";
+    }
+
+    return appLanguage === "es"
+      ? "No tiene permiso para inspeccionar este informe."
+      : appLanguage === "en"
+        ? "You do not have permission to inspect this report."
+        : "この報告書を点検する権限がありません。";
+  }
+
+  async function logoutCurrentUser() {
+    if (!window.confirm("ログアウトしますか？")) return;
+    await signOut(auth);
+  }
+
   const [parts, setParts] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [reports, setReports] = useState([]);
@@ -3517,7 +3659,12 @@ export default function App() {
     setHistoryAiAnswer("");
     setHistoryAiError("");
     setSimilarProblems([]);
-    setNewReport(createBlankReport());
+    setNewReport({
+      ...createBlankReport(),
+      createdBy: currentUserName,
+      worker: currentUserName,
+      reportCreatedDate: todayText(),
+    });
   }
 
   function cancelNewReport() {
@@ -3537,10 +3684,19 @@ export default function App() {
       return;
     }
 
+    const createdNow = new Date().toISOString();
     const reportToSave = {
       ...sanitizeReportDates(newReport),
       createdAt: newReport.createdAt || normalizeDateOnly(newReport.workStartDateTime) || todayText(),
       reportCreatedDate: newReport.reportCreatedDate || todayText(),
+      createdBy: currentUserName,
+      createdByUid: currentUser.uid,
+      createdByEmail: currentUser.email || "",
+      createdAtAudit: newReport.createdAtAudit || createdNow,
+      approvalStatus:
+        !newReport.approvalStatus || newReport.approvalStatus === "下書き"
+          ? "点検待ち"
+          : newReport.approvalStatus,
     };
 
     await addDoc(collection(db, "maintenanceReports"), reportToSave);
@@ -5287,40 +5443,62 @@ Rules:
             </div>
 
             <div className="reportApprovalCompact" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", borderLeft: 0, borderTop: "2px solid #0f172a", flex: "1 1 100%", minWidth: 0, maxWidth: "100%", width: "100%" }}>
-              {[
-                ["承認", "approvedBy", "approvedDate"],
-                ["点検", "inspectedBy", "inspectedDate"],
-                ["作成", "createdBy", "reportCreatedDate"],
-              ].map(([label, nameKey, dateKey]) => (
-                <div key={label} style={{ borderRight: "1px solid #94a3b8", padding: "8px", minHeight: "96px" }}>
-                  <strong>{label}</strong>
-                  <input
-                    placeholder="氏名"
-                    value={newReport[nameKey] || ""}
-                    onChange={(e) => setReport(nameKey, e.target.value)}
-                    style={{ marginTop: "6px" }}
-                  />
-                  <input
-                    type="date"
-                    value={newReport[dateKey] || ""}
-                    onChange={(e) => setReport(dateKey, e.target.value)}
-                    style={{ marginTop: "6px" }}
-                  />
-                </div>
-              ))}
+              <div style={{ borderRight: "1px solid #94a3b8", padding: "8px", minHeight: "96px" }}>
+                <strong>承認</strong>
+                <div style={{ marginTop: "8px", fontWeight: 800 }}>{newReport.approvedBy || "—"}</div>
+                <small>{newReport.approvedDate || ""}</small>
+              </div>
+              <div style={{ borderRight: "1px solid #94a3b8", padding: "8px", minHeight: "96px" }}>
+                <strong>点検</strong>
+                <div style={{ marginTop: "8px", fontWeight: 800 }}>{newReport.inspectedBy || "—"}</div>
+                <small>{newReport.inspectedDate || ""}</small>
+              </div>
+              <div style={{ borderRight: "1px solid #94a3b8", padding: "8px", minHeight: "96px" }}>
+                <strong>作成</strong>
+                <div style={{ marginTop: "8px", fontWeight: 800 }}>{newReport.createdBy || currentUserName || "—"}</div>
+                <small>{newReport.reportCreatedDate || todayText()}</small>
+              </div>
             </div>
           </div>
 
           <div style={{ padding: "14px", background: reportStatusColor(newReport.approvalStatus), display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
             <strong>承認ステータス</strong>
-            <select value={newReport.approvalStatus || "下書き"} onChange={(e) => setReport("approvalStatus", e.target.value)} style={{ maxWidth: "180px" }}>
+            <select
+              value={newReport.approvalStatus || "下書き"}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (next === "承認済み" && !canApprove) {
+                  alert(approvalPermissionMessage("approve"));
+                  return;
+                }
+                if (next === "承認待ち" && !canInspect) {
+                  alert(approvalPermissionMessage("inspect"));
+                  return;
+                }
+                setReport("approvalStatus", next);
+              }}
+              style={{ maxWidth: "180px" }}
+            >
               <option value="下書き">下書き</option>
               <option value="点検待ち">点検待ち</option>
-              <option value="承認待ち">承認待ち</option>
-              <option value="承認済み">承認済み</option>
-              <option value="差戻し">差戻し</option>
+              {canInspect && <option value="承認待ち">承認待ち</option>}
+              {canApprove && <option value="承認済み">承認済み</option>}
+              {(canInspect || canApprove) && <option value="差戻し">差戻し</option>}
               <option value="Excel取込">Excel取込</option>
             </select>
+
+            <span
+              style={{
+                padding: "8px 12px",
+                borderRadius: "10px",
+                background: "#eff6ff",
+                color: "#1e40af",
+                fontWeight: 800,
+                fontSize: "12px",
+              }}
+            >
+              🔐 新規報告書は保存後に点検・承認できます。
+            </span>
 
             <button className="primaryButton" onClick={saveNewReport}>
               <Save size={16} /> 保存
@@ -7561,6 +7739,134 @@ function renderHome() {
     const calc = calculateReport(row);
     const isDirty = !!reportDirty[sourceRow.id];
     const setRow = (field, value) => setReportDraftField(sourceRow.id, field, value);
+
+    const setSavedApprovalStatus = (nextStatus) => {
+      if (nextStatus === "承認済み" && !canApprove) {
+        alert(approvalPermissionMessage("approve"));
+        return;
+      }
+
+      if (nextStatus === "承認待ち" && !canInspect) {
+        alert(approvalPermissionMessage("inspect"));
+        return;
+      }
+
+      if (
+        row.approvalStatus === "承認済み" &&
+        nextStatus !== "承認済み" &&
+        !canApprove
+      ) {
+        alert(approvalPermissionMessage("approve"));
+        return;
+      }
+
+      setRow("approvalStatus", nextStatus);
+    };
+
+    const inspectSavedReport = async () => {
+      if (!canInspect) {
+        alert(approvalPermissionMessage("inspect"));
+        return;
+      }
+
+      if (row.approvalStatus === "承認済み") {
+        alert("承認済み報告書は点検変更できません。");
+        return;
+      }
+
+      const ok = window.confirm(
+        `点検を実施します。\n\n点検者：${currentUserName}\n日付：${todayText()}\n\nよろしいですか？`
+      );
+      if (!ok) return;
+
+      const nowIso = new Date().toISOString();
+      const patch = {
+        inspectedBy: currentUserName,
+        inspectedByUid: currentUser.uid,
+        inspectedByEmail: currentUser.email || "",
+        inspectedDate: todayText(),
+        inspectedAt: nowIso,
+        approvalStatus: "承認待ち",
+      };
+
+      try {
+        setReportSavingId(sourceRow.id);
+        await updateDoc(doc(db, "maintenanceReports", sourceRow.id), patch);
+
+        setReports((current) =>
+          current.map((item) =>
+            item.id === sourceRow.id ? { ...item, ...patch } : item
+          )
+        );
+        setReportDrafts((current) => ({
+          ...current,
+          [sourceRow.id]: { ...(current[sourceRow.id] || row), ...patch },
+        }));
+        setReportDirty((current) => ({ ...current, [sourceRow.id]: false }));
+
+        alert(`点検を記録しました。\n点検者：${currentUserName}`);
+      } catch (error) {
+        console.error("inspection save error:", error);
+        alert("点検の保存に失敗しました。権限またはFirebase接続を確認してください。");
+      } finally {
+        setReportSavingId(null);
+      }
+    };
+
+    const approveSavedReport = async () => {
+      if (!canApprove) {
+        alert(approvalPermissionMessage("approve"));
+        return;
+      }
+
+      if (!row.inspectedBy) {
+        alert("先に点検を実施してください。");
+        return;
+      }
+
+      if (row.approvalStatus === "承認済み") {
+        alert("この報告書はすでに承認済みです。");
+        return;
+      }
+
+      const ok = window.confirm(
+        `承認を実施します。\n\n承認者：${currentUserName}\n日付：${todayText()}\n\n承認後は承認情報を権限者以外変更できません。\nよろしいですか？`
+      );
+      if (!ok) return;
+
+      const nowIso = new Date().toISOString();
+      const patch = {
+        approvedBy: currentUserName,
+        approvedByUid: currentUser.uid,
+        approvedByEmail: currentUser.email || "",
+        approvedDate: todayText(),
+        approvedAt: nowIso,
+        approvalStatus: "承認済み",
+      };
+
+      try {
+        setReportSavingId(sourceRow.id);
+        await updateDoc(doc(db, "maintenanceReports", sourceRow.id), patch);
+
+        setReports((current) =>
+          current.map((item) =>
+            item.id === sourceRow.id ? { ...item, ...patch } : item
+          )
+        );
+        setReportDrafts((current) => ({
+          ...current,
+          [sourceRow.id]: { ...(current[sourceRow.id] || row), ...patch },
+        }));
+        setReportDirty((current) => ({ ...current, [sourceRow.id]: false }));
+
+        alert(`承認を記録しました。\n承認者：${currentUserName}`);
+      } catch (error) {
+        console.error("approval save error:", error);
+        alert("承認の保存に失敗しました。権限またはFirebase接続を確認してください。");
+      } finally {
+        setReportSavingId(null);
+      }
+    };
     const reportAccentColors = ["#2563eb", "#16a34a", "#f97316", "#7c3aed", "#0891b2", "#dc2626"];
     const reportAccent = reportAccentColors[index % reportAccentColors.length];
     const reportTabs = [
@@ -7612,14 +7918,42 @@ function renderHome() {
           </div>
           <div className="reportActionBar" style={{ padding: "10px", background: reportStatusColor(row.approvalStatus) }}>
             <strong>✅ 状態：</strong>
-            <select value={row.approvalStatus || "下書き"} onChange={(e) => setRow("approvalStatus", e.target.value)} style={{ maxWidth: "180px" }}>
+            <select
+              value={row.approvalStatus || "下書き"}
+              onChange={(e) => setSavedApprovalStatus(e.target.value)}
+              style={{ maxWidth: "180px" }}
+            >
               <option value="下書き">下書き</option>
               <option value="点検待ち">点検待ち</option>
-              <option value="承認待ち">承認待ち</option>
-              <option value="承認済み">承認済み</option>
-              <option value="差戻し">差戻し</option>
+              {canInspect && <option value="承認待ち">承認待ち</option>}
+              {canApprove && <option value="承認済み">承認済み</option>}
+              {(canInspect || canApprove) && <option value="差戻し">差戻し</option>}
               <option value="Excel取込">Excel取込</option>
             </select>
+            {canInspect && (
+              <button
+                className="primaryButton"
+                type="button"
+                onClick={inspectSavedReport}
+                disabled={reportSavingId === sourceRow.id || row.approvalStatus === "承認済み"}
+              >
+                🔎 点検して自動保存
+              </button>
+            )}
+            {canApprove && (
+              <button
+                className="primaryButton"
+                type="button"
+                onClick={approveSavedReport}
+                disabled={
+                  reportSavingId === sourceRow.id ||
+                  !row.inspectedBy ||
+                  row.approvalStatus === "承認済み"
+                }
+              >
+                ✅ 承認して自動保存
+              </button>
+            )}
             <button
               className="primaryButton"
               onClick={() => saveReportDraft(sourceRow.id)}
@@ -7903,13 +8237,52 @@ function renderHome() {
               <div className="approvalStep"><div className="approvalStepIcon">🔒</div><span>STEP 4</span><strong>{row.approvalStatus === "承認済み" ? "ロック対象" : "編集中"}</strong><small>{row.approvalStatus || "下書き"}</small></div>
             </div>
             <div className="reportGrid">
-              <label>✅ 承認者<input value={row.approvedBy || ""} onChange={(e) => setRow("approvedBy", e.target.value)} /></label>
-              <label>📅 承認日<input type="date" value={dateOnlyInputValue(row.approvedDate)} onChange={(e) => setRow("approvedDate", e.target.value)} /></label>
-              <label>🔍 点検者<input value={row.inspectedBy || ""} onChange={(e) => setRow("inspectedBy", e.target.value)} /></label>
-              <label>📅 点検日<input type="date" value={dateOnlyInputValue(row.inspectedDate)} onChange={(e) => setRow("inspectedDate", e.target.value)} /></label>
-              <label>作成者<input value={row.createdBy || ""} onChange={(e) => setRow("createdBy", e.target.value)} /></label>
-              <label>📅 作成日<input type="date" value={dateOnlyInputValue(row.reportCreatedDate)} onChange={(e) => setRow("reportCreatedDate", e.target.value)} /></label>
+              <label>✅ 承認者<input readOnly value={row.approvedBy || ""} /></label>
+              <label>📅 承認日<input readOnly type="date" value={dateOnlyInputValue(row.approvedDate)} /></label>
+              <label>🔍 点検者<input readOnly value={row.inspectedBy || ""} /></label>
+              <label>📅 点検日<input readOnly type="date" value={dateOnlyInputValue(row.inspectedDate)} /></label>
+              <label>作成者<input readOnly value={row.createdBy || row.worker || ""} /></label>
+              <label>📅 作成日<input readOnly type="date" value={dateOnlyInputValue(row.reportCreatedDate)} /></label>
             </div>
+            <div style={{
+              marginTop: "12px",
+              padding: "12px",
+              borderRadius: "12px",
+              background: canApprove ? "#ecfdf5" : canInspect ? "#eff6ff" : "#f8fafc",
+              border: "1px solid #cbd5e1",
+              fontWeight: 800
+            }}>
+              🔐 ログイン権限：{roleLabel()}
+              {!canInspect && <span> — 点検・承認は権限者のみ実施できます。</span>}
+              {canInspect && !canApprove && <span> — 点検が可能です。承認は承認者のみです。</span>}
+              {canApprove && <span> — 点検・承認が可能です。</span>}
+            </div>
+
+            {(row.inspectedAt || row.approvedAt) && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "12px",
+                  borderRadius: "12px",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  fontSize: "12px",
+                  lineHeight: 1.7,
+                }}
+              >
+                <strong>🧾 承認履歴</strong>
+                {row.inspectedAt && (
+                  <div>
+                    🔎 点検：{row.inspectedBy || "—"} / {new Date(row.inspectedAt).toLocaleString()}
+                  </div>
+                )}
+                {row.approvedAt && (
+                  <div>
+                    ✅ 承認：{row.approvedBy || "—"} / {new Date(row.approvedAt).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            )}
           </Section>
         )}
 
@@ -10725,6 +11098,61 @@ return (
             <option key={key} value={key}>{label}</option>
           ))}
         </select>
+
+        <div
+          data-no-translate="true"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "6px 10px",
+            borderRadius: "12px",
+            border: "1px solid #cbd5e1",
+            background: "#fff",
+            minWidth: "190px",
+          }}
+          title={currentUser?.email || ""}
+        >
+          <div style={{
+            width: "30px",
+            height: "30px",
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            background: "#dbeafe",
+            fontWeight: 900,
+          }}>
+            👤
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <strong style={{
+              display: "block",
+              fontSize: "12px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
+              {currentUserName}
+            </strong>
+            <small style={{ color: "#64748b" }}>{roleLabel()}</small>
+          </div>
+          <button
+            type="button"
+            onClick={logoutCurrentUser}
+            style={{
+              border: 0,
+              background: "#fee2e2",
+              color: "#991b1b",
+              borderRadius: "9px",
+              padding: "6px 8px",
+              cursor: "pointer",
+              fontWeight: 900,
+            }}
+          >
+            Logout
+          </button>
+        </div>
+
         {menuItems.map((item) => (
           <button
             key={item.key}

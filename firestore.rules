@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function role() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? profile().role
+        : "none";
+    }
+
+    function isAdmin() {
+      return signedIn() && (
+        role() == "admin" ||
+        profile().isAdmin == true
+      );
+    }
+
+    function canInspect() {
+      return signedIn() && (
+        role() == "inspector" ||
+        role() == "approver" ||
+        role() == "admin" ||
+        profile().canInspect == true
+      );
+    }
+
+    function canApprove() {
+      return signedIn() && (
+        role() == "approver" ||
+        role() == "admin" ||
+        profile().canApprove == true
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /maintenanceReports/{reportId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.approvalStatus != "承認済み"
+        && (request.resource.data.approvedBy == null || request.resource.data.approvedBy == "")
+        && (request.resource.data.approvedDate == null || request.resource.data.approvedDate == "");
+
+      allow update: if signedIn()
+        && (
+          (
+            request.resource.data.inspectedBy == resource.data.inspectedBy
+            && request.resource.data.inspectedDate == resource.data.inspectedDate
+            && request.resource.data.inspectedByUid == resource.data.inspectedByUid
+            && request.resource.data.inspectedByEmail == resource.data.inspectedByEmail
+            && request.resource.data.inspectedAt == resource.data.inspectedAt
+          )
+          || canInspect()
+        )
+        && (
+          (
+            request.resource.data.approvedBy == resource.data.approvedBy
+            && request.resource.data.approvedDate == resource.data.approvedDate
+            && request.resource.data.approvedByUid == resource.data.approvedByUid
+            && request.resource.data.approvedByEmail == resource.data.approvedByEmail
+            && request.resource.data.approvedAt == resource.data.approvedAt
+          )
+          || canApprove()
+        )
+        && (
+          request.resource.data.approvalStatus == resource.data.approvalStatus
+          || (
+            resource.data.approvalStatus == "承認済み"
+              ? canApprove()
+              : (
+                  request.resource.data.approvalStatus == "承認済み"
+                    ? canApprove()
+                    : request.resource.data.approvalStatus == "承認待ち"
+                      ? canInspect()
+                      : true
+                )
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // The rest of the MIYAMA system requires an authenticated account.
+    match /{document=**} {
+      allow read, write: if signedIn();
+    }
+  }
+}

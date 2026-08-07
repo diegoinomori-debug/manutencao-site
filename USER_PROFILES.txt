@@ -1,0 +1,43 @@
+Firestore collection: users
+Document ID: USE THE FIREBASE AUTH UID
+
+Example operator:
+{
+  "name": "Operator 01",
+  "email": "operator01@example.com",
+  "role": "operator",
+  "canInspect": false,
+  "canApprove": false,
+  "active": true
+}
+
+Example inspector:
+{
+  "name": "Inspector 01",
+  "email": "inspector01@example.com",
+  "role": "inspector",
+  "canInspect": true,
+  "canApprove": false,
+  "active": true
+}
+
+Example approver:
+{
+  "name": "Approver 01",
+  "email": "approver01@example.com",
+  "role": "approver",
+  "canInspect": true,
+  "canApprove": true,
+  "active": true
+}
+
+Example admin:
+{
+  "name": "Administrator",
+  "email": "admin@example.com",
+  "role": "admin",
+  "canInspect": true,
+  "canApprove": true,
+  "isAdmin": true,
+  "active": true
+}

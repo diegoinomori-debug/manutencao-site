@@ -1,30 +1,28 @@
-MIYAMA AI — STEP 1
+MIYAMA LOGIN + APPROVAL V28
 
-1. Copy:
-   api/chat.js
-   src/services/miyamaAI.js
+Files:
+- src/App.jsx
+- src/firebase.js
+- src/components/LoginScreen.jsx
+- firestore.rules
+- USER_PROFILES.txt
 
-   into the same folders in your manutencao-site project.
+Roles:
+operator  = create/edit reports, submit for inspection
+inspector = operator + inspection (点検)
+approver  = inspector + approval (承認)
+admin     = all permissions
 
-2. OPENAI_API_KEY is already configured in Vercel.
+IMPORTANT:
+Before installing App.jsx, enable Firebase Email/Password and create at least one Authentication user.
+Then create a Firestore document users/{UID} for that account.
 
-3. Build:
-   npm run build
+After replacing files:
+npm run build
 
-4. Commit:
-   git add api/chat.js src/services/miyamaAI.js package.json package-lock.json
-   git commit -m "Adiciona backend seguro do MIYAMA AI"
-   git push
+Then:
+git add src/App.jsx src/firebase.js src/components/LoginScreen.jsx
+git commit -m "Adiciona login e permissoes de inspecao e aprovacao"
+git push
 
-5. After Vercel deploys, test in PowerShell:
-
-   Invoke-RestMethod `
-     -Method Post `
-     -Uri "https://manutencao-site-swart.vercel.app/api/chat" `
-     -ContentType "application/json" `
-     -Body '{"message":"Responda apenas: MIYAMA AI conectado","language":"Portuguese"}'
-
-Expected:
-   answer : MIYAMA AI conectado
-
-Do not put OPENAI_API_KEY in App.jsx, firebase.js, or GitHub.
+After testing login, publish the Firestore rules from firestore.rules.
