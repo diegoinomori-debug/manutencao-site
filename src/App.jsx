@@ -8237,12 +8237,86 @@ function renderHome() {
               <div className="approvalStep"><div className="approvalStepIcon">🔒</div><span>STEP 4</span><strong>{row.approvalStatus === "承認済み" ? "ロック対象" : "編集中"}</strong><small>{row.approvalStatus || "下書き"}</small></div>
             </div>
             <div className="reportGrid">
-              <label>✅ 承認者<input readOnly value={row.approvedBy || ""} /></label>
-              <label>📅 承認日<input readOnly type="date" value={dateOnlyInputValue(row.approvedDate)} /></label>
-              <label>🔍 点検者<input readOnly value={row.inspectedBy || ""} /></label>
-              <label>📅 点検日<input readOnly type="date" value={dateOnlyInputValue(row.inspectedDate)} /></label>
-              <label>作成者<input readOnly value={row.createdBy || row.worker || ""} /></label>
-              <label>📅 作成日<input readOnly type="date" value={dateOnlyInputValue(row.reportCreatedDate)} /></label>
+              <label>
+                ✅ 承認者
+                <input
+                  value={row.approvedBy || ""}
+                  onChange={(e) => setRow("approvedBy", e.target.value)}
+                  readOnly={!canApprove}
+                  style={{
+                    background: canApprove ? "#ffffff" : "#f1f5f9",
+                    cursor: canApprove ? "text" : "not-allowed",
+                  }}
+                />
+              </label>
+
+              <label>
+                📅 承認日
+                <input
+                  type="date"
+                  value={dateOnlyInputValue(row.approvedDate)}
+                  onChange={(e) => setRow("approvedDate", e.target.value)}
+                  disabled={!canApprove}
+                  style={{
+                    background: canApprove ? "#ffffff" : "#f1f5f9",
+                    cursor: canApprove ? "pointer" : "not-allowed",
+                  }}
+                />
+              </label>
+
+              <label>
+                🔍 点検者
+                <input
+                  value={row.inspectedBy || ""}
+                  onChange={(e) => setRow("inspectedBy", e.target.value)}
+                  readOnly={!canInspect}
+                  style={{
+                    background: canInspect ? "#ffffff" : "#f1f5f9",
+                    cursor: canInspect ? "text" : "not-allowed",
+                  }}
+                />
+              </label>
+
+              <label>
+                📅 点検日
+                <input
+                  type="date"
+                  value={dateOnlyInputValue(row.inspectedDate)}
+                  onChange={(e) => setRow("inspectedDate", e.target.value)}
+                  disabled={!canInspect}
+                  style={{
+                    background: canInspect ? "#ffffff" : "#f1f5f9",
+                    cursor: canInspect ? "pointer" : "not-allowed",
+                  }}
+                />
+              </label>
+
+              <label>
+                👤 作成者
+                <input
+                  value={row.createdBy || row.worker || ""}
+                  onChange={(e) => setRow("createdBy", e.target.value)}
+                  readOnly={!isAdmin}
+                  style={{
+                    background: isAdmin ? "#ffffff" : "#f1f5f9",
+                    cursor: isAdmin ? "text" : "not-allowed",
+                  }}
+                />
+              </label>
+
+              <label>
+                📅 作成日
+                <input
+                  type="date"
+                  value={dateOnlyInputValue(row.reportCreatedDate)}
+                  onChange={(e) => setRow("reportCreatedDate", e.target.value)}
+                  disabled={!isAdmin}
+                  style={{
+                    background: isAdmin ? "#ffffff" : "#f1f5f9",
+                    cursor: isAdmin ? "pointer" : "not-allowed",
+                  }}
+                />
+              </label>
             </div>
             <div style={{
               marginTop: "12px",
