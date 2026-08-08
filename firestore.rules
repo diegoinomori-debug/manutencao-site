@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -6,95 +7,128 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasProfile() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function profile() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function activeUser() {
+      return hasProfile() && profile().get("active", false) == true;
+    }
+
     function role() {
-      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        ? profile().role
-        : "none";
+      return hasProfile() ? profile().get("role", "operator") : "none";
     }
 
     function isAdmin() {
-      return signedIn() && (
+      return activeUser() && (
         role() == "admin" ||
-        profile().isAdmin == true
+        profile().get("isAdmin", false) == true
       );
     }
 
     function canInspect() {
-      return signedIn() && (
+      return activeUser() && (
         role() == "inspector" ||
         role() == "approver" ||
         role() == "admin" ||
-        profile().canInspect == true
+        profile().get("canInspect", false) == true
       );
     }
 
     function canApprove() {
-      return signedIn() && (
+      return activeUser() && (
         role() == "approver" ||
         role() == "admin" ||
-        profile().canApprove == true
+        profile().get("canApprove", false) == true
       );
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if activeUser()
+        && (request.auth.uid == userId || isAdmin());
+
       allow create, update, delete: if isAdmin();
     }
 
     match /maintenanceReports/{reportId} {
-      allow read: if signedIn();
+      allow read: if activeUser();
 
-      allow create: if signedIn()
-        && request.resource.data.approvalStatus != "承認済み"
-        && (request.resource.data.approvedBy == null || request.resource.data.approvedBy == "")
-        && (request.resource.data.approvedDate == null || request.resource.data.approvedDate == "");
+      allow create: if activeUser()
+        && request.resource.data.get("approvalStatus", "下書き")
+          in ["下書き", "点検待ち", "Excel取込"]
+        && request.resource.data.get("inspectedBy", "") == ""
+        && request.resource.data.get("approvedBy", "") == "";
 
-      allow update: if signedIn()
-        && (
-          (
-            request.resource.data.inspectedBy == resource.data.inspectedBy
-            && request.resource.data.inspectedDate == resource.data.inspectedDate
-            && request.resource.data.inspectedByUid == resource.data.inspectedByUid
-            && request.resource.data.inspectedByEmail == resource.data.inspectedByEmail
-            && request.resource.data.inspectedAt == resource.data.inspectedAt
-          )
-          || canInspect()
-        )
-        && (
-          (
-            request.resource.data.approvedBy == resource.data.approvedBy
-            && request.resource.data.approvedDate == resource.data.approvedDate
-            && request.resource.data.approvedByUid == resource.data.approvedByUid
-            && request.resource.data.approvedByEmail == resource.data.approvedByEmail
-            && request.resource.data.approvedAt == resource.data.approvedAt
-          )
-          || canApprove()
-        )
-        && (
-          request.resource.data.approvalStatus == resource.data.approvalStatus
-          || (
-            resource.data.approvalStatus == "承認済み"
-              ? canApprove()
-              : (
-                  request.resource.data.approvalStatus == "承認済み"
-                    ? canApprove()
-                    : request.resource.data.approvalStatus == "承認待ち"
-                      ? canInspect()
-                      : true
-                )
-          )
-        );
+      allow update: if activeUser()
+        && inspectionChangeAllowed()
+        && approvalChangeAllowed()
+        && creatorChangeAllowed()
+        && statusChangeAllowed();
 
       allow delete: if isAdmin();
+
+      function inspectionChangeAllowed() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        return !changed.hasAny([
+          "inspectedBy",
+          "inspectedDate",
+          "inspectedByUid",
+          "inspectedByEmail",
+          "inspectedAt"
+        ]) || canInspect();
+      }
+
+      function approvalChangeAllowed() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        return !changed.hasAny([
+          "approvedBy",
+          "approvedDate",
+          "approvedByUid",
+          "approvedByEmail",
+          "approvedAt"
+        ]) || canApprove();
+      }
+
+      function creatorChangeAllowed() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        return !changed.hasAny([
+          "createdBy",
+          "createdByUid",
+          "createdByEmail",
+          "createdAtAudit",
+          "reportCreatedDate"
+        ]) || isAdmin();
+      }
+
+      function statusChangeAllowed() {
+        let changed = request.resource.data.diff(resource.data).affectedKeys();
+        let oldStatus = resource.data.get("approvalStatus", "下書き");
+        let newStatus = request.resource.data.get("approvalStatus", "下書き");
+
+        return !changed.hasAny(["approvalStatus"])
+          || (
+            oldStatus == "承認済み"
+              ? canApprove()
+              : newStatus == "承認済み"
+                ? canApprove()
+                : newStatus == "承認待ち"
+                  ? canInspect()
+                  : newStatus == "差戻し"
+                    ? canInspect()
+                    : true
+          );
+      }
     }
 
-    // The rest of the MIYAMA system requires an authenticated account.
-    match /{document=**} {
-      allow read, write: if signedIn();
+    match /{collectionName}/{document=**} {
+      allow read, write: if activeUser()
+        && collectionName != "users"
+        && collectionName != "maintenanceReports";
     }
   }
 }

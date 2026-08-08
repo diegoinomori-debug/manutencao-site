@@ -3267,6 +3267,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const draft = reportDrafts[reportId] || reports.find((r) => r.id === reportId);
     if (!draft) return;
 
+    if (draft.approvalStatus === "承認済み") {
+      alert("🔒 この報告書は承認済みのため編集できません。修正が必要な場合は、承認権限者が差戻ししてください。");
+      return;
+    }
+
     try {
       setReportSavingId(reportId);
       const { id, ...plainDraft } = draft;
@@ -7738,7 +7743,14 @@ function renderHome() {
     const row = reportDrafts[sourceRow.id] || sourceRow;
     const calc = calculateReport(row);
     const isDirty = !!reportDirty[sourceRow.id];
-    const setRow = (field, value) => setReportDraftField(sourceRow.id, field, value);
+    const isApprovedLocked = row.approvalStatus === "承認済み";
+    const setRow = (field, value) => {
+      if (isApprovedLocked) {
+        alert("🔒 承認済み報告書はロックされています。修正する場合は、承認権限者が差戻ししてください。");
+        return;
+      }
+      setReportDraftField(sourceRow.id, field, value);
+    };
 
     const setSavedApprovalStatus = (nextStatus) => {
       if (nextStatus === "承認済み" && !canApprove) {
@@ -7763,6 +7775,89 @@ function renderHome() {
       setRow("approvalStatus", nextStatus);
     };
 
+    const requestInspection = async () => {
+      if (row.approvalStatus === "承認済み") {
+        alert("承認済み報告書は点検依頼できません。");
+        return;
+      }
+      if (row.approvalStatus === "点検待ち") {
+        alert("この報告書はすでに点検待ちです。");
+        return;
+      }
+
+      const ok = window.confirm("この報告書を点検依頼しますか？\n\n状態：点検待ち");
+      if (!ok) return;
+
+      const patch = {
+        approvalStatus: "点検待ち",
+        inspectionRequestedBy: currentUserName,
+        inspectionRequestedByUid: currentUser.uid,
+        inspectionRequestedAt: new Date().toISOString(),
+        inspectedBy: "",
+        inspectedDate: "",
+        inspectedAt: "",
+        approvedBy: "",
+        approvedDate: "",
+        approvedAt: "",
+      };
+
+      try {
+        setReportSavingId(sourceRow.id);
+        await updateDoc(doc(db, "maintenanceReports", sourceRow.id), patch);
+        setReports((current) =>
+          current.map((item) => item.id === sourceRow.id ? { ...item, ...patch } : item)
+        );
+        setReportDrafts((current) => ({
+          ...current,
+          [sourceRow.id]: { ...(current[sourceRow.id] || row), ...patch },
+        }));
+        setReportDirty((current) => ({ ...current, [sourceRow.id]: false }));
+        alert("📨 点検依頼を送信しました。");
+      } catch (error) {
+        console.error("inspection request error:", error);
+        alert("点検依頼の保存に失敗しました。");
+      } finally {
+        setReportSavingId(null);
+      }
+    };
+
+    const returnApprovedReport = async () => {
+      if (!canApprove) {
+        alert(approvalPermissionMessage("approve"));
+        return;
+      }
+      if (row.approvalStatus !== "承認済み") return;
+
+      const ok = window.confirm("承認済み報告書を差戻しますか？\n\n差戻し後、報告書を再編集できます。");
+      if (!ok) return;
+
+      const patch = {
+        approvalStatus: "差戻し",
+        returnedBy: currentUserName,
+        returnedByUid: currentUser.uid,
+        returnedAt: new Date().toISOString(),
+      };
+
+      try {
+        setReportSavingId(sourceRow.id);
+        await updateDoc(doc(db, "maintenanceReports", sourceRow.id), patch);
+        setReports((current) =>
+          current.map((item) => item.id === sourceRow.id ? { ...item, ...patch } : item)
+        );
+        setReportDrafts((current) => ({
+          ...current,
+          [sourceRow.id]: { ...(current[sourceRow.id] || row), ...patch },
+        }));
+        setReportDirty((current) => ({ ...current, [sourceRow.id]: false }));
+        alert("↩️ 報告書を差戻しました。再編集できます。");
+      } catch (error) {
+        console.error("return report error:", error);
+        alert("差戻しの保存に失敗しました。");
+      } finally {
+        setReportSavingId(null);
+      }
+    };
+
     const inspectSavedReport = async () => {
       if (!canInspect) {
         alert(approvalPermissionMessage("inspect"));
@@ -7771,6 +7866,11 @@ function renderHome() {
 
       if (row.approvalStatus === "承認済み") {
         alert("承認済み報告書は点検変更できません。");
+        return;
+      }
+
+      if (row.approvalStatus !== "点検待ち") {
+        alert("先に「📨 点検依頼」を実施してください。");
         return;
       }
 
@@ -7819,8 +7919,8 @@ function renderHome() {
         return;
       }
 
-      if (!row.inspectedBy) {
-        alert("先に点検を実施してください。");
+      if (!row.inspectedBy || row.approvalStatus !== "承認待ち") {
+        alert("先に点検を実施し、状態を「承認待ち」にしてください。");
         return;
       }
 
@@ -7918,48 +8018,51 @@ function renderHome() {
           </div>
           <div className="reportActionBar" style={{ padding: "10px", background: reportStatusColor(row.approvalStatus) }}>
             <strong>✅ 状態：</strong>
-            <select
-              value={row.approvalStatus || "下書き"}
-              onChange={(e) => setSavedApprovalStatus(e.target.value)}
-              style={{ maxWidth: "180px" }}
+            <span
+              style={{
+                padding: "8px 12px",
+                borderRadius: "999px",
+                background: "#ffffff",
+                border: "1px solid #cbd5e1",
+                fontWeight: 900,
+              }}
             >
-              <option value="下書き">下書き</option>
-              <option value="点検待ち">点検待ち</option>
-              {canInspect && <option value="承認待ち">承認待ち</option>}
-              {canApprove && <option value="承認済み">承認済み</option>}
-              {(canInspect || canApprove) && <option value="差戻し">差戻し</option>}
-              <option value="Excel取込">Excel取込</option>
-            </select>
-            {canInspect && (
-              <button
-                className="primaryButton"
-                type="button"
-                onClick={inspectSavedReport}
-                disabled={reportSavingId === sourceRow.id || row.approvalStatus === "承認済み"}
-              >
-                🔎 点検して自動保存
+              {row.approvalStatus || "下書き"}
+            </span>
+
+            {!isApprovedLocked && row.approvalStatus !== "点検待ち" && row.approvalStatus !== "承認待ち" && (
+              <button className="primaryButton" type="button" onClick={requestInspection}
+                disabled={reportSavingId === sourceRow.id}>
+                📨 点検依頼
               </button>
             )}
-            {canApprove && (
-              <button
-                className="primaryButton"
-                type="button"
-                onClick={approveSavedReport}
-                disabled={
-                  reportSavingId === sourceRow.id ||
-                  !row.inspectedBy ||
-                  row.approvalStatus === "承認済み"
-                }
-              >
-                ✅ 承認して自動保存
+
+            {canInspect && row.approvalStatus === "点検待ち" && (
+              <button className="primaryButton" type="button" onClick={inspectSavedReport}
+                disabled={reportSavingId === sourceRow.id}>
+                🔎 点検して承認依頼へ
+              </button>
+            )}
+
+            {canApprove && row.approvalStatus === "承認待ち" && (
+              <button className="primaryButton" type="button" onClick={approveSavedReport}
+                disabled={reportSavingId === sourceRow.id || !row.inspectedBy}>
+                ✅ 承認してロック
+              </button>
+            )}
+
+            {canApprove && isApprovedLocked && (
+              <button className="deleteButton" type="button" onClick={returnApprovedReport}
+                disabled={reportSavingId === sourceRow.id}>
+                ↩️ 差戻して再編集
               </button>
             )}
             <button
               className="primaryButton"
               onClick={() => saveReportDraft(sourceRow.id)}
-              disabled={reportSavingId === sourceRow.id}
+              disabled={reportSavingId === sourceRow.id || isApprovedLocked}
             >
-              <Save size={16} /> {reportSavingId === sourceRow.id ? "保存中..." : isDirty ? "変更を保存" : "保存済み"}
+              <Save size={16} /> {isApprovedLocked ? "🔒 承認済み・編集ロック" : reportSavingId === sourceRow.id ? "保存中..." : isDirty ? "変更を保存" : "保存済み"}
             </button>
             {isDirty && (
               <button className="deleteButton" onClick={() => resetReportDraft(sourceRow.id)}>
