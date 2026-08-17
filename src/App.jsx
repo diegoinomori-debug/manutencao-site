@@ -243,6 +243,11 @@ function createBlankCalendarEvent(date = "") {
     owner: "",
     importance: "通常",
     category: "定期保全",
+      criticality: "B",
+      annualPlannedQty: "",
+      budgetCategory: "通常",
+      criticalSpare: false,
+
     image: "",
   };
 }
@@ -4008,6 +4013,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
       reorderPoint: "",
       reorderQty: "",
       category: "手入力",
+      criticality: "B",
+      annualPlannedQty: "",
+      budgetCategory: "通常",
+      criticalSpare: false,
+
       maintenanceType: "交換",
       maintenanceMode: "定期保全",
       maintenanceDetail: "",
@@ -7471,6 +7481,174 @@ function renderHome() {
           <SubTabBar items={[{ key: "cards", label: "カード表示", icon: "🧾" }, { key: "urgent", label: "緊急確認", icon: "🚨" }, { key: "stock", label: "部品連携", icon: "🔩" }]} value={maintenanceViewMode} onChange={setMaintenanceViewMode} />
         </div>
 
+        <section className="miyamaSpareEliteHero">
+          <div>
+            <span className="miyamaElitePhaseBadge">
+              {appLanguage === "es" ? "FASE 6" : appLanguage === "en" ? "PHASE 6" : "フェーズ6"}
+            </span>
+            <h2>
+              🛡️ {appLanguage === "es"
+                ? "Gestión estratégica de repuestos"
+                : appLanguage === "en"
+                  ? "Strategic Spare Parts Management"
+                  : "戦略的予備品管理"}
+            </h2>
+            <p>
+              {appLanguage === "es"
+                ? "Prioriza repuestos críticos, riesgo de falta, presupuesto anual y compras necesarias."
+                : appLanguage === "en"
+                  ? "Prioritizes critical spares, shortage risk, annual budget, and required purchasing."
+                  : "重要予備品・欠品リスク・年間予算・発注必要量を一つの画面で判断します。"}
+            </p>
+          </div>
+          <button type="button" className="miyamaSpareEliteExport" onClick={eliteBudgetCsv}>
+            <Download size={16} />
+            {appLanguage === "es" ? "Exportar plan" : appLanguage === "en" ? "Export Plan" : "計画CSV出力"}
+          </button>
+        </section>
+
+        <section className="miyamaSpareEliteKpis">
+          <div className="miyamaSpareEliteKpi">
+            <span>🛡️</span>
+            <small>{appLanguage === "es" ? "Repuestos críticos" : appLanguage === "en" ? "Critical Spares" : "重要予備品"}</small>
+            <strong>{eliteCriticalParts.length}</strong>
+          </div>
+          <div className="miyamaSpareEliteKpi danger">
+            <span>🚨</span>
+            <small>{appLanguage === "es" ? "Riesgo de falta" : appLanguage === "en" ? "Shortage Risk" : "欠品リスク"}</small>
+            <strong>{eliteShortageParts.length}</strong>
+          </div>
+          <div className="miyamaSpareEliteKpi">
+            <span>💴</span>
+            <small>{appLanguage === "es" ? "Presupuesto anual" : appLanguage === "en" ? "Annual Budget" : "年間保全予算"}</small>
+            <strong>{formatYen(eliteAnnualBudget)}</strong>
+          </div>
+          <div className="miyamaSpareEliteKpi warn">
+            <span>🏷️</span>
+            <small>{appLanguage === "es" ? "Mantenimiento de alto costo" : appLanguage === "en" ? "High-Cost Maintenance" : "高額保全"}</small>
+            <strong>{eliteHighCostParts.length}</strong>
+            <p>≥ ¥500,000</p>
+          </div>
+          <div className="miyamaSpareEliteKpi success">
+            <span>🛒</span>
+            <small>{appLanguage === "es" ? "Compra recomendada" : appLanguage === "en" ? "Recommended Purchase" : "推奨発注額"}</small>
+            <strong>{formatYen(eliteOrderForecast)}</strong>
+          </div>
+        </section>
+
+        <section className="miyamaSpareEliteGrid">
+          <div className="miyamaSpareElitePanel">
+            <div className="miyamaElitePanelTitle">
+              <div>
+                <h3>🚨 {appLanguage === "es" ? "Riesgo de falta" : appLanguage === "en" ? "Shortage Forecast" : "欠品予測"}</h3>
+                <p>
+                  {appLanguage === "es"
+                    ? "Basado en stock, mínimo, uso de 180 días y plazo de entrega."
+                    : appLanguage === "en"
+                      ? "Based on stock, minimum, 180-day usage, and lead time."
+                      : "在庫・最低在庫・180日使用実績・納期から欠品リスクを予測します。"}
+                </p>
+              </div>
+            </div>
+
+            <div className="miyamaSpareEliteTableHead">
+              <span>{appLanguage === "es" ? "Pieza" : appLanguage === "en" ? "Part" : "部品"}</span>
+              <span>{appLanguage === "es" ? "Stock" : appLanguage === "en" ? "Stock" : "在庫"}</span>
+              <span>{appLanguage === "es" ? "Cobertura" : appLanguage === "en" ? "Coverage" : "在庫月数"}</span>
+              <span>{appLanguage === "es" ? "Riesgo" : appLanguage === "en" ? "Risk" : "リスク"}</span>
+              <span>{appLanguage === "es" ? "Pedido" : appLanguage === "en" ? "Order" : "推奨発注"}</span>
+            </div>
+
+            {eliteShortageParts.length === 0 ? (
+              <div className="miyamaSpareEliteEmpty">
+                ✅ {appLanguage === "es" ? "Sin riesgo detectado." : appLanguage === "en" ? "No shortage risk detected." : "現在、欠品リスクは検出されていません。"}
+              </div>
+            ) : eliteShortageParts.slice(0, 8).map((row) => (
+              <div className="miyamaSpareEliteTableRow" key={`risk-${row.id}`}>
+                <div>
+                  <b>{row.partName || row.partNo || "-"}</b>
+                  <small>{row.equipment || row.lineName || "-"}</small>
+                </div>
+                <strong>{row.stockQty || 0}/{row.minStock || 1}</strong>
+                <span>{row.eliteCoverageMonths >= 99 ? "∞" : `${row.eliteCoverageMonths.toFixed(1)}M`}</span>
+                <span className={`miyamaSpareRisk ${row.eliteShortageRisk.toLowerCase()}`}>{eliteRiskLabel(row.eliteShortageRisk)}</span>
+                <strong>{row.eliteRecommendedOrderQty}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="miyamaSpareElitePanel">
+            <div className="miyamaElitePanelTitle">
+              <div>
+                <h3>💰 {appLanguage === "es" ? "Mantenimiento de alto costo" : appLanguage === "en" ? "High-Cost Maintenance" : "高額保全管理"}</h3>
+                <p>
+                  {appLanguage === "es"
+                    ? "Elementos con costo unitario o presupuesto anual de ¥500.000 o más."
+                    : appLanguage === "en"
+                      ? "Items with unit price or annual budget of ¥500,000 or more."
+                      : "単価または年間予定額が50万円以上の保全項目を抽出します。"}
+                </p>
+              </div>
+            </div>
+
+            {eliteHighCostParts.length === 0 ? (
+              <div className="miyamaSpareEliteEmpty">-</div>
+            ) : eliteHighCostParts.slice(0, 8).map((row, index) => (
+              <div className="miyamaSpareHighCostRow" key={`cost-${row.id}`}>
+                <span className={`miyamaEliteRankNo ${index < 3 ? "top" : ""}`}>{index + 1}</span>
+                <div>
+                  <b>{row.partName || row.partNo || "-"}</b>
+                  <small>{row.equipment || row.lineName || "-"}</small>
+                </div>
+                <span>{row.eliteAnnualPlannedQty}{appLanguage === "ja" ? "個/年" : appLanguage === "en" ? "/yr" : "/año"}</span>
+                <strong>{formatYen(row.eliteAnnualBudget)}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="miyamaSpareCriticalPanel">
+          <div className="miyamaElitePanelTitle">
+            <div>
+              <h3>🛡️ {appLanguage === "es" ? "Lista de repuestos críticos" : appLanguage === "en" ? "Critical Spare List" : "重要予備品リスト"}</h3>
+              <p>
+                {appLanguage === "es"
+                  ? "La prioridad combina criticidad de falla, uso histórico y riesgo de falta."
+                  : appLanguage === "en"
+                    ? "Priority combines failure criticality, historical usage, and shortage risk."
+                    : "故障重要度・交換実績・欠品リスクを組み合わせて重要予備品を抽出します。"}
+              </p>
+            </div>
+            <strong>{formatYen(eliteCriticalBudget)}</strong>
+          </div>
+
+          <div className="miyamaSpareCriticalGrid">
+            {eliteCriticalParts.slice(0, 12).map((row) => (
+              <div className={`miyamaSpareCriticalCard risk-${row.eliteShortageRisk.toLowerCase()}`} key={`critical-${row.id}`}>
+                <div className="miyamaSpareCriticalTop">
+                  <span className="miyamaSpareCriticality">{row.eliteCriticality}</span>
+                  <span className={`miyamaSpareRisk ${row.eliteShortageRisk.toLowerCase()}`}>{eliteRiskLabel(row.eliteShortageRisk)}</span>
+                </div>
+                <h4>{row.partName || row.partNo || "-"}</h4>
+                <p>{row.partNo || row.serialNo || "-"}</p>
+                <small>⚙️ {row.equipment || row.lineName || "-"}</small>
+                <div className="miyamaSpareCriticalStats">
+                  <span>{appLanguage === "ja" ? "180日使用" : appLanguage === "en" ? "180d use" : "uso 180d"} <b>{row.eliteUsageQty180}</b></span>
+                  <span>{appLanguage === "ja" ? "故障使用" : appLanguage === "en" ? "failure uses" : "uso en fallas"} <b>{row.eliteFailureUses180}</b></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="miyamaSpareEliteNote">
+          ℹ️ {appLanguage === "es"
+            ? "La previsión usa los últimos 180 días de informes. Si el nombre de la pieza no está registrado de forma consistente en los informes, la demanda estimada puede ser menor que la real."
+            : appLanguage === "en"
+              ? "Forecasting uses the last 180 days of repair reports. If part names are not recorded consistently, estimated demand may be lower than actual demand."
+              : "欠品予測は直近180日の修理報告を使用します。修理報告に部品名が統一して登録されていない場合、使用量は実際より少なく見えることがあります。"}
+        </div>
+
         <div className="cards" style={{ marginBottom: "18px" }}>
           <div className="card red"><span>🚨 期限超過</span><strong>{over}</strong></div>
           <div className="card yellow"><span>⚠️ 7日以内</span><strong>{soon7}</strong></div>
@@ -8444,6 +8622,202 @@ function renderHome() {
       }
     );
 
+    // =====================================================
+    // MIYAMA ELITE - PHASE 6
+    // Critical spare parts / annual budget / shortage forecast
+    // =====================================================
+    const eliteNormalizePart = (value = "") =>
+      String(value || "")
+        .toLowerCase()
+        .replace(/[　\s\-_/・、。,.;:：()（）]/g, "")
+        .trim();
+
+    const eliteReportStart = addDays(todayText(), -180);
+    const eliteRecentReports = reports.filter((report) => {
+      const d = normalizeDateOnly(report.createdAt || report.troubleDateTime || report.workStartDateTime);
+      return d && d >= eliteReportStart && d <= todayText();
+    });
+
+    const elitePartRows = spareRows.map((row) => {
+      const partKeys = [
+        row.partName,
+        row.partNo,
+        row.serialNo,
+      ].map(eliteNormalizePart).filter((x) => x.length >= 2);
+
+      let usageQty180 = 0;
+      let failureUses180 = 0;
+      let highCriticalUses = 0;
+
+      eliteRecentReports.forEach((report) => {
+        const reportParts = [
+          { name: report.replacedPart, qty: 1 },
+          { name: report.partName1, qty: Number(report.partQty1 || 1) },
+          { name: report.partName2, qty: Number(report.partQty2 || 1) },
+          { name: report.partName3, qty: Number(report.partQty3 || 1) },
+        ].filter((item) => item.name);
+
+        const matched = reportParts.filter((item) => {
+          const reportKey = eliteNormalizePart(item.name);
+          return partKeys.some((key) => reportKey.includes(key) || key.includes(reportKey));
+        });
+
+        if (matched.length) {
+          const qty = matched.reduce((sum, item) => sum + Math.max(1, Number(item.qty || 1)), 0);
+          usageQty180 += qty;
+          failureUses180 += 1;
+          if (["S", "A"].includes(String(report.criticality || ""))) highCriticalUses += 1;
+        }
+      });
+
+      const monthlyUsage = usageQty180 > 0 ? usageQty180 / 6 : 0;
+      const stockQty = Number(row.stockQty || 0);
+      const minStock = Number(row.minStock || row.reorderPoint || 1) || 1;
+      const price = parseYen(row.price);
+      const leadTimeText = String(row.leadTime || "");
+      const leadTimeMatch = leadTimeText.match(/(\d+(?:\.\d+)?)/);
+      const leadTimeDays = leadTimeMatch ? Number(leadTimeMatch[1]) : 0;
+
+      const explicitCriticality = String(row.criticality || "").toUpperCase();
+      const inferredCriticality =
+        explicitCriticality ||
+        (highCriticalUses >= 1 ? "A" : failureUses180 >= 3 ? "A" : failureUses180 >= 1 ? "B" : "C");
+
+      const stockCoverageMonths =
+        monthlyUsage > 0 ? stockQty / monthlyUsage : stockQty > 0 ? 99 : 0;
+
+      const leadTimeMonths = leadTimeDays > 0 ? leadTimeDays / 30 : 0;
+      const shortageRisk =
+        stockQty <= 0
+          ? "RED"
+          : stockQty <= minStock
+            ? "RED"
+            : monthlyUsage > 0 && stockCoverageMonths <= Math.max(1, leadTimeMonths + 0.5)
+              ? "YELLOW"
+              : "GREEN";
+
+      const cycleDays = Number(row.cycle || 0);
+      const annualOccurrences = row.isMaintenanceTarget && cycleDays > 0 ? Math.max(1, 365 / cycleDays) : 0;
+      const plannedQty = Number(row.annualPlannedQty || 0) > 0
+        ? Number(row.annualPlannedQty)
+        : annualOccurrences > 0
+          ? Math.ceil(annualOccurrences)
+          : Math.ceil(monthlyUsage * 12);
+
+      const annualBudget = price > 0 ? price * plannedQty : 0;
+      const highCost = annualBudget >= 500000 || price >= 500000;
+      const criticalSpare =
+        row.criticalSpare === true ||
+        inferredCriticality === "S" ||
+        (inferredCriticality === "A" && shortageRisk !== "GREEN") ||
+        highCriticalUses > 0;
+
+      const recommendedOrderQty =
+        shortageRisk === "GREEN"
+          ? 0
+          : Math.max(
+              Number(row.reorderQty || 0),
+              minStock - stockQty,
+              Math.ceil(monthlyUsage * Math.max(1, leadTimeMonths + 1) - stockQty),
+              1
+            );
+
+      return {
+        ...row,
+        eliteCriticality: inferredCriticality,
+        eliteUsageQty180: usageQty180,
+        eliteFailureUses180: failureUses180,
+        eliteHighCriticalUses: highCriticalUses,
+        eliteMonthlyUsage: monthlyUsage,
+        eliteCoverageMonths: stockCoverageMonths,
+        eliteLeadTimeDays: leadTimeDays,
+        eliteShortageRisk: shortageRisk,
+        eliteAnnualPlannedQty: plannedQty,
+        eliteAnnualBudget: annualBudget,
+        eliteHighCost: highCost,
+        eliteCriticalSpare: criticalSpare,
+        eliteRecommendedOrderQty: recommendedOrderQty,
+      };
+    });
+
+    const eliteCriticalParts = elitePartRows
+      .filter((row) => row.eliteCriticalSpare)
+      .sort((a, b) => {
+        const riskWeight = { RED: 3, YELLOW: 2, GREEN: 1 };
+        return (
+          (riskWeight[b.eliteShortageRisk] || 0) - (riskWeight[a.eliteShortageRisk] || 0) ||
+          ["S", "A", "B", "C"].indexOf(a.eliteCriticality) - ["S", "A", "B", "C"].indexOf(b.eliteCriticality) ||
+          b.eliteFailureUses180 - a.eliteFailureUses180
+        );
+      });
+
+    const eliteShortageParts = elitePartRows
+      .filter((row) => row.eliteShortageRisk !== "GREEN")
+      .sort((a, b) => {
+        const riskWeight = { RED: 3, YELLOW: 2, GREEN: 1 };
+        return (riskWeight[b.eliteShortageRisk] || 0) - (riskWeight[a.eliteShortageRisk] || 0) ||
+          b.eliteFailureUses180 - a.eliteFailureUses180;
+      });
+
+    const eliteHighCostParts = elitePartRows
+      .filter((row) => row.eliteHighCost)
+      .sort((a, b) => b.eliteAnnualBudget - a.eliteAnnualBudget);
+
+    const eliteAnnualBudget = elitePartRows.reduce((sum, row) => sum + row.eliteAnnualBudget, 0);
+    const eliteCriticalBudget = eliteCriticalParts.reduce((sum, row) => sum + row.eliteAnnualBudget, 0);
+    const eliteOrderForecast = eliteShortageParts.reduce(
+      (sum, row) => sum + parseYen(row.price) * Number(row.eliteRecommendedOrderQty || 0),
+      0
+    );
+
+    const eliteRiskLabel = (risk) => {
+      if (appLanguage === "es") return risk === "RED" ? "Crítico" : risk === "YELLOW" ? "Atención" : "OK";
+      if (appLanguage === "en") return risk === "RED" ? "Critical" : risk === "YELLOW" ? "Watch" : "OK";
+      return risk === "RED" ? "緊急" : risk === "YELLOW" ? "注意" : "OK";
+    };
+
+    const eliteBudgetCsv = () => {
+      const header = [
+        "Part",
+        "Part No",
+        "Equipment",
+        "Criticality",
+        "Stock",
+        "Minimum",
+        "Usage 180d",
+        "Monthly Usage",
+        "Coverage Months",
+        "Lead Time Days",
+        "Risk",
+        "Annual Planned Qty",
+        "Price",
+        "Annual Budget",
+        "Recommended Order Qty",
+      ];
+      const rows = elitePartRows.map((row) => [
+        row.partName || "",
+        row.partNo || row.serialNo || "",
+        row.equipment || row.lineName || "",
+        row.eliteCriticality,
+        row.stockQty || 0,
+        row.minStock || 0,
+        row.eliteUsageQty180,
+        row.eliteMonthlyUsage.toFixed(2),
+        row.eliteCoverageMonths >= 99 ? "" : row.eliteCoverageMonths.toFixed(1),
+        row.eliteLeadTimeDays,
+        row.eliteShortageRisk,
+        row.eliteAnnualPlannedQty,
+        parseYen(row.price),
+        Math.round(row.eliteAnnualBudget),
+        row.eliteRecommendedOrderQty,
+      ]);
+      downloadTextFile(
+        `MIYAMA_Elite_Spare_Budget_${todayText()}.csv`,
+        "\ufeff" + [header, ...rows].map((r) => r.map(makeCsvSafe).join(",")).join("\n"),
+        "text/csv;charset=utf-8"
+      );
+    };
+
     const searched = spareSearch.trim().length > 0;
     const rowsToShow = searched ? filteredSpareRows : filteredSpareRows.slice(0, 30);
 
@@ -8594,6 +8968,38 @@ function renderHome() {
                 <label>📦 在庫数<input type="number" value={row.stockQty || 0} onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)} /></label>
                 <label>⚠️ 最低在庫<input type="number" value={row.minStock || 1} onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)} /></label>
                 <label>🚚 納期<input value={row.leadTime || ""} onChange={(e) => updateField("parts", row.id, "leadTime", e.target.value)} /></label>
+
+                <label>
+                  🚦 {appLanguage === "es" ? "Criticidad" : appLanguage === "en" ? "Criticality" : "部品重要度"}
+                  <select value={row.criticality || "B"} onChange={(e) => updateField("parts", row.id, "criticality", e.target.value)}>
+                    <option value="S">{appLanguage === "ja" ? "S - 安全・品質重大" : appLanguage === "en" ? "S - Safety / quality critical" : "S - Seguridad / calidad crítica"}</option>
+                    <option value="A">{appLanguage === "ja" ? "A - 生産停止重大" : appLanguage === "en" ? "A - Major production impact" : "A - Impacto mayor en producción"}</option>
+                    <option value="B">{appLanguage === "ja" ? "B - 影響中" : appLanguage === "en" ? "B - Medium impact" : "B - Impacto medio"}</option>
+                    <option value="C">{appLanguage === "ja" ? "C - 影響小" : appLanguage === "en" ? "C - Low impact" : "C - Impacto bajo"}</option>
+                  </select>
+                </label>
+
+                <label>
+                  📅 {appLanguage === "es" ? "Cantidad anual planificada" : appLanguage === "en" ? "Annual Planned Qty" : "年間予定数量"}
+                  <input
+                    type="number"
+                    min="0"
+                    value={row.annualPlannedQty || ""}
+                    onChange={(e) => updateField("parts", row.id, "annualPlannedQty", e.target.value)}
+                    placeholder={appLanguage === "ja" ? "空欄＝履歴/周期から自動推定" : ""}
+                  />
+                </label>
+
+                <label>
+                  🛡️ {appLanguage === "es" ? "Repuesto crítico" : appLanguage === "en" ? "Critical Spare" : "重要予備品"}
+                  <select
+                    value={row.criticalSpare === true ? "yes" : "no"}
+                    onChange={(e) => updateField("parts", row.id, "criticalSpare", e.target.value === "yes")}
+                  >
+                    <option value="no">{appLanguage === "es" ? "Automático / No" : appLanguage === "en" ? "Automatic / No" : "自動判定 / No"}</option>
+                    <option value="yes">{appLanguage === "es" ? "Sí - crítico" : appLanguage === "en" ? "Yes - Critical" : "Yes - 重要指定"}</option>
+                  </select>
+                </label>
               </div>
 
               <h3>📝 備考</h3>

@@ -1573,3 +1573,221 @@
   .miyamaNewEquipmentSummary,
   .miyamaNewEquipmentChecklistGroups { grid-template-columns: 1fr; }
 }
+
+
+/* =========================================================
+   MIYAMA ELITE MAINTENANCE - PHASE 6
+   Strategic Spare Parts / Budget / Shortage
+   ========================================================= */
+.miyamaSpareEliteHero {
+  margin-bottom: 13px;
+  padding: 21px 23px;
+  border-radius: 18px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 90% 20%, rgba(245,158,11,.25), transparent 28%),
+    linear-gradient(120deg,#172554,#24459a 58%,#2f66db);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.miyamaSpareEliteHero h2 { margin: 7px 0 5px; }
+.miyamaSpareEliteHero p { margin: 0; color: #e0e9ff; }
+
+.miyamaSpareEliteExport {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 11px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 900;
+}
+
+.miyamaSpareEliteKpis {
+  display: grid;
+  grid-template-columns: repeat(5,minmax(135px,1fr));
+  gap: 9px;
+  margin-bottom: 13px;
+}
+
+.miyamaSpareEliteKpi {
+  min-height: 115px;
+  padding: 14px;
+  border: 1px solid #e0e7f1;
+  border-radius: 15px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0 5px 18px rgba(17,36,75,.04);
+}
+.miyamaSpareEliteKpi > span { font-size: 21px; }
+.miyamaSpareEliteKpi small { margin-top: 5px; color: #718097; font-weight: 800; }
+.miyamaSpareEliteKpi strong { margin-top: 3px; font-size: 22px; color: #17233d; }
+.miyamaSpareEliteKpi p { margin: 2px 0 0; color: #718097; font-size: 9px; }
+.miyamaSpareEliteKpi.danger { border-top: 4px solid #ef4444; }
+.miyamaSpareEliteKpi.warn { border-top: 4px solid #f59e0b; }
+.miyamaSpareEliteKpi.success { border-top: 4px solid #22c55e; }
+
+.miyamaSpareEliteGrid {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 13px;
+  margin-bottom: 13px;
+}
+
+.miyamaSpareElitePanel,
+.miyamaSpareCriticalPanel {
+  padding: 17px;
+  border: 1px solid #e0e7f1;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(17,36,75,.04);
+}
+
+.miyamaSpareEliteTableHead,
+.miyamaSpareEliteTableRow {
+  display: grid;
+  grid-template-columns: minmax(150px,1.5fr) 65px 70px 72px 65px;
+  gap: 8px;
+  align-items: center;
+}
+.miyamaSpareEliteTableHead {
+  padding: 7px 8px;
+  color: #718097;
+  font-size: 9px;
+  font-weight: 900;
+}
+.miyamaSpareEliteTableRow {
+  min-height: 52px;
+  padding: 8px;
+  border-top: 1px solid #edf1f6;
+  font-size: 11px;
+}
+.miyamaSpareEliteTableRow > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.miyamaSpareEliteTableRow b,
+.miyamaSpareEliteTableRow small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.miyamaSpareEliteTableRow small { color: #718097; }
+
+.miyamaSpareRisk {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 1000;
+}
+.miyamaSpareRisk.red { background: #feecec; color: #b4232f; }
+.miyamaSpareRisk.yellow { background: #fff3d9; color: #93620a; }
+.miyamaSpareRisk.green { background: #e9f8ef; color: #16854a; }
+
+.miyamaSpareHighCostRow {
+  display: grid;
+  grid-template-columns: 30px 1fr 65px 95px;
+  gap: 8px;
+  align-items: center;
+  min-height: 51px;
+  border-top: 1px solid #edf1f6;
+  font-size: 10px;
+}
+.miyamaSpareHighCostRow > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.miyamaSpareHighCostRow small { color: #718097; }
+.miyamaSpareHighCostRow > strong { text-align: right; }
+
+.miyamaSpareCriticalPanel { margin-bottom: 13px; }
+
+.miyamaSpareCriticalGrid {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 9px;
+}
+
+.miyamaSpareCriticalCard {
+  min-height: 140px;
+  padding: 12px;
+  border: 1px solid #e0e7f1;
+  border-radius: 13px;
+  background: #fbfcff;
+}
+.miyamaSpareCriticalCard.risk-red { border-left: 5px solid #ef4444; }
+.miyamaSpareCriticalCard.risk-yellow { border-left: 5px solid #f59e0b; }
+.miyamaSpareCriticalCard.risk-green { border-left: 5px solid #22c55e; }
+.miyamaSpareCriticalTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 7px;
+}
+.miyamaSpareCriticality {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #172554;
+  color: #fff;
+  font-weight: 1000;
+}
+.miyamaSpareCriticalCard h4 { margin: 9px 0 2px; }
+.miyamaSpareCriticalCard p { margin: 0 0 5px; color: #4f5f75; font-size: 10px; }
+.miyamaSpareCriticalCard > small { color: #718097; }
+.miyamaSpareCriticalStats {
+  margin-top: 9px;
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.miyamaSpareCriticalStats span {
+  padding: 4px 6px;
+  border-radius: 7px;
+  background: #eef3fa;
+  font-size: 9px;
+}
+
+.miyamaSpareEliteNote,
+.miyamaSpareEliteEmpty {
+  margin-bottom: 13px;
+  padding: 10px 12px;
+  border: 1px solid #d9e4f3;
+  border-radius: 10px;
+  background: #f7faff;
+  color: #5d6e85;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1200px) {
+  .miyamaSpareEliteKpis { grid-template-columns: repeat(3,1fr); }
+  .miyamaSpareCriticalGrid { grid-template-columns: repeat(2,1fr); }
+}
+
+@media (max-width: 850px) {
+  .miyamaSpareEliteHero { flex-direction: column; align-items: flex-start; }
+  .miyamaSpareEliteGrid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .miyamaSpareEliteKpis,
+  .miyamaSpareCriticalGrid { grid-template-columns: 1fr; }
+  .miyamaSpareEliteTableHead { display: none; }
+  .miyamaSpareEliteTableRow {
+    grid-template-columns: 1fr 70px;
+  }
+}
