@@ -847,3 +847,172 @@
     grid-column: span 1;
   }
 }
+
+
+/* =========================================================
+   MIYAMA ELITE MAINTENANCE - PHASE 3
+   Automatic recurrence + strategic recommendation
+   ========================================================= */
+.miyamaEliteDiagnosis {
+  margin: 0 0 18px;
+  padding: 17px;
+  border: 1px solid #c9d8ff;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 95% 0%, rgba(99,102,241,.09), transparent 35%),
+    linear-gradient(180deg,#f8faff,#ffffff);
+  box-shadow: 0 8px 23px rgba(30,64,175,.06);
+}
+
+.miyamaEliteDiagnosisTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.miyamaEliteDiagnosisTop h3 {
+  margin: 7px 0 4px;
+  font-size: 18px;
+}
+
+.miyamaEliteDiagnosisTop p {
+  margin: 0;
+  color: #697890;
+  font-size: 12px;
+}
+
+.miyamaElitePhaseBadge {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #172554;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .5px;
+}
+
+.miyamaEliteApplyButton {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(135deg,#4f46e5,#2563eb);
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 7px 16px rgba(37,99,235,.18);
+}
+
+.miyamaEliteDiagnosisMetrics {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.miyamaEliteDiagnosisMetrics > div {
+  min-height: 92px;
+  padding: 12px 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: rgba(255,255,255,.92);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.miyamaEliteDiagnosisMetrics small {
+  color: #718097;
+  font-weight: 800;
+}
+
+.miyamaEliteDiagnosisMetrics strong {
+  margin-top: 4px;
+  font-size: 25px;
+  color: #17233d;
+}
+
+.miyamaEliteDiagnosisMetrics span {
+  color: #65748a;
+  font-size: 11px;
+}
+
+.miyamaEliteDiagnosisMetrics .strategy-bm { border-left: 5px solid #64748b; }
+.miyamaEliteDiagnosisMetrics .strategy-pm { border-left: 5px solid #22c55e; }
+.miyamaEliteDiagnosisMetrics .strategy-cbm { border-left: 5px solid #06b6d4; }
+.miyamaEliteDiagnosisMetrics .strategy-cm { border-left: 5px solid #f59e0b; }
+
+.miyamaEliteReason {
+  margin-top: 10px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  background: #eef5ff;
+  color: #36516f;
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+.miyamaEliteReason p { margin: 5px 0 0; }
+
+.miyamaEliteHistory {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid #e3e9f3;
+}
+
+.miyamaEliteHistoryRow {
+  display: grid;
+  grid-template-columns: 95px minmax(120px,.8fr) minmax(180px,1.5fr) 70px;
+  gap: 9px;
+  align-items: center;
+  min-height: 42px;
+  border-top: 1px solid #edf1f6;
+  font-size: 11px;
+}
+
+.miyamaEliteHistoryRow:first-of-type { margin-top: 8px; }
+.miyamaEliteHistoryRow em {
+  font-style: normal;
+  color: #4f46e5;
+  font-weight: 900;
+}
+
+.miyamaLinkedActionBox {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #bcd1ff;
+  border-radius: 14px;
+  background: #f6f9ff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.miyamaLinkedActionBox > div {
+  flex: 1 1 280px;
+}
+
+.miyamaLinkedActionBox p {
+  margin: 4px 0 0;
+  color: #66758c;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .miyamaEliteDiagnosisTop {
+    flex-direction: column;
+  }
+  .miyamaEliteDiagnosisMetrics {
+    grid-template-columns: 1fr;
+  }
+  .miyamaEliteHistoryRow {
+    grid-template-columns: 90px 1fr;
+  }
+  .miyamaEliteHistoryRow span:nth-child(3),
+  .miyamaEliteHistoryRow em {
+    grid-column: 2;
+  }
+}

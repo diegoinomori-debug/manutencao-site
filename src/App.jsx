@@ -163,6 +163,12 @@ function createBlankReport() {
     linkedMaintenanceId: "",
     linkedPlannedWorkId: "",
 
+    // MIYAMA Elite Maintenance - Phase 3 diagnosis snapshot
+    eliteHistoryMatchCount: 0,
+    eliteRecommendedStrategy: "",
+    eliteRecommendationReason: "",
+    eliteDiagnosisAt: "",
+
     recurrenceCategory: "必要",
     recurrenceStatus: "未実施",
     recurrencePrevention: "",
@@ -3963,6 +3969,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
       strategyActionType: "",
       linkedMaintenanceId: "",
       linkedPlannedWorkId: "",
+      eliteHistoryMatchCount: Number(newReport.eliteHistoryMatchCount || eliteHistoryCount || 0),
+      eliteRecommendedStrategy: newReport.eliteRecommendedStrategy || eliteRecommendation.strategy || "",
+      eliteRecommendationReason: newReport.eliteRecommendationReason || eliteRecommendation.reason || "",
+      eliteDiagnosisAt: newReport.eliteDiagnosisAt || createdNow,
     };
 
     const reportRef = await addDoc(collection(db, "maintenanceReports"), reportToSave);
@@ -5635,6 +5645,134 @@ const handleBulkReportExcelUpload = async (e) => {
     const calc = calculateReport(newReport);
     const setReport = (field, value) => setNewReport((current) => ({ ...current, [field]: value }));
 
+    // =====================================================
+    // MIYAMA ELITE - PHASE 3
+    // Automatic recurrence detection + strategy recommendation
+    // =====================================================
+    const normalizeElite = (value = "") =>
+      String(value || "")
+        .toLowerCase()
+        .replace(/[　\s\-_/・、。,.;:：]/g, "")
+        .trim();
+
+    const eliteKeywords = (value = "") =>
+      String(value || "")
+        .toLowerCase()
+        .split(/[\s　,、。.;:：/\\_\-]+/)
+        .map((x) => x.trim())
+        .filter((x) => x.length >= 2);
+
+    const currentEquipmentKey = normalizeElite(newReport.equipment);
+    const currentLineKey = normalizeElite(newReport.lineName);
+    const currentCauseKey = normalizeElite(newReport.failureCauseCategory);
+    const currentPointKey = normalizeElite(newReport.troublePoint);
+    const currentPhenomenonWords = eliteKeywords(newReport.phenomenon);
+
+    const eliteHistoryMatches = reports
+      .map((history) => {
+        let score = 0;
+        const equipmentKey = normalizeElite(history.equipment);
+        const lineKey = normalizeElite(history.lineName);
+        const causeKey = normalizeElite(history.failureCauseCategory);
+        const pointKey = normalizeElite(history.troublePoint);
+        const historyText = normalizeElite(
+          `${history.phenomenon || ""} ${history.troublePoint || ""} ${history.why1 || ""} ${history.why2 || ""} ${history.why3 || ""}`
+        );
+
+        if (currentEquipmentKey && equipmentKey === currentEquipmentKey) score += 5;
+        if (currentLineKey && lineKey === currentLineKey) score += 2;
+        if (currentCauseKey && causeKey === currentCauseKey) score += 3;
+        if (currentPointKey && pointKey === currentPointKey) score += 3;
+
+        const keywordHits = currentPhenomenonWords.filter((word) => historyText.includes(normalizeElite(word))).length;
+        score += Math.min(3, keywordHits);
+
+        return { ...history, eliteScore: score };
+      })
+      .filter((history) => history.eliteScore >= 5)
+      .sort((a, b) => b.eliteScore - a.eliteScore || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+    const eliteHistoryCount = eliteHistoryMatches.length;
+
+    const eliteDetectedRecurrence =
+      eliteHistoryCount >= 4 ? "慢性" :
+      eliteHistoryCount >= 2 ? "頻発" :
+      eliteHistoryCount >= 1 ? "再発" :
+      "初回";
+
+    function buildEliteRecommendation() {
+      const cause = String(newReport.failureCauseCategory || "");
+      const detail = String(newReport.failureCauseDetail || "");
+      const criticality = String(newReport.criticality || "B");
+      const recurrence = eliteDetectedRecurrence;
+
+      const structural =
+        ["設計・構造", "操作・作業"].includes(cause) ||
+        ["構造問題", "施工・組付不良", "調整不良"].includes(detail);
+
+      const timeBased =
+        ["摩耗", "寿命", "給油・潤滑"].includes(cause) ||
+        ["寿命超過", "給油不足", "点検不足"].includes(detail);
+
+      const conditionFriendly =
+        ["センサー", "制御・電気", "空圧・油圧"].includes(cause);
+
+      let strategy = "BM";
+      let reasonJa = "初回または影響が比較的小さく、まず履歴監視が適切です。";
+      let reasonEn = "This is a first/low-impact occurrence, so controlled run-to-failure with history monitoring is reasonable.";
+      let reasonEs = "Es una primera ocurrencia o de bajo impacto; es razonable continuar con BM y vigilar el historial.";
+
+      if (structural && (eliteHistoryCount >= 1 || ["S", "A"].includes(criticality))) {
+        strategy = "CM";
+        reasonJa = "構造・設計・作業方法に関係する原因で、再発または高い影響が確認されています。構造的な再発防止を優先します。";
+        reasonEn = "The cause is related to design, structure, or work method, with recurrence or high impact. Structural improvement should be prioritized.";
+        reasonEs = "La causa está relacionada con diseño, estructura o método de trabajo y existe recurrencia o alto impacto. Se prioriza una mejora estructural.";
+      } else if (timeBased && (eliteHistoryCount >= 1 || ["S", "A"].includes(criticality))) {
+        strategy = "PM";
+        reasonJa = "摩耗・寿命・給油・点検に関係するため、周期保全で故障前に介入する効果が期待できます。";
+        reasonEn = "The cause is related to wear, lifetime, lubrication, or inspection. Scheduled preventive maintenance can intervene before failure.";
+        reasonEs = "La causa está relacionada con desgaste, vida útil, lubricación o inspección. El mantenimiento preventivo puede actuar antes de la falla.";
+      } else if (conditionFriendly && (eliteHistoryCount >= 2 || ["S", "A"].includes(criticality))) {
+        strategy = "CBM";
+        reasonJa = "状態値を監視しやすい機器で、頻発または高い影響があります。状態基準保全の検討価値があります。";
+        reasonEn = "This equipment can be monitored by condition and has frequent/high-impact failures. Condition-Based Maintenance is worth considering.";
+        reasonEs = "Este equipo permite monitoreo por condición y presenta fallas frecuentes o de alto impacto. Conviene considerar CBM.";
+      } else if (["慢性", "頻発"].includes(recurrence)) {
+        strategy = "CM";
+        reasonJa = "同種故障が繰り返されているため、単純修理ではなく再発原因を除去する改良保全を推奨します。";
+        reasonEn = "Similar failures are recurring. Improvement Maintenance is recommended to remove the recurring root cause instead of repeatedly repairing it.";
+        reasonEs = "La misma falla se repite. Se recomienda mantenimiento de mejora para eliminar la causa recurrente.";
+      } else if (["S", "A"].includes(criticality)) {
+        strategy = "PM";
+        reasonJa = "安全・品質・生産への影響が大きいため、事後対応だけでなく予防的な管理を推奨します。";
+        reasonEn = "Because the safety, quality, or production impact is high, proactive preventive control is recommended instead of BM alone.";
+        reasonEs = "Debido al alto impacto en seguridad, calidad o producción, se recomienda control preventivo en lugar de solo BM.";
+      }
+
+      return {
+        strategy,
+        reason:
+          appLanguage === "es" ? reasonEs :
+          appLanguage === "en" ? reasonEn :
+          reasonJa,
+      };
+    }
+
+    const eliteRecommendation = buildEliteRecommendation();
+
+    function applyEliteRecommendation() {
+      setNewReport((current) => ({
+        ...current,
+        recurrenceLevel: eliteDetectedRecurrence,
+        maintenanceStrategy: eliteRecommendation.strategy,
+        strategyReason: current.strategyReason || eliteRecommendation.reason,
+        eliteHistoryMatchCount: eliteHistoryCount,
+        eliteRecommendedStrategy: eliteRecommendation.strategy,
+        eliteRecommendationReason: eliteRecommendation.reason,
+        eliteDiagnosisAt: new Date().toISOString(),
+      }));
+    }
+
     async function generateThreeWhys() {
       const phenomenon = String(newReport.phenomenon || "").trim();
       const troublePoint = String(newReport.troublePoint || "").trim();
@@ -6217,6 +6355,84 @@ Rules:
                   ? "First we standardize cause, criticality, recurrence, and strategy. In the next phase this decision will connect automatically to PM, improvement work, calendar, and analytics."
                   : "まず原因・重要度・再発性・保全戦略を標準化します。次のPhaseで、この判定を定期保全・改良工事・カレンダー・分析へ自動連携します。"}
             </div>
+          </div>
+
+          <div className="miyamaEliteDiagnosis">
+            <div className="miyamaEliteDiagnosisTop">
+              <div>
+                <span className="miyamaElitePhaseBadge">
+                  {appLanguage === "es" ? "FASE 3" : appLanguage === "en" ? "PHASE 3" : "フェーズ3"}
+                </span>
+                <h3>
+                  🧠 {appLanguage === "es"
+                    ? "Diagnóstico estratégico automático"
+                    : appLanguage === "en"
+                      ? "Automatic Strategic Diagnosis"
+                      : "自動戦略診断"}
+                </h3>
+                <p>
+                  {appLanguage === "es"
+                    ? "El sistema compara el equipo, punto de falla, causa y síntomas con el historial guardado."
+                    : appLanguage === "en"
+                      ? "The system compares equipment, failure point, cause, and symptoms with saved maintenance history."
+                      : "設備・不具合箇所・原因・現象を過去の保全履歴と比較して再発性を判定します。"}
+                </p>
+              </div>
+
+              <button type="button" className="miyamaEliteApplyButton" onClick={applyEliteRecommendation}>
+                ✓ {appLanguage === "es" ? "Aplicar recomendación" : appLanguage === "en" ? "Apply Recommendation" : "推奨判定を反映"}
+              </button>
+            </div>
+
+            <div className="miyamaEliteDiagnosisMetrics">
+              <div>
+                <small>{appLanguage === "es" ? "Historial similar" : appLanguage === "en" ? "Similar History" : "類似履歴"}</small>
+                <strong>{eliteHistoryCount}</strong>
+                <span>{appLanguage === "es" ? "casos" : appLanguage === "en" ? "cases" : "件"}</span>
+              </div>
+
+              <div>
+                <small>{appLanguage === "es" ? "Recurrencia detectada" : appLanguage === "en" ? "Detected Recurrence" : "自動再発判定"}</small>
+                <strong>
+                  {appLanguage === "es"
+                    ? ({ "初回": "Primera vez", "再発": "Repetición", "頻発": "Frecuente", "慢性": "Crónico" }[eliteDetectedRecurrence] || eliteDetectedRecurrence)
+                    : appLanguage === "en"
+                      ? ({ "初回": "First", "再発": "Repeated", "頻発": "Frequent", "慢性": "Chronic" }[eliteDetectedRecurrence] || eliteDetectedRecurrence)
+                      : eliteDetectedRecurrence}
+                </strong>
+              </div>
+
+              <div className={`strategy-${eliteRecommendation.strategy.toLowerCase()}`}>
+                <small>{appLanguage === "es" ? "Estrategia recomendada" : appLanguage === "en" ? "Recommended Strategy" : "推奨保全戦略"}</small>
+                <strong>{eliteRecommendation.strategy}</strong>
+                <span>
+                  {appLanguage === "es"
+                    ? ({ BM: "Correctivo", PM: "Preventivo", CBM: "Basado en condición", CM: "Mejora" }[eliteRecommendation.strategy])
+                    : appLanguage === "en"
+                      ? ({ BM: "Breakdown", PM: "Preventive", CBM: "Condition-Based", CM: "Improvement" }[eliteRecommendation.strategy])
+                      : ({ BM: "事後保全", PM: "予防保全", CBM: "状態基準保全", CM: "改良保全" }[eliteRecommendation.strategy])}
+                </span>
+              </div>
+            </div>
+
+            <div className="miyamaEliteReason">
+              <b>💡 {appLanguage === "es" ? "Motivo" : appLanguage === "en" ? "Reason" : "推奨理由"}</b>
+              <p>{eliteRecommendation.reason}</p>
+            </div>
+
+            {eliteHistoryMatches.length > 0 && (
+              <div className="miyamaEliteHistory">
+                <b>📚 {appLanguage === "es" ? "Casos similares recientes" : appLanguage === "en" ? "Recent Similar Cases" : "近い過去事例"}</b>
+                {eliteHistoryMatches.slice(0, 3).map((history) => (
+                  <div className="miyamaEliteHistoryRow" key={history.id}>
+                    <span>{history.createdAt || history.reportCreatedDate || "-"}</span>
+                    <strong>{history.equipment || history.lineName || "-"}</strong>
+                    <span>{history.phenomenon || history.troublePoint || "-"}</span>
+                    <em>Score {history.eliteScore}</em>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="reportGrid">
@@ -8803,6 +9019,31 @@ function renderHome() {
               <IconMetric icon="✅" label="承認状態" value={row.approvalStatus || "下書き"} />
               <IconMetric icon="🛠️" label="保全分類" value={row.maintenanceType || "-"} />
             </div>
+            {(row.strategyActionCreated || row.linkedMaintenanceId || row.linkedPlannedWorkId) && (
+              <div className="miyamaLinkedActionBox">
+                <div>
+                  <b>🔗 {appLanguage === "es" ? "Acción vinculada" : appLanguage === "en" ? "Linked Action" : "関連アクション"}</b>
+                  <p>
+                    {row.strategyActionType === "PM"
+                      ? (appLanguage === "es" ? "Este informe generó mantenimiento preventivo." : appLanguage === "en" ? "This report generated a Preventive Maintenance item." : "この報告書から定期保全項目を作成しました。")
+                      : (appLanguage === "es" ? "Este informe generó un trabajo de mejora." : appLanguage === "en" ? "This report generated an Improvement Work item." : "この報告書から改良工事を作成しました。")}
+                  </p>
+                </div>
+
+                {row.linkedMaintenanceId && (
+                  <button type="button" className="primaryButton" onClick={() => setPage("maintenance")}>
+                    🔧 {appLanguage === "es" ? "Abrir mantenimiento" : appLanguage === "en" ? "Open Maintenance" : "定期保全を開く"}
+                  </button>
+                )}
+
+                {row.linkedPlannedWorkId && (
+                  <button type="button" className="primaryButton" onClick={() => setPage("work")}>
+                    🏗️ {appLanguage === "es" ? "Abrir mejora" : appLanguage === "en" ? "Open Improvement" : "工事管理を開く"}
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="qrPreviewBox">
               <div style={{ fontSize: "34px" }}>🔳</div>
               <div>
