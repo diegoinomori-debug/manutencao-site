@@ -1,31 +1,44 @@
 <!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8" />
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1d4ed8" />
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  />
+    <title>MIYAMA Maintenance</title>
 
-  <title>MIYAMA Maintenance</title>
+    <script>
+      // MIYAMA Maintenance - temporary PWA/cache cleanup.
+      // Removes old service workers/caches that can keep an old index.html
+      // pointing to a Vite hashed JS file that no longer exists.
+      (function () {
+        try {
+          if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+              navigator.serviceWorker.getRegistrations().then(function (regs) {
+                regs.forEach(function (reg) {
+                  reg.unregister().catch(function () {});
+                });
+              }).catch(function () {});
+            });
+          }
 
-  <meta name="description" content="設備保全管理システム" />
-  <meta name="theme-color" content="#2563eb" />
+          if ("caches" in window) {
+            caches.keys().then(function (keys) {
+              keys.forEach(function (key) {
+                caches.delete(key).catch(function () {});
+              });
+            }).catch(function () {});
+          }
+        } catch (e) {
+          console.warn("MIYAMA cache cleanup:", e);
+        }
+      })();
+    </script>
+  </head>
 
-  <!-- Apple iPhone -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="MIYAMA" />
-
-  <!-- Android / PWA -->
-  <link rel="icon" href="/miyama-logo.png" />
-  <link rel="apple-touch-icon" href="/miyama-logo.png" />
-  <link rel="manifest" href="/manifest.webmanifest" />
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
-</body>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
