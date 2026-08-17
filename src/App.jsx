@@ -9981,6 +9981,137 @@ function renderHome() {
     const maxMachineStop = Math.max(1, ...machineRank.map((x) => x.stopHours));
     const maxReasonStop = Math.max(1, ...reasonRank.map((x) => x.stopHours));
 
+    // =====================================================
+    // MIYAMA ELITE - PHASE 4 ANALYTICS
+    // =====================================================
+    const eliteStrategyOrder = ["BM", "PM", "CBM", "CM", "未分類"];
+
+    const eliteStrategyStats = eliteStrategyOrder.map((strategy) => {
+      const rows = filtered.filter((row) => {
+        const current = String(row.maintenanceStrategy || "").trim();
+        return strategy === "未分類" ? !current : current === strategy;
+      });
+      return {
+        strategy,
+        count: rows.length,
+        stopHours: rows.reduce((sum, row) => sum + toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0), 0),
+        cost: rows.reduce((sum, row) => sum + toNumber(row.totalCost ?? calculateReport(row).totalCost, 0), 0),
+      };
+    });
+
+    const eliteClassifiedCount = filtered.filter((row) => String(row.maintenanceStrategy || "").trim()).length;
+    const eliteClassifiedRate = totalReports > 0 ? (eliteClassifiedCount / totalReports) * 100 : 0;
+
+    const eliteRecurringRows = filtered.filter((row) =>
+      ["再発", "頻発", "慢性"].includes(String(row.recurrenceLevel || ""))
+    );
+    const eliteRecurrenceRate = totalReports > 0 ? (eliteRecurringRows.length / totalReports) * 100 : 0;
+
+    const eliteChronicCount = filtered.filter((row) => String(row.recurrenceLevel || "") === "慢性").length;
+    const eliteFrequentCount = filtered.filter((row) => String(row.recurrenceLevel || "") === "頻発").length;
+
+    const eliteHighCriticalityCount = filtered.filter((row) =>
+      ["S", "A"].includes(String(row.criticality || ""))
+    ).length;
+
+    const eliteActionCreatedCount = filtered.filter((row) => row.strategyActionCreated === true).length;
+    const eliteActionEligibleCount = filtered.filter((row) =>
+      ["PM", "CM"].includes(String(row.maintenanceStrategy || ""))
+    ).length;
+    const eliteActionConversionRate =
+      eliteActionEligibleCount > 0 ? (eliteActionCreatedCount / eliteActionEligibleCount) * 100 : 0;
+
+    const eliteCauseMap = {};
+    filtered.forEach((row) => {
+      const key = String(row.failureCauseCategory || "未分類").trim() || "未分類";
+      if (!eliteCauseMap[key]) eliteCauseMap[key] = { key, count: 0, stopHours: 0, cost: 0 };
+      eliteCauseMap[key].count += 1;
+      eliteCauseMap[key].stopHours += toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0);
+      eliteCauseMap[key].cost += toNumber(row.totalCost ?? calculateReport(row).totalCost, 0);
+    });
+    const eliteCauseRank = Object.values(eliteCauseMap)
+      .sort((a, b) => b.stopHours - a.stopHours || b.count - a.count)
+      .slice(0, 8);
+    const eliteCauseMax = Math.max(1, ...eliteCauseRank.map((x) => x.stopHours));
+
+    const eliteMachineRiskRank = machineRank
+      .map((machine) => {
+        const rows = filtered.filter((row) => getReportMachine(row) === machine.key);
+        const recurrence = rows.filter((row) => ["再発", "頻発", "慢性"].includes(String(row.recurrenceLevel || ""))).length;
+        const highCriticality = rows.filter((row) => ["S", "A"].includes(String(row.criticality || ""))).length;
+        const chronic = rows.filter((row) => String(row.recurrenceLevel || "") === "慢性").length;
+        const riskScore =
+          machine.stopHours * 2 +
+          recurrence * 5 +
+          highCriticality * 8 +
+          chronic * 12 +
+          machine.count;
+        return {
+          ...machine,
+          recurrence,
+          highCriticality,
+          chronic,
+          riskScore,
+        };
+      })
+      .sort((a, b) => b.riskScore - a.riskScore)
+      .slice(0, 5);
+
+    const eliteFirstDate = filtered
+      .map(getReportDate)
+      .filter(Boolean)
+      .sort()[0] || "";
+    const eliteLastDate = filtered
+      .map(getReportDate)
+      .filter(Boolean)
+      .sort()
+      .slice(-1)[0] || "";
+
+    const eliteSpanDays = eliteFirstDate && eliteLastDate
+      ? Math.max(1, Math.round((parseLocalDate(eliteLastDate) - parseLocalDate(eliteFirstDate)) / 86400000) + 1)
+      : 0;
+
+    // Reference MTBF: 16 operating hours/day because the current MIYAMA dashboard
+    // already uses a 2-shift / 16h basis. This is explicitly a reference, not true PLC runtime.
+    const eliteReferenceOperatingHours = eliteSpanDays * 16;
+    const eliteMtbfReference =
+      totalReports > 0 && eliteReferenceOperatingHours > 0
+        ? eliteReferenceOperatingHours / totalReports
+        : 0;
+
+    const eliteStrategyName = (strategy) => {
+      const dictionary = {
+        ja: { BM: "事後保全", PM: "予防保全", CBM: "状態基準保全", CM: "改良保全", "未分類": "未分類" },
+        en: { BM: "Breakdown", PM: "Preventive", CBM: "Condition-Based", CM: "Improvement", "未分類": "Unclassified" },
+        es: { BM: "Correctivo", PM: "Preventivo", CBM: "Basado en condición", CM: "Mejora", "未分類": "Sin clasificar" },
+      };
+      return dictionary[appLanguage]?.[strategy] || dictionary.ja[strategy] || strategy;
+    };
+
+    const eliteCauseLabel = (cause) => {
+      const dictionary = {
+        摩耗: { en: "Wear", es: "Desgaste" },
+        破損: { en: "Breakage", es: "Rotura" },
+        "断線・配線": { en: "Wiring / disconnection", es: "Cableado / desconexión" },
+        "位置ズレ・調整": { en: "Misalignment / adjustment", es: "Desalineación / ajuste" },
+        "給油・潤滑": { en: "Lubrication", es: "Lubricación" },
+        "汚れ・異物": { en: "Contamination", es: "Suciedad / material extraño" },
+        "制御・電気": { en: "Control / electrical", es: "Control / eléctrico" },
+        センサー: { en: "Sensor", es: "Sensor" },
+        "空圧・油圧": { en: "Pneumatic / hydraulic", es: "Neumática / hidráulica" },
+        "ワーク・材料": { en: "Workpiece / material", es: "Pieza / material" },
+        プログラム: { en: "Program", es: "Programa" },
+        "操作・作業": { en: "Operation / work", es: "Operación / trabajo" },
+        保全不備: { en: "Maintenance issue", es: "Falla de mantenimiento" },
+        "設計・構造": { en: "Design / structure", es: "Diseño / estructura" },
+        寿命: { en: "End of life", es: "Fin de vida" },
+        不明: { en: "Unknown", es: "Desconocido" },
+        未分類: { en: "Unclassified", es: "Sin clasificar" },
+      };
+      if (appLanguage === "ja") return cause;
+      return dictionary[cause]?.[appLanguage] || cause;
+    };
+
     const Row = ({ item, index, max, mode = "hours" }) => (
       <div className="productionDetailBarRow">
         <div className={`productionRankNo ${index < 3 ? "top" : ""}`}>{index + 1}</div>
@@ -9992,6 +10123,175 @@ function renderHome() {
 
     return (
       <>
+        <section className="miyamaEliteAnalyticsHero">
+          <div>
+            <span className="miyamaElitePhaseBadge">
+              {appLanguage === "es" ? "FASE 4" : appLanguage === "en" ? "PHASE 4" : "フェーズ4"}
+            </span>
+            <h1>
+              🏆 {appLanguage === "es"
+                ? "MIYAMA Elite Maintenance Dashboard"
+                : appLanguage === "en"
+                  ? "MIYAMA Elite Maintenance Dashboard"
+                  : "MIYAMA Elite Maintenance ダッシュボード"}
+            </h1>
+            <p>
+              {appLanguage === "es"
+                ? "Convierte los informes de mantenimiento en indicadores para eliminar recurrencias y decidir dónde actuar primero."
+                : appLanguage === "en"
+                  ? "Turns maintenance reports into indicators for eliminating recurrence and deciding where to act first."
+                  : "修理報告を『再発をなくすための経営指標』に変換し、どこから改善するかを判断します。"}
+            </p>
+          </div>
+          <div className="miyamaEliteHeroStatus">
+            <small>{appLanguage === "es" ? "Datos clasificados" : appLanguage === "en" ? "Classified Data" : "戦略分類率"}</small>
+            <strong>{eliteClassifiedRate.toFixed(0)}%</strong>
+            <span>{eliteClassifiedCount}/{totalReports}</span>
+          </div>
+        </section>
+
+        <section className="miyamaEliteKpiGrid">
+          <div className="miyamaEliteKpi">
+            <span>🔁</span>
+            <small>{appLanguage === "es" ? "Tasa de recurrencia" : appLanguage === "en" ? "Recurrence Rate" : "再発率"}</small>
+            <strong>{eliteRecurrenceRate.toFixed(1)}%</strong>
+            <p>{eliteRecurringRows.length} / {totalReports}</p>
+          </div>
+
+          <div className="miyamaEliteKpi danger">
+            <span>🚨</span>
+            <small>{appLanguage === "es" ? "Alta criticidad S/A" : appLanguage === "en" ? "High Criticality S/A" : "高重要度 S/A"}</small>
+            <strong>{eliteHighCriticalityCount}</strong>
+            <p>{appLanguage === "es" ? "casos" : appLanguage === "en" ? "cases" : "件"}</p>
+          </div>
+
+          <div className="miyamaEliteKpi warn">
+            <span>♻️</span>
+            <small>{appLanguage === "es" ? "Crónicas / frecuentes" : appLanguage === "en" ? "Chronic / Frequent" : "慢性・頻発"}</small>
+            <strong>{eliteChronicCount + eliteFrequentCount}</strong>
+            <p>{appLanguage === "ja" ? `慢性 ${eliteChronicCount} / 頻発 ${eliteFrequentCount}` : appLanguage === "en" ? `Chronic ${eliteChronicCount} / Frequent ${eliteFrequentCount}` : `Crónico ${eliteChronicCount} / Frecuente ${eliteFrequentCount}`}</p>
+          </div>
+
+          <div className="miyamaEliteKpi success">
+            <span>⚡</span>
+            <small>{appLanguage === "es" ? "Conversión PM/CM" : appLanguage === "en" ? "PM/CM Action Conversion" : "PM/CMアクション化率"}</small>
+            <strong>{eliteActionConversionRate.toFixed(0)}%</strong>
+            <p>{eliteActionCreatedCount} / {eliteActionEligibleCount}</p>
+          </div>
+
+          <div className="miyamaEliteKpi">
+            <span>⏱️</span>
+            <small>MTTR</small>
+            <strong>{mttr.toFixed(1)}H</strong>
+            <p>{appLanguage === "es" ? "promedio por falla" : appLanguage === "en" ? "average per failure" : "1件平均停止時間"}</p>
+          </div>
+
+          <div className="miyamaEliteKpi">
+            <span>📈</span>
+            <small>{appLanguage === "es" ? "MTBF referencia" : appLanguage === "en" ? "MTBF Reference" : "参考MTBF"}</small>
+            <strong>{eliteMtbfReference.toFixed(1)}H</strong>
+            <p>{appLanguage === "es" ? "base 16 h/día" : appLanguage === "en" ? "16 h/day basis" : "2直16H/日基準"}</p>
+          </div>
+        </section>
+
+        <section className="miyamaEliteAnalyticsGrid">
+          <div className="miyamaElitePanel">
+            <div className="miyamaElitePanelTitle">
+              <h3>🧭 {appLanguage === "es" ? "Estrategia de mantenimiento" : appLanguage === "en" ? "Maintenance Strategy" : "保全戦略構成"}</h3>
+              <small>{totalReports}{appLanguage === "ja" ? "件" : appLanguage === "en" ? " reports" : " informes"}</small>
+            </div>
+
+            <div className="miyamaEliteStrategyAnalytics">
+              {eliteStrategyStats.map((item) => {
+                const percent = totalReports > 0 ? (item.count / totalReports) * 100 : 0;
+                return (
+                  <div className={`miyamaEliteStrategyRow strategy-${String(item.strategy).toLowerCase()}`} key={item.strategy}>
+                    <div>
+                      <b>{item.strategy}</b>
+                      <span>{eliteStrategyName(item.strategy)}</span>
+                    </div>
+                    <div className="miyamaEliteBarTrack">
+                      <div className="miyamaEliteBarFill" style={{ width: `${percent}%` }} />
+                    </div>
+                    <strong>{item.count}</strong>
+                    <small>{percent.toFixed(0)}%</small>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="miyamaElitePanel">
+            <div className="miyamaElitePanelTitle">
+              <h3>🎯 {appLanguage === "es" ? "Pareto de causas por parada" : appLanguage === "en" ? "Cause Pareto by Downtime" : "原因別 停止時間Pareto"}</h3>
+              <small>{formatHours(totalStopHours)}</small>
+            </div>
+
+            <div className="miyamaEliteCauseList">
+              {eliteCauseRank.length === 0 && <p className="miyamaEliteEmpty">-</p>}
+              {eliteCauseRank.map((item, index) => (
+                <div className="miyamaEliteCauseRow" key={item.key}>
+                  <span className="miyamaEliteRankNo">{index + 1}</span>
+                  <div>
+                    <b>{eliteCauseLabel(item.key)}</b>
+                    <small>{item.count}{appLanguage === "ja" ? "件" : appLanguage === "en" ? " cases" : " casos"}</small>
+                  </div>
+                  <div className="miyamaEliteBarTrack">
+                    <div className="miyamaEliteBarFill danger" style={{ width: `${Math.min(100, (item.stopHours / eliteCauseMax) * 100)}%` }} />
+                  </div>
+                  <strong>{formatHours(item.stopHours)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="miyamaElitePanel miyamaEliteMachineRisk">
+          <div className="miyamaElitePanelTitle">
+            <div>
+              <h3>🔥 {appLanguage === "es" ? "Equipos prioritarios" : appLanguage === "en" ? "Priority Equipment" : "重点改善設備ランキング"}</h3>
+              <p>
+                {appLanguage === "es"
+                  ? "Prioridad calculada con parada, recurrencia, criticidad y cronicidad."
+                  : appLanguage === "en"
+                    ? "Priority score combines downtime, recurrence, criticality, and chronic failures."
+                    : "停止時間・再発・重要度・慢性化を組み合わせて改善優先度を算出します。"}
+              </p>
+            </div>
+          </div>
+
+          <div className="miyamaEliteMachineHeader">
+            <span>No.</span>
+            <span>{appLanguage === "es" ? "Equipo" : appLanguage === "en" ? "Equipment" : "設備"}</span>
+            <span>{appLanguage === "es" ? "Parada" : appLanguage === "en" ? "Downtime" : "停止時間"}</span>
+            <span>{appLanguage === "es" ? "Recurrencia" : appLanguage === "en" ? "Recurrence" : "再発"}</span>
+            <span>S/A</span>
+            <span>{appLanguage === "es" ? "Puntuación" : appLanguage === "en" ? "Score" : "優先Score"}</span>
+          </div>
+
+          {eliteMachineRiskRank.map((machine, index) => (
+            <div className="miyamaEliteMachineRow" key={machine.key}>
+              <span className={`miyamaEliteRankNo ${index < 3 ? "top" : ""}`}>{index + 1}</span>
+              <div>
+                <b>{machine.key}</b>
+                <small>{machine.count}{appLanguage === "ja" ? "件" : appLanguage === "en" ? " reports" : " informes"}</small>
+              </div>
+              <strong>{formatHours(machine.stopHours)}</strong>
+              <span>{machine.recurrence}</span>
+              <span>{machine.highCriticality}</span>
+              <strong>{machine.riskScore.toFixed(0)}</strong>
+            </div>
+          ))}
+        </section>
+
+        <div className="miyamaEliteMtbfNote">
+          ℹ️ {appLanguage === "es"
+            ? "MTBF referencia usa 16 horas de operación por día porque el sistema todavía no recibe el tiempo real de operación del PLC. Cuando integremos horas reales de máquina, se convertirá en MTBF real."
+            : appLanguage === "en"
+              ? "Reference MTBF uses 16 operating hours/day because the system does not yet receive actual PLC runtime. When real machine runtime is integrated, this can become true MTBF."
+              : "参考MTBFは現在の2直16H/日を基準にした参考値です。PLCから実稼働時間を取得できるようになれば、実MTBFへ切り替えます。"}
+        </div>
+
         <div className="tableWrap productionHero">
           <h1>📈 保全分析センター</h1>
           <p>この画面は <b>保全修理報告書だけ</b> を使って、停止時間・MTTR・費用・設備ランキングを計算します。CSVアラームはここでは使いません。</p>

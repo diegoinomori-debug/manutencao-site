@@ -1016,3 +1016,270 @@
     grid-column: 2;
   }
 }
+
+
+/* =========================================================
+   MIYAMA ELITE MAINTENANCE - PHASE 4 DASHBOARD
+   ========================================================= */
+.miyamaEliteAnalyticsHero {
+  margin-bottom: 14px;
+  padding: 25px 27px;
+  border-radius: 20px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 88% 20%, rgba(59,130,246,.35), transparent 30%),
+    linear-gradient(120deg,#091d4e,#153c98 56%,#2563eb);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  box-shadow: 0 16px 34px rgba(15,48,120,.14);
+}
+
+.miyamaEliteAnalyticsHero h1 {
+  margin: 8px 0 6px;
+  font-size: clamp(25px,3vw,38px);
+}
+
+.miyamaEliteAnalyticsHero p {
+  margin: 0;
+  color: #dbe8ff;
+}
+
+.miyamaEliteHeroStatus {
+  min-width: 145px;
+  padding: 14px 18px;
+  border-radius: 15px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.miyamaEliteHeroStatus small { color: #dce8ff; }
+.miyamaEliteHeroStatus strong { font-size: 34px; }
+.miyamaEliteHeroStatus span { font-size: 11px; }
+
+.miyamaEliteKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(6,minmax(130px,1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.miyamaEliteKpi {
+  min-height: 128px;
+  padding: 15px;
+  border: 1px solid #e0e7f1;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 6px 19px rgba(17,36,75,.045);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.miyamaEliteKpi > span { font-size: 22px; }
+.miyamaEliteKpi small {
+  margin-top: 7px;
+  color: #718097;
+  font-weight: 800;
+}
+.miyamaEliteKpi strong {
+  margin-top: 4px;
+  font-size: 26px;
+  color: #17233d;
+}
+.miyamaEliteKpi p {
+  margin: 3px 0 0;
+  color: #7a879b;
+  font-size: 10px;
+}
+.miyamaEliteKpi.danger { border-top: 4px solid #ef4444; }
+.miyamaEliteKpi.warn { border-top: 4px solid #f59e0b; }
+.miyamaEliteKpi.success { border-top: 4px solid #22c55e; }
+
+.miyamaEliteAnalyticsGrid {
+  display: grid;
+  grid-template-columns: .9fr 1.1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.miyamaElitePanel {
+  padding: 18px;
+  border: 1px solid #e0e7f1;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(17,36,75,.045);
+}
+
+.miyamaElitePanelTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 13px;
+}
+
+.miyamaElitePanelTitle h3 { margin: 0; }
+.miyamaElitePanelTitle p {
+  margin: 5px 0 0;
+  color: #718097;
+  font-size: 11px;
+}
+.miyamaElitePanelTitle small { color: #718097; }
+
+.miyamaEliteStrategyAnalytics {
+  display: grid;
+  gap: 10px;
+}
+
+.miyamaEliteStrategyRow {
+  display: grid;
+  grid-template-columns: 120px 1fr 35px 38px;
+  gap: 9px;
+  align-items: center;
+}
+
+.miyamaEliteStrategyRow > div:first-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.miyamaEliteStrategyRow b { font-size: 13px; }
+.miyamaEliteStrategyRow span { font-size: 10px; color: #718097; }
+.miyamaEliteStrategyRow > strong { text-align: right; }
+.miyamaEliteStrategyRow > small { color: #718097; }
+
+.miyamaEliteBarTrack {
+  height: 9px;
+  border-radius: 999px;
+  background: #edf1f6;
+  overflow: hidden;
+}
+
+.miyamaEliteBarFill {
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg,#3b82f6,#6366f1);
+}
+
+.miyamaEliteBarFill.danger {
+  background: linear-gradient(90deg,#fb7185,#ef4444);
+}
+
+.miyamaEliteStrategyRow.strategy-bm .miyamaEliteBarFill { background: #64748b; }
+.miyamaEliteStrategyRow.strategy-pm .miyamaEliteBarFill { background: #22c55e; }
+.miyamaEliteStrategyRow.strategy-cbm .miyamaEliteBarFill { background: #06b6d4; }
+.miyamaEliteStrategyRow.strategy-cm .miyamaEliteBarFill { background: #f59e0b; }
+
+.miyamaEliteCauseList {
+  display: grid;
+  gap: 8px;
+}
+
+.miyamaEliteCauseRow {
+  display: grid;
+  grid-template-columns: 28px minmax(115px,.8fr) 1fr 65px;
+  gap: 8px;
+  align-items: center;
+}
+
+.miyamaEliteCauseRow > div:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+}
+.miyamaEliteCauseRow small { color: #718097; font-size: 9px; }
+.miyamaEliteCauseRow > strong { text-align: right; font-size: 11px; }
+
+.miyamaEliteRankNo {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef3ff;
+  color: #315ba6;
+  font-size: 10px;
+  font-weight: 1000;
+}
+.miyamaEliteRankNo.top {
+  background: #172554;
+  color: #fff;
+}
+
+.miyamaEliteMachineRisk { margin-bottom: 14px; }
+
+.miyamaEliteMachineHeader,
+.miyamaEliteMachineRow {
+  display: grid;
+  grid-template-columns: 45px minmax(180px,1.5fr) 100px 85px 65px 90px;
+  gap: 10px;
+  align-items: center;
+}
+
+.miyamaEliteMachineHeader {
+  padding: 8px 9px;
+  color: #718097;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.miyamaEliteMachineRow {
+  min-height: 55px;
+  padding: 8px 9px;
+  border-top: 1px solid #edf1f6;
+}
+
+.miyamaEliteMachineRow > div:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+}
+.miyamaEliteMachineRow small { color: #718097; font-size: 9px; }
+
+.miyamaEliteMtbfNote {
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  border: 1px solid #cfe0fb;
+  border-radius: 11px;
+  background: #f5f9ff;
+  color: #51647d;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.miyamaEliteEmpty { color: #718097; }
+
+@media (max-width: 1250px) {
+  .miyamaEliteKpiGrid { grid-template-columns: repeat(3,1fr); }
+}
+
+@media (max-width: 850px) {
+  .miyamaEliteAnalyticsHero { flex-direction: column; align-items: flex-start; }
+  .miyamaEliteHeroStatus { width: 100%; }
+  .miyamaEliteAnalyticsGrid { grid-template-columns: 1fr; }
+  .miyamaEliteMachineHeader { display: none; }
+  .miyamaEliteMachineRow {
+    grid-template-columns: 35px 1fr 80px;
+  }
+  .miyamaEliteMachineRow > span:nth-child(4),
+  .miyamaEliteMachineRow > span:nth-child(5),
+  .miyamaEliteMachineRow > strong:nth-child(6) {
+    grid-column: 2 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .miyamaEliteKpiGrid { grid-template-columns: repeat(2,1fr); }
+  .miyamaEliteStrategyRow {
+    grid-template-columns: 100px 1fr 30px;
+  }
+  .miyamaEliteStrategyRow > small { display: none; }
+  .miyamaEliteCauseRow {
+    grid-template-columns: 25px 1fr 60px;
+  }
+  .miyamaEliteCauseRow .miyamaEliteBarTrack { grid-column: 2 / -1; }
+}
