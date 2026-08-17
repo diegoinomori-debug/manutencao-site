@@ -1,0 +1,443 @@
+/* =========================================================
+   MIYAMA Maintenance - Nova Home + Navegação
+   Arquivo: src/components/HomeDashboard.css
+   ========================================================= */
+
+.miyamaTopNav {
+  position: sticky;
+  top: 8px;
+  z-index: 100;
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  margin-bottom: 18px !important;
+  background: rgba(255,255,255,.96) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid #dfe7f3;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 28px rgba(15,23,42,.08);
+  overflow: visible !important;
+}
+
+.miyamaNavArrow {
+  flex: 0 0 48px !important;
+  min-width: 48px !important;
+  width: 48px !important;
+  border: 1px solid #dbe4f0 !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  color: #14213d !important;
+  font-size: 31px !important;
+  line-height: 1 !important;
+  font-weight: 500 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+}
+
+.miyamaNavArrow:hover {
+  border-color: #9ebcf5 !important;
+  background: #f4f8ff !important;
+  color: #1762e8 !important;
+}
+
+.miyamaFixedControls {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  min-width: max-content;
+}
+
+.miyamaLanguageSelect {
+  width: 150px !important;
+  min-width: 150px !important;
+  height: 100% !important;
+  min-height: 64px !important;
+  border: 1px solid #dbe4f0 !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  color: #16213b !important;
+  font-weight: 900 !important;
+  padding: 0 12px !important;
+}
+
+.miyamaUserBox {
+  min-width: 210px;
+  max-width: 250px;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid #dbe4f0;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.miyamaUserAvatar {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e9efff;
+}
+
+.miyamaUserText {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.miyamaUserText strong {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.miyamaUserText small {
+  color: #718097;
+  margin-top: 2px;
+}
+
+.miyamaLogout {
+  border: 0 !important;
+  border-radius: 9px !important;
+  padding: 7px 9px !important;
+  background: #fff0f1 !important;
+  color: #c5222f !important;
+  font-weight: 900 !important;
+  min-width: auto !important;
+}
+
+.miyamaTopMenuViewport {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.miyamaTopMenuViewport::-webkit-scrollbar { display: none; }
+
+.tabs .miyamaTopMenuButton {
+  flex: 0 0 112px !important;
+  min-width: 112px !important;
+  height: 64px !important;
+  margin: 0 !important;
+  padding: 7px 10px !important;
+  border: 1px solid #dbe4f0 !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  color: #17233d !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.tabs .miyamaTopMenuButton:hover {
+  background: #f5f8ff !important;
+  border-color: #a8c3f5 !important;
+}
+
+.tabs .miyamaTopMenuButton.active {
+  color: #fff !important;
+  border-color: #2261e8 !important;
+  background: linear-gradient(135deg,#2465ec,#1553db) !important;
+  box-shadow: 0 7px 16px rgba(37,99,235,.22) !important;
+}
+
+/* HOME */
+.miyamaHomeHero {
+  min-height: 265px;
+  display: grid;
+  grid-template-columns: minmax(300px,.9fr) minmax(390px,1.2fr);
+  align-items: center;
+  gap: 46px;
+  padding: 42px 56px;
+  border-radius: 22px;
+  overflow: hidden;
+  position: relative;
+  color: #fff;
+  background:
+    radial-gradient(circle at 86% 42%,rgba(65,124,255,.32),transparent 34%),
+    linear-gradient(120deg,#081b4a 0%,#12358c 49%,#1761ed 100%);
+  box-shadow: 0 18px 42px rgba(23,55,130,.15);
+}
+
+.miyamaHomeHero::after {
+  content: "MIYAMA";
+  position: absolute;
+  right: 28px;
+  bottom: -18px;
+  font-size: 78px;
+  font-weight: 1000;
+  letter-spacing: 5px;
+  color: rgba(255,255,255,.055);
+  pointer-events: none;
+}
+
+.miyamaHomeHeroText,
+.miyamaHomeHeroActions {
+  position: relative;
+  z-index: 1;
+}
+
+.miyamaHomeHeroText h1 {
+  margin: 0;
+  font-size: clamp(34px,4vw,48px);
+  line-height: 1.05;
+  letter-spacing: .5px;
+}
+
+.miyamaHomeHeroText h2 {
+  margin: 17px 0 0;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.miyamaHomeHeroText p {
+  margin: 25px 0 0;
+  font-size: 17px;
+  color: #dfe9ff;
+}
+
+.miyamaHomeSearch {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: #fff;
+  color: #2e436e;
+  box-shadow: 0 10px 26px rgba(0,0,0,.12);
+}
+
+.miyamaHomeSearch input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: #17233d !important;
+  font-size: 15px !important;
+  padding: 0 !important;
+}
+
+.miyamaHomeButtons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 17px;
+  flex-wrap: wrap;
+}
+
+.miyamaHomeButtons button {
+  min-height: 43px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 12px;
+  padding: 0 19px;
+  background: rgba(5,31,98,.54);
+  color: #fff;
+  font-weight: 900;
+}
+
+.miyamaHomeButtons button:hover {
+  background: rgba(4,27,88,.8);
+}
+
+.miyamaQuickGrid {
+  display: grid;
+  grid-template-columns: repeat(6,minmax(145px,1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.miyamaQuickCard {
+  min-height: 145px;
+  position: relative;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 5px !important;
+  text-align: left !important;
+  padding: 19px 16px !important;
+  border: 1px solid #e0e7f1 !important;
+  border-radius: 17px !important;
+  background: #fff !important;
+  color: #17233d !important;
+  box-shadow: 0 6px 20px rgba(17,36,75,.045) !important;
+}
+
+.miyamaQuickCard:hover {
+  transform: translateY(-2px);
+  border-color: #a8c3f5 !important;
+  box-shadow: 0 12px 27px rgba(25,70,150,.09) !important;
+}
+
+.miyamaQuickIcon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 7px;
+  border-radius: 14px;
+  background: #eef4ff;
+  font-size: 24px;
+}
+
+.miyamaQuickCard strong {
+  font-size: 15px;
+}
+
+.miyamaQuickCard small {
+  color: #718097;
+  line-height: 1.45;
+}
+
+.miyamaQuickArrow {
+  position: absolute;
+  right: 14px;
+  bottom: 13px;
+  font-size: 23px;
+  color: #7c8ba3;
+}
+
+.miyamaHomeBottom {
+  display: grid;
+  grid-template-columns: .92fr 1.18fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.miyamaHomePanel {
+  border: 1px solid #e0e7f1;
+  border-radius: 17px;
+  background: #fff;
+  padding: 19px;
+  box-shadow: 0 6px 20px rgba(17,36,75,.045);
+}
+
+.miyamaPanelTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.miyamaPanelTitle h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.miyamaPanelTitle button {
+  border: 0;
+  background: transparent;
+  color: #1762e8;
+  font-weight: 900;
+}
+
+.miyamaNoticeRow {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 92px 75px 1fr;
+  align-items: center;
+  gap: 9px;
+  border-top: 1px solid #edf1f6;
+  font-size: 12px;
+}
+
+.miyamaNoticeRow > span:first-child { color: #718097; }
+.miyamaNoticeRow p { margin: 0; }
+
+.miyamaBadge {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.miyamaBadge.blue { background: #e8f0ff; color: #1b5dde; }
+.miyamaBadge.green { background: #e8f7ee; color: #16854a; }
+
+.miyamaRecentHeader,
+.miyamaRecentRow {
+  display: grid !important;
+  grid-template-columns: 100px minmax(130px,1fr) minmax(150px,1.2fr) 90px !important;
+  align-items: center !important;
+  gap: 9px !important;
+}
+
+.miyamaRecentHeader {
+  padding: 8px 7px;
+  color: #748198;
+  font-size: 10px;
+}
+
+.miyamaRecentRow {
+  width: 100%;
+  min-height: 52px !important;
+  padding: 7px !important;
+  border: 0 !important;
+  border-top: 1px solid #edf1f6 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #17233d !important;
+  text-align: left !important;
+  font-size: 11px !important;
+}
+
+.miyamaRecentRow:hover { background: #f8faff !important; }
+.miyamaEmpty { padding: 20px 7px; color: #718097; }
+
+@media (max-width: 1250px) {
+  .miyamaQuickGrid { grid-template-columns: repeat(3,1fr); }
+  .miyamaHomeHero { padding: 35px; gap: 30px; }
+}
+
+@media (max-width: 980px) {
+  .miyamaFixedControls { max-width: 390px; }
+  .miyamaUserBox { min-width: 185px; }
+  .miyamaHomeHero { grid-template-columns: 1fr; }
+  .miyamaHomeBottom { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .miyamaTopNav { position: static; }
+  .miyamaFixedControls { display: none; }
+  .miyamaQuickGrid { grid-template-columns: repeat(2,1fr); }
+  .miyamaHomeHero { padding: 30px 22px; }
+  .miyamaRecentHeader { display: none !important; }
+  .miyamaRecentRow {
+    grid-template-columns: 90px 1fr !important;
+  }
+  .miyamaRecentRow span:nth-child(3),
+  .miyamaRecentRow span:nth-child(4) { grid-column: 2; }
+}
+
+@media (max-width: 470px) {
+  .miyamaQuickGrid { grid-template-columns: 1fr; }
+}

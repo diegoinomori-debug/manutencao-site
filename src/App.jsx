@@ -24,6 +24,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import "./index.css";
+import "./components/HomeDashboard.css";
 import { db, auth } from "./firebase";
 import { askMiyamaAI } from "./services/miyamaAI";
 import { searchHistory } from "./services/historySearch";
@@ -3085,6 +3086,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [reportSavingId, setReportSavingId] = useState(null);
 
   const [page, setPage] = useState("home");
+  const topMenuRef = useRef(null);
   const [appLanguage, setAppLanguage] = useState(() => {
     const savedLanguage = localStorage.getItem("miyamaLanguage") || "ja";
     return MIYAMA_LANGUAGES[savedLanguage] ? savedLanguage : "ja";
@@ -5879,163 +5881,126 @@ Rules:
 
 
 function renderHome() {
+  const recentReports = [...reports]
+    .sort((a, b) => String(b.createdAt || b.troubleDateTime || "").localeCompare(String(a.createdAt || a.troubleDateTime || "")))
+    .slice(0, 3);
+
+  const quickMenus = [
+    { key: "report", icon: "📄", title: "修理報告", sub: "故障・修理の記録" },
+    { key: "maintenance", icon: "🔧", title: "定期保全", sub: "保全計画・実績の管理" },
+    { key: "work", icon: "🏗️", title: "工事管理", sub: "工事の計画・進捗管理" },
+    { key: "spare", icon: "📦", title: "予備品管理", sub: "在庫・発注の管理" },
+    { key: "analytics", icon: "📊", title: "保全分析", sub: "停止・故障データ分析" },
+    { key: "dailyProduction", icon: "🗄️", title: "生産数DB", sub: "生産データの管理" },
+  ];
+
   return (
     <>
-      <div
-        className="tableWrap executiveHero"
-        style={{
-          textAlign: "center",
-          padding: "20px",
-          maxWidth: "900px",
-          margin: "0 auto"
-        }}
-      >
-        <div className="javaLogo">
+      <section className="miyamaHomeHero">
+        <div className="miyamaHomeHeroText">
+          <h1>MIYAMA Maintenance</h1>
+          <h2>One Team Maintenance Group</h2>
+          <p>設備保全を、もっとスマートに。</p>
+        </div>
 
-          <div>
-            <h1
-              style={{
-                fontSize: "56px",
-                fontWeight: "900",
-                color: "#0057ff",
-                margin: "0",
-                letterSpacing: "3px",
-                textShadow: "0 4px 12px rgba(0,87,255,0.25)"
+        <div className="miyamaHomeHeroActions">
+          <div className="miyamaHomeSearch">
+            <Search size={22} />
+            <input
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              placeholder="設備・部品・トラブル内容を検索してください"
+            />
+          </div>
+
+          <div className="miyamaHomeButtons">
+            <button
+              type="button"
+              onClick={() => {
+                setMiyamaAiQuestion(globalSearch);
+                setPage("miyamaAi");
               }}
             >
-              MIYAMA
-            </h1>
+              🤖 MIYAMA AIへ
+            </button>
 
-          
-            <p
-              style={{
-                fontSize: "22px",
-                color: "#64748b",
-                margin: "0"
-              }}
-            >
-              One Team Maintenance Group
-            </p>
+            <button type="button" onClick={() => setPage("analytics")}>
+              📊 ダッシュボードへ
+            </button>
           </div>
         </div>
-
-        <p
-          style={{
-            marginTop: "20px",
-            color: "#64748b",
-            fontSize: "18px"
-          }}
-        >
-          設備保全を、もっとスマートに。
-        </p>
-
-        <div style={{ maxWidth: "760px", margin: "24px auto 0" }}>
-          <input
-            value={globalSearch}
-            onChange={(e) => setGlobalSearch(e.target.value)}
-            placeholder="設備・部品・トラブル内容を検索してください"
-            style={{
-              textAlign: "center",
-              fontSize: "18px",
-              minHeight: "52px"
-            }}
-          />
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "12px",
-            marginTop: "20px",
-            flexWrap: "wrap"
-          }}
-        >
-          <button
-            className="primaryButton"
-            onClick={() => {
-              setMiyamaAiQuestion(globalSearch);
-              setPage("miyamaAi");
-            }}
-          >
-            <Search size={16} /> MIYAMA AIへ
-          </button>
-
-          <button
-            className="primaryButton"
-            onClick={() => setPage("report")}
-          >
-            システムへ入る
-          </button>
-        </div>
-      </div>
+      </section>
 
       {globalSearch && renderGlobalSearchBox()}
 
-      <div className="executiveDashboardGrid">
-        <ExecutiveMetric icon="🟢" label="推定稼働率（2直16H基準）" value={`${estimatedAvailabilityTwoShift.toFixed(1)}%`} percent={estimatedAvailabilityTwoShift} sub="今月停止時間を16H基準で比較" />
-        <ExecutiveMetric icon="🔴" label="今月停止時間" value={`${monthStopHours.toFixed(1)}H`} percent={stopPercentTwoShift} tone="danger" sub={`1直8H: ${stopPercentOneShift.toFixed(1)}% / 2直16H: ${stopPercentTwoShift.toFixed(1)}%`} />
-        <ExecutiveMetric icon="🛠️" label="今月修理時間" value={`${monthRepairHours.toFixed(1)}H`} percent={(monthRepairHours / 16) * 100} tone="warn" sub="保全作業に使った時間" />
-        <ExecutiveMetric icon="💴" label="今月参考費用" value={formatYen(monthTotalCost)} percent={Math.min(100, monthTotalCost / 10000)} sub="労務費＋部品費" />
-      </div>
+      <section className="miyamaQuickGrid">
+        {quickMenus.map((item) => (
+          <button
+            type="button"
+            key={item.key}
+            className="miyamaQuickCard"
+            onClick={() => setPage(item.key)}
+          >
+            <span className="miyamaQuickIcon">{item.icon}</span>
+            <strong>{item.title}</strong>
+            <small>{item.sub}</small>
+            <span className="miyamaQuickArrow">›</span>
+          </button>
+        ))}
+      </section>
 
-      <div className="cards">
-        <div className="card red">
-          <span>交換超過</span>
-          <strong>{overCount}</strong>
+      <section className="miyamaHomeBottom">
+        <div className="miyamaHomePanel">
+          <div className="miyamaPanelTitle">
+            <h3>📢 お知らせ</h3>
+          </div>
+
+          <div className="miyamaNoticeRow">
+            <span>{todayText()}</span>
+            <b className="miyamaBadge blue">システム</b>
+            <p>MIYAMA Maintenance テスト運用中</p>
+          </div>
+
+          <div className="miyamaNoticeRow">
+            <span>現在</span>
+            <b className="miyamaBadge green">保全</b>
+            <p>現場テストのフィードバックを反映しながら改善しています。</p>
+          </div>
         </div>
 
-        <div className="card yellow">
-          <span>交換間近</span>
-          <strong>{nearCount}</strong>
-        </div>
+        <div className="miyamaHomePanel">
+          <div className="miyamaPanelTitle">
+            <h3>📄 最近の修理報告</h3>
+            <button type="button" onClick={() => setPage("report")}>すべて見る ›</button>
+          </div>
 
-        <div className="card red">
-          <span>在庫不足</span>
-          <strong>{lowStockCount}</strong>
-        </div>
+          <div className="miyamaRecentHeader">
+            <span>日付</span>
+            <span>設備名</span>
+            <span>内容</span>
+            <span>状態</span>
+          </div>
 
-        <div className="card">
-          <span>今月報告書</span>
-          <strong>{monthReportCount}</strong>
+          {recentReports.length === 0 ? (
+            <div className="miyamaEmpty">まだ修理報告がありません。</div>
+          ) : recentReports.map((r) => (
+            <button
+              type="button"
+              key={r.id || `${r.createdAt}-${r.equipment}-${r.phenomenon}`}
+              className="miyamaRecentRow"
+              onClick={() => setPage("report")}
+            >
+              <span>{normalizeDateOnly(r.createdAt || r.troubleDateTime) || "-"}</span>
+              <span>{r.equipment || r.lineName || "設備未設定"}</span>
+              <span>{r.phenomenon || r.troublePoint || "内容未入力"}</span>
+              <span><b className="miyamaBadge green">{r.approvalStatus || "登録済み"}</b></span>
+            </button>
+          ))}
         </div>
-      </div>
-
-      <div className="cards" style={{ marginTop: "20px" }}>
-        <div className="card" onClick={() => setPage("miyamaAi")} style={{ cursor: "pointer" }}>
-          <span>🤖 MIYAMA AI</span>
-          <strong>統合AI</strong>
-        </div>
-
-        <div className="card" onClick={() => setPage("report")} style={{ cursor: "pointer" }}>
-          <span>📝 保全報告書</span>
-          <strong>{reports.length}</strong>
-        </div>
-
-        <div className="card" onClick={() => setPage("maintenance")} style={{ cursor: "pointer" }}>
-          <span>🔧 定期保全</span>
-          <strong>{maintenanceRows.length}</strong>
-        </div>
-
-        <div className="card" onClick={() => setPage("spare")} style={{ cursor: "pointer" }}>
-          <span>📦 予備品管理</span>
-          <strong>{spareRows.length}</strong>
-        </div>
-
-        <div className="card" onClick={() => setPage("calendar")} style={{ cursor: "pointer" }}>
-          <span>📅 カレンダー</span>
-          <strong>{unifiedCalendarEvents.length}</strong>
-        </div>
-
-        <div className="card" onClick={() => setPage("work")} style={{ cursor: "pointer" }}>
-          <span>🏗️ 計画工事</span>
-          <strong>{plannedWorks.length}</strong>
-        </div>
-      </div>
+      </section>
     </>
   );
 }
-
 
   function formatMaintenanceDate(value) {
     if (!value) return "";
@@ -11349,14 +11314,14 @@ Requirements:
   const menuItems = [
     { key: "home", label: "ホーム", icon: <Home size={16} /> },
     { key: "miyamaAi", label: "MIYAMA AI", icon: <Bot size={16} /> },
-    { key: "report", label: "保全報告書", icon: <FileText size={16} /> },
-    { key: "maintenance", label: "定期保全", icon: <Wrench size={16} /> },
-    { key: "dailyProduction", label: "生産数DB", icon: <BarChart3 size={16} /> },
-    { key: "spare", label: "予備品管理", icon: <Package size={16} /> },
     { key: "calendar", label: "カレンダー", icon: <CalendarDays size={16} /> },
+    { key: "report", label: "修理報告", icon: <FileText size={16} /> },
+    { key: "maintenance", label: "定期保全", icon: <Wrench size={16} /> },
+    { key: "work", label: "工事管理", icon: <Hammer size={16} /> },
+    { key: "spare", label: "予備品管理", icon: <Package size={16} /> },
     { key: "analytics", label: "保全分析", icon: <BarChart3 size={16} /> },
+    { key: "dailyProduction", label: "生産数DB", icon: <BarChart3 size={16} /> },
     { key: "csvAnalytics", label: "CSV分析", icon: <FileSpreadsheet size={16} /> },
-    { key: "work", label: "計画工事", icon: <Hammer size={16} /> },
   ];
 
 return (
@@ -11364,83 +11329,75 @@ return (
     <style>{PROFESSIONAL_RESPONSIVE_CSS}</style>
     <div className="container">
 
-      <div className="tabs">
-        <select
-          data-no-translate="true"
-          value={appLanguage}
-          onChange={(e) => setAppLanguage(e.target.value)}
-          title="言語"
-          style={{ width: "150px", minWidth: "150px", fontWeight: 900, border: "2px solid #bfdbfe", background: "#fff" }}
+      <div className="tabs miyamaTopNav">
+        <button
+          type="button"
+          className="miyamaNavArrow"
+          onClick={() => topMenuRef.current?.scrollBy({ left: -420, behavior: "smooth" })}
+          aria-label="前のメニュー"
+          title="前のメニュー"
         >
-          {Object.entries(MIYAMA_LANGUAGES).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
+          ‹
+        </button>
 
-        <div
-          data-no-translate="true"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "6px 10px",
-            borderRadius: "12px",
-            border: "1px solid #cbd5e1",
-            background: "#fff",
-            minWidth: "190px",
-          }}
-          title={currentUser?.email || ""}
-        >
-          <div style={{
-            width: "30px",
-            height: "30px",
-            borderRadius: "50%",
-            display: "grid",
-            placeItems: "center",
-            background: "#dbeafe",
-            fontWeight: 900,
-          }}>
-            👤
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <strong style={{
-              display: "block",
-              fontSize: "12px",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}>
-              {currentUserName}
-            </strong>
-            <small style={{ color: "#64748b" }}>{roleLabel()}</small>
-          </div>
-          <button
-            type="button"
-            onClick={logoutCurrentUser}
-            style={{
-              border: 0,
-              background: "#fee2e2",
-              color: "#991b1b",
-              borderRadius: "9px",
-              padding: "6px 8px",
-              cursor: "pointer",
-              fontWeight: 900,
-            }}
+        <div className="miyamaFixedControls">
+          <select
+            data-no-translate="true"
+            value={appLanguage}
+            onChange={(e) => setAppLanguage(e.target.value)}
+            title="言語"
+            className="miyamaLanguageSelect"
           >
-            Logout
-          </button>
+            {Object.entries(MIYAMA_LANGUAGES).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+
+          <div
+            data-no-translate="true"
+            className="miyamaUserBox"
+            title={currentUser?.email || ""}
+          >
+            <div className="miyamaUserAvatar">👤</div>
+
+            <div className="miyamaUserText">
+              <strong>{currentUserName}</strong>
+              <small>{roleLabel()}</small>
+            </div>
+
+            <button
+              type="button"
+              onClick={logoutCurrentUser}
+              className="miyamaLogout"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
-        {menuItems.map((item) => (
-          <button
-            key={item.key}
-            className={page === item.key ? "active" : ""}
-            onClick={() => setPage(item.key)}
-          >
-            {item.icon}
-            {item.label}
-          </button>
-        ))}
+        <div ref={topMenuRef} className="miyamaTopMenuViewport">
+          {menuItems.map((item) => (
+            <button
+              type="button"
+              key={item.key}
+              className={`miyamaTopMenuButton ${page === item.key ? "active" : ""}`}
+              onClick={() => setPage(item.key)}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="miyamaNavArrow"
+          onClick={() => topMenuRef.current?.scrollBy({ left: 420, behavior: "smooth" })}
+          aria-label="次のメニュー"
+          title="次のメニュー"
+        >
+          ›
+        </button>
       </div>
 
       {page !== "home" && page !== "miyamaAi" && renderGlobalSearchBox()}
