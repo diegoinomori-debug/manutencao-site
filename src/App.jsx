@@ -3218,10 +3218,6 @@ function MaintenanceApp({ currentUser, userProfile }) {
     }
   }
 
-  useEffect(() => {
-    if (isAdmin && page === "users") loadSystemUsers();
-  }, [isAdmin, page]);
-
   const [parts, setParts] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [reports, setReports] = useState([]);
@@ -3252,6 +3248,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const savedLanguage = localStorage.getItem("miyamaLanguage") || "ja";
     return MIYAMA_LANGUAGES[savedLanguage] ? savedLanguage : "ja";
   });
+
+  useEffect(() => {
+    if (isAdmin && page === "users") loadSystemUsers();
+  }, [isAdmin, page]);
+
   const [globalSearch, setGlobalSearch] = useState("");
   const GLOBAL_RESULTS_PER_PAGE = 20;
   const [globalPage, setGlobalPage] = useState(1);
