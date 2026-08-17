@@ -147,7 +147,7 @@ function createBlankReport() {
     action: "",
     linkUrl: "",
 
-    // MIYAMA Elite Maintenance - Phase 1
+    // MIYAMA Maintenance
     failureCauseCategory: "",
     failureCauseDetail: "",
     maintenanceStrategy: "",
@@ -155,7 +155,7 @@ function createBlankReport() {
     recurrenceLevel: "初回",
     strategyReason: "",
 
-    // MIYAMA Elite Maintenance - Phase 2 auto-action fields
+    // MIYAMA Maintenance - Phase 2 auto-action fields
     pmCycleDays: 90,
     pmActionDetail: "",
     pmOwner: "",
@@ -167,7 +167,7 @@ function createBlankReport() {
     linkedMaintenanceId: "",
     linkedPlannedWorkId: "",
 
-    // MIYAMA Elite Maintenance - Phase 3 diagnosis snapshot
+    // MIYAMA Maintenance - Phase 3 diagnosis snapshot
     eliteHistoryMatchCount: 0,
     eliteRecommendedStrategy: "",
     eliteRecommendationReason: "",
@@ -1235,6 +1235,294 @@ const MIYAMA_TRANSLATIONS = {
 
 // Words below caused broken translations inside names or Japanese phrases.
 // Example: 区分 -> 区Minutes, 鈴木 -> 鈴Thu, この日 -> このDay.
+
+// ===== MIYAMA Maintenance: professional JP / EN / ES terminology patch =====
+// These entries cover fixed UI labels, select options and status values.
+// Database free-text remains stored in its original language.
+Object.assign(MIYAMA_TRANSLATIONS.en, {
+  "ログアウト": "Logout",
+  "管理者": "Administrator",
+  "承認者": "Approver",
+  "点検者": "Inspector",
+  "閲覧のみ": "View Only",
+  "作業者": "Operator",
+  "一般ユーザー": "Standard User",
+  "新規作成": "New Report",
+  "新規報告書": "New Report",
+  "新規プロジェクト": "New Project",
+  "プロジェクト作成": "Create Project",
+  "更新": "Refresh",
+  "読込中": "Loading",
+  "計画中": "Planning",
+  "製作中": "Manufacturing",
+  "立会い中": "Validation",
+  "引渡し準備": "Handover Preparation",
+  "完了": "Completed",
+  "設備引渡し可能": "Ready for Handover",
+  "原因大分類": "Cause Category",
+  "原因詳細": "Cause Detail",
+  "重要度": "Criticality",
+  "再発レベル": "Recurrence Level",
+  "保全戦略": "Maintenance Strategy",
+  "判定理由": "Decision Rationale",
+  "推奨理由": "Recommendation Reason",
+  "推奨保全戦略": "Recommended Strategy",
+  "自動再発判定": "Detected Recurrence",
+  "自動戦略診断": "Automatic Strategy Assessment",
+  "推奨判定を反映": "Apply Recommendation",
+  "類似履歴": "Similar History",
+  "近い過去事例": "Similar Past Cases",
+  "初回": "First Occurrence",
+  "再発": "Repeated",
+  "頻発": "Frequent",
+  "慢性": "Chronic",
+  "事後保全": "Breakdown Maintenance",
+  "予防保全": "Preventive Maintenance",
+  "状態基準保全": "Condition-Based Maintenance",
+  "改良保全": "Improvement Maintenance",
+  "自動アクション": "Automatic Action",
+  "保全内容": "Maintenance Action",
+  "目標日": "Target Date",
+  "改良工事件名": "Improvement Work Title",
+  "関連アクション": "Linked Action",
+  "定期保全を開く": "Open Preventive Maintenance",
+  "工事管理を開く": "Open Work Management",
+  "戦略分類率": "Strategy Classification Rate",
+  "再発率": "Recurrence Rate",
+  "高重要度 S/A": "High Criticality S/A",
+  "慢性・頻発": "Chronic / Frequent",
+  "PM/CMアクション化率": "PM/CM Action Conversion",
+  "参考MTBF": "Reference MTBF",
+  "保全戦略構成": "Maintenance Strategy Mix",
+  "原因別 停止時間Pareto": "Cause Pareto by Downtime",
+  "重点改善設備ランキング": "Priority Equipment Ranking",
+  "優先Score": "Priority Score",
+  "未分類": "Unclassified",
+  "新規設備管理": "New Equipment Management",
+  "プロジェクト名": "Project Name",
+  "稼働予定日": "Target Start Date",
+  "生産技術担当": "Production Engineering Owner",
+  "保全担当": "Maintenance Owner",
+  "プロジェクト": "Projects",
+  "準備中": "In Preparation",
+  "引渡し可能": "Ready for Handover",
+  "平均進捗": "Average Progress",
+  "製品図面DRチェックシート": "Product Drawing DR Checklist",
+  "工程検討書": "Process Study Document",
+  "工程FMEA": "Process FMEA",
+  "設備共通基本仕様書": "Common Equipment Specification",
+  "設備個別基本仕様書": "Individual Equipment Specification",
+  "設備製作仕様書": "Equipment Manufacturing Specification",
+  "設備図面DRチェックシート": "Equipment Drawing DR Checklist",
+  "工程点検チェックシート": "Process Inspection Checklist",
+  "保全ポリシー・設備保全方針書": "Maintenance Policy",
+  "定期・定量点検表": "Time / Production Based Inspection Sheet",
+  "予防保全リスト": "Preventive Maintenance List",
+  "予備品リスト": "Spare Parts List",
+  "給油指導票": "Lubrication Guide",
+  "バックアップ電池使用リスト": "Backup Battery List",
+  "設備引き渡し書": "Equipment Handover Document",
+  "重要予備品": "Critical Spares",
+  "欠品リスク": "Shortage Risk",
+  "年間保全予算": "Annual Maintenance Budget",
+  "高額保全": "High-Cost Maintenance",
+  "推奨発注額": "Recommended Purchase Amount",
+  "欠品予測": "Shortage Forecast",
+  "高額保全管理": "High-Cost Maintenance Management",
+  "重要予備品リスト": "Critical Spare List",
+  "部品重要度": "Part Criticality",
+  "年間予定数量": "Annual Planned Quantity",
+  "緊急": "Critical",
+  "注意": "Watch",
+  "正常": "Normal",
+  "在庫なし": "Out of Stock",
+  "在庫注意": "Low Stock",
+  "在庫OK": "Stock OK",
+  "登録部品": "Registered Parts",
+  "価格登録済み": "Price Registered",
+  "在庫総額": "Inventory Value",
+  "発注予定額": "Planned Order Value",
+  "商品カード": "Part Cards",
+  "金額確認": "Cost Review",
+  "発注確認": "Order Review",
+  "写真AI": "Photo AI",
+  "表示メニュー": "View Menu",
+  "予備品AI検索": "Spare Parts Search",
+  "部品名なし": "Unnamed Part",
+  "写真なし": "No Photo",
+  "型式・品番": "Model / Part No.",
+  "メーカー": "Manufacturer",
+  "カテゴリ": "Category",
+  "使用設備": "Used On Equipment",
+  "保管場所": "Storage Location",
+  "在庫数": "Stock Quantity",
+  "最低在庫": "Minimum Stock",
+  "納期": "Lead Time",
+  "購入先": "Supplier",
+  "購入URL": "Purchase URL",
+  "定期保全へ追加": "Add to Preventive Maintenance",
+  "交換超過": "Overdue",
+  "交換間近": "Due Soon",
+  "点検": "Inspection",
+  "交換": "Replacement",
+  "修理": "Repair",
+  "清掃": "Cleaning",
+  "給油": "Lubrication",
+  "締付": "Tightening",
+  "調整": "Adjustment",
+  "全て": "All",
+  "全期間": "All Time",
+  "1ヶ月": "1 Month",
+  "3ヶ月": "3 Months",
+  "6ヶ月": "6 Months",
+  "1年": "1 Year",
+  "対象期間": "Period",
+  "再読込": "Reload",
+  "計画CSV出力": "Export Plan CSV"
+});
+
+Object.assign(MIYAMA_TRANSLATIONS.es, {
+  "ログアウト": "Cerrar sesión",
+  "管理者": "Administrador",
+  "承認者": "Aprobador",
+  "点検者": "Inspector",
+  "閲覧のみ": "Solo lectura",
+  "作業者": "Operador",
+  "一般ユーザー": "Usuario estándar",
+  "新規作成": "Nuevo informe",
+  "新規報告書": "Nuevo informe",
+  "新規プロジェクト": "Nuevo proyecto",
+  "プロジェクト作成": "Crear proyecto",
+  "更新": "Actualizar",
+  "読込中": "Cargando",
+  "計画中": "Planificación",
+  "製作中": "Fabricación",
+  "立会い中": "Validación",
+  "引渡し準備": "Preparación de entrega",
+  "完了": "Completado",
+  "設備引渡し可能": "Listo para entrega",
+  "原因大分類": "Categoría de causa",
+  "原因詳細": "Detalle de causa",
+  "重要度": "Criticidad",
+  "再発レベル": "Nivel de recurrencia",
+  "保全戦略": "Estrategia de mantenimiento",
+  "判定理由": "Justificación de la decisión",
+  "推奨理由": "Motivo de la recomendación",
+  "推奨保全戦略": "Estrategia recomendada",
+  "自動再発判定": "Recurrencia detectada",
+  "自動戦略診断": "Evaluación estratégica automática",
+  "推奨判定を反映": "Aplicar recomendación",
+  "類似履歴": "Historial similar",
+  "近い過去事例": "Casos anteriores similares",
+  "初回": "Primera ocurrencia",
+  "再発": "Repetición",
+  "頻発": "Frecuente",
+  "慢性": "Crónico",
+  "事後保全": "Mantenimiento correctivo",
+  "予防保全": "Mantenimiento preventivo",
+  "状態基準保全": "Mantenimiento basado en condición",
+  "改良保全": "Mantenimiento de mejora",
+  "自動アクション": "Acción automática",
+  "保全内容": "Acción de mantenimiento",
+  "目標日": "Fecha objetivo",
+  "改良工事件名": "Título del trabajo de mejora",
+  "関連アクション": "Acción vinculada",
+  "定期保全を開く": "Abrir mantenimiento preventivo",
+  "工事管理を開く": "Abrir gestión de trabajos",
+  "戦略分類率": "Tasa de clasificación estratégica",
+  "再発率": "Tasa de recurrencia",
+  "高重要度 S/A": "Alta criticidad S/A",
+  "慢性・頻発": "Crónico / frecuente",
+  "PM/CMアクション化率": "Conversión de acciones PM/CM",
+  "参考MTBF": "MTBF de referencia",
+  "保全戦略構成": "Distribución de estrategias",
+  "原因別 停止時間Pareto": "Pareto de causas por tiempo de parada",
+  "重点改善設備ランキング": "Ranking de equipos prioritarios",
+  "優先Score": "Puntuación de prioridad",
+  "未分類": "Sin clasificar",
+  "新規設備管理": "Gestión de equipos nuevos",
+  "プロジェクト名": "Nombre del proyecto",
+  "稼働予定日": "Fecha prevista de arranque",
+  "生産技術担当": "Responsable de ingeniería de producción",
+  "保全担当": "Responsable de mantenimiento",
+  "プロジェクト": "Proyectos",
+  "準備中": "En preparación",
+  "引渡し可能": "Listo para entrega",
+  "平均進捗": "Progreso promedio",
+  "製品図面DRチェックシート": "Checklist DR del plano de producto",
+  "工程検討書": "Documento de estudio de proceso",
+  "工程FMEA": "FMEA de proceso",
+  "設備共通基本仕様書": "Especificación común del equipo",
+  "設備個別基本仕様書": "Especificación individual del equipo",
+  "設備製作仕様書": "Especificación de fabricación del equipo",
+  "設備図面DRチェックシート": "Checklist DR del plano del equipo",
+  "工程点検チェックシート": "Checklist de inspección del proceso",
+  "保全ポリシー・設備保全方針書": "Política de mantenimiento",
+  "定期・定量点検表": "Hoja de inspección periódica / por producción",
+  "予防保全リスト": "Lista de mantenimiento preventivo",
+  "予備品リスト": "Lista de repuestos",
+  "給油指導票": "Guía de lubricación",
+  "バックアップ電池使用リスト": "Lista de baterías de respaldo",
+  "設備引き渡し書": "Documento de entrega del equipo",
+  "重要予備品": "Repuestos críticos",
+  "欠品リスク": "Riesgo de falta",
+  "年間保全予算": "Presupuesto anual de mantenimiento",
+  "高額保全": "Mantenimiento de alto costo",
+  "推奨発注額": "Importe de compra recomendado",
+  "欠品予測": "Previsión de falta",
+  "高額保全管理": "Gestión de mantenimiento de alto costo",
+  "重要予備品リスト": "Lista de repuestos críticos",
+  "部品重要度": "Criticidad de la pieza",
+  "年間予定数量": "Cantidad anual planificada",
+  "緊急": "Crítico",
+  "注意": "Atención",
+  "正常": "Normal",
+  "在庫なし": "Sin stock",
+  "在庫注意": "Stock bajo",
+  "在庫OK": "Stock OK",
+  "登録部品": "Piezas registradas",
+  "価格登録済み": "Precio registrado",
+  "在庫総額": "Valor del inventario",
+  "発注予定額": "Importe previsto de pedido",
+  "商品カード": "Tarjetas de piezas",
+  "金額確認": "Revisión de costos",
+  "発注確認": "Revisión de pedidos",
+  "写真AI": "IA de foto",
+  "表示メニュー": "Menú de vista",
+  "予備品AI検索": "Búsqueda de repuestos",
+  "部品名なし": "Pieza sin nombre",
+  "写真なし": "Sin foto",
+  "型式・品番": "Modelo / N.º de pieza",
+  "メーカー": "Fabricante",
+  "カテゴリ": "Categoría",
+  "使用設備": "Equipo donde se usa",
+  "保管場所": "Ubicación de almacenamiento",
+  "在庫数": "Cantidad en stock",
+  "最低在庫": "Stock mínimo",
+  "納期": "Plazo de entrega",
+  "購入先": "Proveedor",
+  "購入URL": "URL de compra",
+  "定期保全へ追加": "Agregar a mantenimiento preventivo",
+  "交換超過": "Vencido",
+  "交換間近": "Próximo a vencer",
+  "点検": "Inspección",
+  "交換": "Reemplazo",
+  "修理": "Reparación",
+  "清掃": "Limpieza",
+  "給油": "Lubricación",
+  "締付": "Apriete",
+  "調整": "Ajuste",
+  "全て": "Todos",
+  "全期間": "Todo el período",
+  "1ヶ月": "1 mes",
+  "3ヶ月": "3 meses",
+  "6ヶ月": "6 meses",
+  "1年": "1 año",
+  "対象期間": "Período",
+  "再読込": "Recargar",
+  "計画CSV出力": "Exportar plan CSV"
+});
+
 const MIYAMA_BLOCKED_TRANSLATION_KEYS = new Set(["分", "日", "月", "年", "火", "水", "木", "金", "土"]);
 
 Object.keys(MIYAMA_TRANSLATIONS).forEach((lang) => {
@@ -1372,21 +1660,35 @@ function translateMiyamaText(text = "", language = "ja") {
 
   // 2) UI prefixes that often appear together with DB data. Keep DB text original.
   let output = original;
-  const safePrefixPairs = [
-    ["【Important】 保全報告：", "【Important】 Maintenance Report: "],
-    ["【Important】 保全報告 :", "【Important】 Maintenance Report: "],
-    ["【Important】 Maintenance報告：", "【Important】 Maintenance Report: "],
-    ["区分:", "Category:"],
-    ["Category:", "Category:"],
-    ["担当者:", "Owner:"],
-    ["担当:", "Owner:"],
-    ["Owner:", "Owner:"],
-    ["件数", "Count"],
-    ["最新", "Latest"],
-    ["停止時間", "Downtime"],
-  ];
-  safePrefixPairs.forEach(([ja, en]) => {
-    output = output.split(ja).join(en);
+  const prefixDictionary = selectedLanguage === "es"
+    ? [
+        ["【Important】 保全報告：", "【Importante】 Informe de mantenimiento: "],
+        ["【Important】 保全報告 :", "【Importante】 Informe de mantenimiento: "],
+        ["【Important】 Maintenance報告：", "【Importante】 Informe de mantenimiento: "],
+        ["区分:", "Categoría:"],
+        ["Category:", "Categoría:"],
+        ["担当者:", "Responsable:"],
+        ["担当:", "Responsable:"],
+        ["Owner:", "Responsable:"],
+        ["件数", "Cantidad"],
+        ["最新", "Último"],
+        ["停止時間", "Tiempo de parada"],
+      ]
+    : [
+        ["【Important】 保全報告：", "【Important】 Maintenance Report: "],
+        ["【Important】 保全報告 :", "【Important】 Maintenance Report: "],
+        ["【Important】 Maintenance報告：", "【Important】 Maintenance Report: "],
+        ["区分:", "Category:"],
+        ["Category:", "Category:"],
+        ["担当者:", "Owner:"],
+        ["担当:", "Owner:"],
+        ["Owner:", "Owner:"],
+        ["件数", "Count"],
+        ["最新", "Latest"],
+        ["停止時間", "Downtime"],
+      ];
+  prefixDictionary.forEach(([source, translated]) => {
+    output = output.split(source).join(translated);
   });
 
   // 3) Translate short pure UI text or short labels.
@@ -1411,7 +1713,7 @@ function translateMiyamaText(text = "", language = "ja") {
 function shouldSkipLanguageNode(parent) {
   if (!parent) return true;
   const tag = parent.tagName;
-  if (["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "OPTION", "SELECT"].includes(tag)) return true;
+  if (["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "SELECT"].includes(tag)) return true;
   if (parent.closest && parent.closest("[data-no-translate='true']")) return true;
   return false;
 }
@@ -3107,11 +3409,33 @@ function MaintenanceApp({ currentUser, userProfile }) {
     currentRole === "admin";
 
   function roleLabel() {
-    if (currentRole === "admin") return "管理者 / Admin";
-    if (currentRole === "approver") return "承認者 / Approver";
-    if (currentRole === "inspector") return "点検者 / Inspector";
-    if (currentRole === "viewer") return "閲覧のみ / View only";
-    return "作業者 / Operator";
+    const labels = {
+      ja: {
+        admin: "管理者",
+        approver: "承認者",
+        inspector: "点検者",
+        viewer: "閲覧のみ",
+        operator: "作業者",
+      },
+      en: {
+        admin: "Administrator",
+        approver: "Approver",
+        inspector: "Inspector",
+        viewer: "View Only",
+        operator: "Operator",
+      },
+      es: {
+        admin: "Administrador",
+        approver: "Aprobador",
+        inspector: "Inspector",
+        viewer: "Solo lectura",
+        operator: "Operador",
+      },
+    };
+    const safeRole = ["admin", "approver", "inspector", "viewer"].includes(currentRole)
+      ? currentRole
+      : "operator";
+    return labels[appLanguage]?.[safeRole] || labels.ja[safeRole];
   }
 
   function approvalPermissionMessage(type) {
@@ -3131,7 +3455,13 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function logoutCurrentUser() {
-    if (!window.confirm("ログアウトしますか？")) return;
+    if (!window.confirm(
+      appLanguage === "es"
+        ? "¿Desea cerrar sesión?"
+        : appLanguage === "en"
+          ? "Do you want to log out?"
+          : "ログアウトしますか？"
+    )) return;
     await signOut(auth);
   }
 
@@ -3505,6 +3835,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     dailyProductions.length,
     calendarEvents.length,
     plannedWorks.length,
+    newEquipmentProjects.length,
   ]);
 
   useEffect(() => {
@@ -4224,7 +4555,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
         leadTime: "",
         reorderPoint: "",
         reorderQty: "",
-        category: "MIYAMA Elite PM",
+        category: "MIYAMA Maintenance PM",
         maintenanceType: "点検",
         maintenanceMode: "定期保全",
         maintenanceDetail:
@@ -4246,7 +4577,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
         nextDate,
         owner: reportToSave.pmOwner || reportToSave.worker || currentUserName || "",
         note:
-          `MIYAMA Elite Phase 2 自動作成\n` +
+          `MIYAMA Maintenance 自動作成\n` +
           `元修理報告: ${reportRef.id}\n` +
           `原因: ${reportToSave.failureCauseCategory || "-"} / ${reportToSave.failureCauseDetail || "-"}\n` +
           `判定理由: ${reportToSave.strategyReason || "-"}`,
@@ -4300,7 +4631,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
               : reportToSave.criticality === "B"
                 ? "B：影響中"
                 : "C：影響小",
-        note: `MIYAMA Elite Phase 2 自動作成 / 元修理報告: ${reportRef.id}`,
+        note: `MIYAMA Maintenance 自動作成 / 元修理報告: ${reportRef.id}`,
         image: reportToSave.image || reportToSave.beforeImage || "",
         sourceReportId: reportRef.id,
         sourceStrategy: "CM",
@@ -6544,17 +6875,17 @@ Rules:
           >
             <strong>
               {appLanguage === "es"
-                ? "MIYAMA Elite Maintenance - Fase 1"
+                ? "MIYAMA Maintenance"
                 : appLanguage === "en"
-                  ? "MIYAMA Elite Maintenance - Phase 1"
-                  : "MIYAMA Elite Maintenance - フェーズ1"}
+                  ? "MIYAMA Maintenance"
+                  : "MIYAMA Maintenance"}
             </strong>
             <div style={{ marginTop: "4px", fontSize: "13px" }}>
               {appLanguage === "es"
-                ? "Primero estandarizamos la causa, criticidad, recurrencia y estrategia. En la siguiente fase conectaremos esta decisión automáticamente con PM, trabajos de mejora, calendario y análisis."
+                ? "Estandariza causa, criticidad, recurrencia y estrategia de mantenimiento para conectar la reparación con las acciones posteriores."
                 : appLanguage === "en"
-                  ? "First we standardize cause, criticality, recurrence, and strategy. In the next phase this decision will connect automatically to PM, improvement work, calendar, and analytics."
-                  : "まず原因・重要度・再発性・保全戦略を標準化します。次のPhaseで、この判定を定期保全・改良工事・カレンダー・分析へ自動連携します。"}
+                  ? "Standardizes cause, criticality, recurrence, and maintenance strategy so repair reports connect to follow-up actions."
+                  : "原因・重要度・再発性・保全戦略を標準化し、修理報告から次の保全アクションへつなげます。"}
             </div>
           </div>
 
@@ -6562,7 +6893,7 @@ Rules:
             <div className="miyamaEliteDiagnosisTop">
               <div>
                 <span className="miyamaElitePhaseBadge">
-                  {appLanguage === "es" ? "FASE 3" : appLanguage === "en" ? "PHASE 3" : "フェーズ3"}
+                  "MIYAMA"
                 </span>
                 <h3>
                   🧠 {appLanguage === "es"
@@ -8643,7 +8974,7 @@ function renderHome() {
         row.eliteRecommendedOrderQty,
       ]);
       downloadTextFile(
-        `MIYAMA_Elite_Spare_Budget_${todayText()}.csv`,
+        `MIYAMA_Spare_Budget_${todayText()}.csv`,
         "\ufeff" + [header, ...rows].map((r) => r.map(makeCsvSafe).join(",")).join("\n"),
         "text/csv;charset=utf-8"
       );
@@ -8683,7 +9014,7 @@ function renderHome() {
         <section className="miyamaSpareEliteHero">
           <div>
             <span className="miyamaElitePhaseBadge">
-              {appLanguage === "es" ? "FASE 6" : appLanguage === "en" ? "PHASE 6" : "フェーズ6"}
+              "MIYAMA"
             </span>
             <h2>
               🛡️ {appLanguage === "es"
@@ -10723,14 +11054,14 @@ function renderHome() {
         <section className="miyamaEliteAnalyticsHero">
           <div>
             <span className="miyamaElitePhaseBadge">
-              {appLanguage === "es" ? "FASE 4" : appLanguage === "en" ? "PHASE 4" : "フェーズ4"}
+              "MIYAMA"
             </span>
             <h1>
               🏆 {appLanguage === "es"
-                ? "MIYAMA Elite Maintenance Dashboard"
+                ? "MIYAMA Maintenance Dashboard"
                 : appLanguage === "en"
-                  ? "MIYAMA Elite Maintenance Dashboard"
-                  : "MIYAMA Elite Maintenance ダッシュボード"}
+                  ? "MIYAMA Maintenance Dashboard"
+                  : "MIYAMA Maintenance ダッシュボード"}
             </h1>
             <p>
               {appLanguage === "es"
@@ -13148,7 +13479,7 @@ Requirements:
         <section className="miyamaNewEquipmentHero">
           <div>
             <span className="miyamaElitePhaseBadge">
-              {appLanguage === "es" ? "FASE 5" : appLanguage === "en" ? "PHASE 5" : "フェーズ5"}
+              "MIYAMA"
             </span>
             <h1>
               <Factory size={30} />
@@ -13625,7 +13956,7 @@ return (
               onClick={logoutCurrentUser}
               className="miyamaLogout"
             >
-              Logout
+              {appLanguage === "es" ? "Cerrar sesión" : appLanguage === "en" ? "Logout" : "ログアウト"}
             </button>
           </div>
         </div>
