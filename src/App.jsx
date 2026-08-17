@@ -10852,7 +10852,7 @@ Requirements:
         localPlaceholder: "Ej.: ¿Este problema ya ocurrió? ¿Qué máquina tiene más tiempo de parada? ¿Qué piezas están sin stock?",
         localSearch: "Buscar en el historial",
         clear: "Limpiar",
-        localResult: "{aiUi.localResult}",
+        localResult: "Resultado local",
         localEmpty: "Escriba una pregunta para buscar en el historial interno.",
         openAiTitle: "OpenAI — Análisis avanzado",
         openAiSubtitle: "De pago — usa su clave y cuota de OpenAI.",
@@ -11052,7 +11052,7 @@ Requirements:
               }}
             >
               <strong style={{ display: "block", marginBottom: "8px", color: "#1d4ed8" }}>
-                Resultado local
+                {aiUi.localResult}
               </strong>
               {miyamaAiAnswer}
             </div>
@@ -11123,7 +11123,7 @@ Requirements:
                   setPaidAiError("");
                 }}
               >
-                <X size={16} /> Limpar
+                <X size={16} /> {aiUi.clear}
               </button>
             </div>
 
