@@ -1285,13 +1285,21 @@ function makePartDuplicateKey(row = {}) {
   ].join("|");
 }
 
+let MIYAMA_REVERSE_DICTIONARY_CACHE = null;
+
 function buildMiyamaReverseDictionary() {
+  if (MIYAMA_REVERSE_DICTIONARY_CACHE) return MIYAMA_REVERSE_DICTIONARY_CACHE;
+
   const reverse = {};
   Object.values(MIYAMA_TRANSLATIONS).forEach((langDict) => {
     Object.entries(langDict).forEach(([ja, translated]) => {
-      if (translated && ja && !MIYAMA_BLOCKED_TRANSLATION_KEYS.has(ja)) reverse[String(translated).trim()] = String(ja);
+      if (translated && ja && !MIYAMA_BLOCKED_TRANSLATION_KEYS.has(ja)) {
+        reverse[String(translated).trim()] = String(ja);
+      }
     });
   });
+
+  MIYAMA_REVERSE_DICTIONARY_CACHE = reverse;
   return reverse;
 }
 
@@ -1406,11 +1414,17 @@ async function applyMiyamaLanguage(language = "ja", signal) {
 
   const remainingNodes = textNodes.filter((node) => containsJapaneseText(node.nodeValue));
   const uniqueTexts = [...new Set(
-    remainingNodes.map((node) => node.nodeValue.trim()).filter(Boolean)
-  )];
+    remainingNodes
+      .map((node) => node.nodeValue.trim())
+      .filter(Boolean)
+  )]
+    // Campos longos do relatório usam os componentes de tradução dedicados.
+    // Limitar a tradução automática do DOM evita centenas de chamadas ao abrir a página.
+    .filter((value) => value.length <= 140)
+    .slice(0, 80);
 
   const translatedByOriginal = {};
-  const concurrency = 3;
+  const concurrency = 6;
   let cursor = 0;
 
   async function worker() {
@@ -2779,24 +2793,45 @@ function makeLongTranslationKey(value = "") {
   return `${text.length}_${(hash >>> 0).toString(36)}`;
 }
 
+let MIYAMA_LONG_TRANSLATION_MEMORY_CACHE = null;
+let MIYAMA_LONG_TRANSLATION_SAVE_TIMER = null;
+
 function readLongTranslationCache() {
+  if (MIYAMA_LONG_TRANSLATION_MEMORY_CACHE) {
+    return MIYAMA_LONG_TRANSLATION_MEMORY_CACHE;
+  }
+
   try {
     const parsed = JSON.parse(localStorage.getItem(MIYAMA_LONG_TRANSLATION_CACHE_KEY) || "{}");
-    return parsed && typeof parsed === "object" ? parsed : {};
+    MIYAMA_LONG_TRANSLATION_MEMORY_CACHE =
+      parsed && typeof parsed === "object" ? parsed : {};
   } catch {
-    return {};
+    MIYAMA_LONG_TRANSLATION_MEMORY_CACHE = {};
   }
+
+  return MIYAMA_LONG_TRANSLATION_MEMORY_CACHE;
 }
 
 function writeLongTranslationCache(cache = {}) {
-  try {
-    const entries = Object.entries(cache);
-    // localStorageが大きくなり過ぎないよう、最新800件まで保存します。
-    const limited = Object.fromEntries(entries.slice(-800));
-    localStorage.setItem(MIYAMA_LONG_TRANSLATION_CACHE_KEY, JSON.stringify(limited));
-  } catch (error) {
-    console.warn("Translation cache could not be saved:", error);
+  MIYAMA_LONG_TRANSLATION_MEMORY_CACHE = cache;
+
+  if (MIYAMA_LONG_TRANSLATION_SAVE_TIMER) {
+    window.clearTimeout(MIYAMA_LONG_TRANSLATION_SAVE_TIMER);
   }
+
+  MIYAMA_LONG_TRANSLATION_SAVE_TIMER = window.setTimeout(() => {
+    try {
+      const entries = Object.entries(MIYAMA_LONG_TRANSLATION_MEMORY_CACHE || {});
+      const limited = Object.fromEntries(entries.slice(-800));
+      MIYAMA_LONG_TRANSLATION_MEMORY_CACHE = limited;
+      localStorage.setItem(
+        MIYAMA_LONG_TRANSLATION_CACHE_KEY,
+        JSON.stringify(limited)
+      );
+    } catch (error) {
+      console.warn("Translation cache could not be saved:", error);
+    }
+  }, 700);
 }
 
 function splitTranslationText(value = "", maxLength = 1200) {
@@ -3058,6 +3093,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const GLOBAL_RESULTS_PER_PAGE = 20;
   const [globalPage, setGlobalPage] = useState(1);
   const [reportSearch, setReportSearch] = useState("");
+  const [reportPage, setReportPage] = useState(1);
+  const REPORTS_PER_PAGE = 8;
   const [spareSearch, setSpareSearch] = useState("");
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
   const [maintenanceTypeFilter, setMaintenanceTypeFilter] = useState("全て");
@@ -3197,6 +3234,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
   useEffect(() => {
     loadAll();
   }, []);
+
+  useEffect(() => {
+    setReportPage(1);
+  }, [reportSearch, reportViewMode]);
 
   // Tradução otimizada: executa somente ao trocar idioma/página ou quando a quantidade
   // principal de dados muda. Antes ela era executada várias vezes a cada tecla digitada
@@ -8523,7 +8564,67 @@ function renderHome() {
           />
         </div>
 
-        {filteredReports.map((row, index) => ReportViewCard({ row, index }))}
+        {(() => {
+          const totalPages = Math.max(1, Math.ceil(filteredReports.length / REPORTS_PER_PAGE));
+          const safePage = Math.min(reportPage, totalPages);
+          const startIndex = (safePage - 1) * REPORTS_PER_PAGE;
+          const visibleReports = filteredReports.slice(
+            startIndex,
+            startIndex + REPORTS_PER_PAGE
+          );
+
+          return (
+            <>
+              <div
+                className="tableWrap"
+                style={{
+                  margin: "14px 0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <strong>
+                  表示：{startIndex + 1}〜
+                  {Math.min(startIndex + REPORTS_PER_PAGE, filteredReports.length)}
+                  / {filteredReports.length}件
+                </strong>
+
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={safePage <= 1}
+                    onClick={() => setReportPage((page) => Math.max(1, page - 1))}
+                  >
+                    ← 前へ
+                  </button>
+
+                  <strong>
+                    {safePage} / {totalPages}
+                  </strong>
+
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    disabled={safePage >= totalPages}
+                    onClick={() =>
+                      setReportPage((page) => Math.min(totalPages, page + 1))
+                    }
+                  >
+                    次へ →
+                  </button>
+                </div>
+              </div>
+
+              {visibleReports.map((row, index) =>
+                ReportViewCard({ row, index: startIndex + index })
+              )}
+            </>
+          );
+        })()}
       </>
     );
   }
