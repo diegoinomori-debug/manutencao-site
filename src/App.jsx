@@ -151,6 +151,18 @@ function createBlankReport() {
     recurrenceLevel: "初回",
     strategyReason: "",
 
+    // MIYAMA Elite Maintenance - Phase 2 auto-action fields
+    pmCycleDays: 90,
+    pmActionDetail: "",
+    pmOwner: "",
+    cmTargetDate: "",
+    cmWorkTitle: "",
+    cmOwner: "",
+    strategyActionCreated: false,
+    strategyActionType: "",
+    linkedMaintenanceId: "",
+    linkedPlannedWorkId: "",
+
     recurrenceCategory: "必要",
     recurrenceStatus: "未実施",
     recurrencePrevention: "",
@@ -3899,7 +3911,38 @@ function MaintenanceApp({ currentUser, userProfile }) {
   async function saveNewReport() {
     if (!newReport) return;
     if (!newReport.equipment && !newReport.phenomenon) {
-      alert("設備名または不具合現象を入力してください。");
+      alert(
+        appLanguage === "es"
+          ? "Ingrese el equipo o el síntoma de la falla."
+          : appLanguage === "en"
+            ? "Enter the equipment name or failure symptom."
+            : "設備名または不具合現象を入力してください。"
+      );
+      return;
+    }
+
+    // Phase 2 validation only when an automatic action is requested.
+    if (newReport.maintenanceStrategy === "PM") {
+      if (!Number(newReport.pmCycleDays || 0) || Number(newReport.pmCycleDays || 0) < 1) {
+        alert(
+          appLanguage === "es"
+            ? "Ingrese un ciclo de mantenimiento válido."
+            : appLanguage === "en"
+              ? "Enter a valid maintenance cycle."
+              : "保全周期を入力してください。"
+        );
+        return;
+      }
+    }
+
+    if (newReport.maintenanceStrategy === "CM" && !String(newReport.cmWorkTitle || "").trim()) {
+      alert(
+        appLanguage === "es"
+          ? "Ingrese el título del trabajo de mejora."
+          : appLanguage === "en"
+            ? "Enter the improvement work title."
+            : "改良工事件名を入力してください。"
+      );
       return;
     }
 
@@ -3916,24 +3959,190 @@ function MaintenanceApp({ currentUser, userProfile }) {
         !newReport.approvalStatus || newReport.approvalStatus === "下書き"
           ? "点検待ち"
           : newReport.approvalStatus,
+      strategyActionCreated: false,
+      strategyActionType: "",
+      linkedMaintenanceId: "",
+      linkedPlannedWorkId: "",
     };
 
-    await addDoc(collection(db, "maintenanceReports"), reportToSave);
+    const reportRef = await addDoc(collection(db, "maintenanceReports"), reportToSave);
 
     await addDoc(collection(db, "calendar"), {
       date: reportToSave.createdAt || todayText(),
       time: "",
       title: `保全修理報告書：${reportToSave.equipment || "設備名なし"}`,
-      detail: `${reportToSave.maintenanceType || ""} ${reportToSave.lineName || ""} ${reportToSave.phenomenon || ""} ${reportToSave.action || ""}`,
+      detail: `${reportToSave.maintenanceStrategy || reportToSave.maintenanceType || ""} ${reportToSave.lineName || ""} ${reportToSave.phenomenon || ""} ${reportToSave.action || ""}`,
       owner: reportToSave.worker || reportToSave.createdBy || "",
       importance: reportToSave.approvalStatus === "承認済み" ? "通常" : "重要",
       category: "保全修理報告書",
+      sourceReportId: reportRef.id,
       image: reportToSave.image || reportToSave.beforeImage || "",
     });
 
+    let actionMessage = "";
+    let linkedMaintenanceId = "";
+    let linkedPlannedWorkId = "";
+    let strategyActionType = "";
+
+    // =====================================================
+    // PHASE 2: PM -> 定期保全
+    // =====================================================
+    if (reportToSave.maintenanceStrategy === "PM") {
+      const cycleDays = Math.max(1, Number(reportToSave.pmCycleDays || 90));
+      const baseDate = parseLocalDate(reportToSave.createdAt || todayText()) || getTodayLocalDate();
+      const nextDateObject = new Date(baseDate);
+      nextDateObject.setDate(nextDateObject.getDate() + cycleDays);
+      const nextDate = toLocalDateText(nextDateObject);
+
+      const maintenanceDoc = {
+        equipment: reportToSave.equipment || "",
+        lineName: reportToSave.lineName || "",
+        partName: reportToSave.replacedPart || reportToSave.troublePoint || reportToSave.failureCauseCategory || "",
+        partNo: "",
+        serialNo: "",
+        maker: "",
+        price: "",
+        supplier: "",
+        purchaseUrl: "",
+        location: "",
+        locationRack: "",
+        lot: "",
+        shelf: "",
+        box: "",
+        address: "",
+        leadTime: "",
+        reorderPoint: "",
+        reorderQty: "",
+        category: "MIYAMA Elite PM",
+        maintenanceType: "点検",
+        maintenanceMode: "定期保全",
+        maintenanceDetail:
+          String(reportToSave.pmActionDetail || "").trim() ||
+          String(reportToSave.action || "").trim() ||
+          `再発防止PM：${reportToSave.phenomenon || reportToSave.troublePoint || "保全項目"}`,
+        equipment2Name: "",
+        sectionName: reportToSave.troublePoint || "",
+        method: "",
+        standard: "",
+        responseAction: "",
+        result: "",
+        prepDays: "",
+        isMaintenanceTarget: true,
+        cycle: cycleDays,
+        cycleProductionCount: "",
+        dailyAverageProduction: "",
+        lastDate: reportToSave.createdAt || todayText(),
+        nextDate,
+        owner: reportToSave.pmOwner || reportToSave.worker || currentUserName || "",
+        note:
+          `MIYAMA Elite Phase 2 自動作成\n` +
+          `元修理報告: ${reportRef.id}\n` +
+          `原因: ${reportToSave.failureCauseCategory || "-"} / ${reportToSave.failureCauseDetail || "-"}\n` +
+          `判定理由: ${reportToSave.strategyReason || "-"}`,
+        stockQty: 0,
+        minStock: 1,
+        stockNote: "",
+        image: reportToSave.image || "",
+        imageUrl: "",
+        sourceReportId: reportRef.id,
+        sourceStrategy: "PM",
+        createdAt: createdNow,
+        createdBy: currentUserName,
+      };
+
+      const maintenanceRef = await addDoc(collection(db, "parts"), maintenanceDoc);
+      linkedMaintenanceId = maintenanceRef.id;
+      strategyActionType = "PM";
+
+      actionMessage =
+        appLanguage === "es"
+          ? " Se creó automáticamente un mantenimiento preventivo."
+          : appLanguage === "en"
+            ? " A Preventive Maintenance item was created automatically."
+            : " 定期保全にPM項目を自動作成しました。";
+    }
+
+    // =====================================================
+    // PHASE 2: CM -> 工事管理 + カレンダー
+    // =====================================================
+    if (reportToSave.maintenanceStrategy === "CM") {
+      const work = {
+        date: reportToSave.cmTargetDate || todayText(),
+        endDate: "",
+        title: String(reportToSave.cmWorkTitle || "").trim(),
+        equipment: reportToSave.equipment || "",
+        purpose: "改良保全 / CM",
+        detail:
+          `元故障：${reportToSave.phenomenon || "-"}\n` +
+          `不具合箇所：${reportToSave.troublePoint || "-"}\n` +
+          `原因：${reportToSave.failureCauseCategory || "-"} / ${reportToSave.failureCauseDetail || "-"}\n` +
+          `修理処置：${reportToSave.action || "-"}\n` +
+          `CM判定理由：${reportToSave.strategyReason || "-"}`,
+        owner: reportToSave.cmOwner || reportToSave.worker || currentUserName || "",
+        status: "計画中",
+        progress: 0,
+        risk:
+          reportToSave.criticality === "S"
+            ? "S：安全・品質重大"
+            : reportToSave.criticality === "A"
+              ? "A：生産影響大"
+              : reportToSave.criticality === "B"
+                ? "B：影響中"
+                : "C：影響小",
+        note: `MIYAMA Elite Phase 2 自動作成 / 元修理報告: ${reportRef.id}`,
+        image: reportToSave.image || reportToSave.beforeImage || "",
+        sourceReportId: reportRef.id,
+        sourceStrategy: "CM",
+        createdAt: createdNow,
+        createdBy: currentUserName,
+      };
+
+      const workRef = await addDoc(collection(db, "plannedWorks"), work);
+      linkedPlannedWorkId = workRef.id;
+      strategyActionType = "CM";
+
+      await addDoc(collection(db, "calendar"), {
+        date: work.date || todayText(),
+        time: "",
+        title: `改良保全：${work.title}`,
+        detail: `${work.equipment || ""} ${work.purpose || ""} ${reportToSave.strategyReason || ""}`,
+        owner: work.owner || "",
+        importance: ["S", "A"].includes(reportToSave.criticality) ? "最重要" : "重要",
+        category: "改良保全",
+        plannedWorkId: workRef.id,
+        sourceReportId: reportRef.id,
+        image: work.image || "",
+      });
+
+      actionMessage =
+        appLanguage === "es"
+          ? " Se creó automáticamente un trabajo de mejora."
+          : appLanguage === "en"
+            ? " An Improvement Work item was created automatically."
+            : " 工事管理にCM改良工事を自動作成しました。";
+    }
+
+    if (strategyActionType) {
+      await updateDoc(doc(db, "maintenanceReports", reportRef.id), {
+        strategyActionCreated: true,
+        strategyActionType,
+        linkedMaintenanceId,
+        linkedPlannedWorkId,
+        strategyActionCreatedAt: createdNow,
+      });
+    }
+
     setNewReport(null);
-    await Promise.all([loadReports(), loadCalendar()]);
-    alert("保存しました。カレンダーとAI検索に反映されます。");
+    await Promise.all([loadReports(), loadCalendar(), loadParts(), loadPlannedWorks()]);
+
+    const savedText =
+      appLanguage === "es"
+        ? "Informe guardado."
+        : appLanguage === "en"
+          ? "Report saved."
+          : "保存しました。";
+
+    alert(`${savedText}${actionMessage}`);
   }
 
   function startNewCalendarEvent(date = selectedDate) {
@@ -6155,6 +6364,114 @@ Rules:
               </button>
             ))}
           </div>
+
+          {(newReport.maintenanceStrategy === "PM" || newReport.maintenanceStrategy === "CM") && (
+            <div className="miyamaPhase2ActionBox">
+              <div className="miyamaPhase2Title">
+                <strong>
+                  ⚡ {appLanguage === "es"
+                    ? "Acción automática - Fase 2"
+                    : appLanguage === "en"
+                      ? "Automatic Action - Phase 2"
+                      : "自動アクション - フェーズ2"}
+                </strong>
+                <span>
+                  {newReport.maintenanceStrategy === "PM"
+                    ? (appLanguage === "es" ? "→ Mantenimiento preventivo" : appLanguage === "en" ? "→ Preventive Maintenance" : "→ 定期保全へ自動登録")
+                    : (appLanguage === "es" ? "→ Trabajo de mejora" : appLanguage === "en" ? "→ Improvement Work" : "→ 工事管理へ自動登録")}
+                </span>
+              </div>
+
+              {newReport.maintenanceStrategy === "PM" && (
+                <div className="reportGrid miyamaPhase2Grid">
+                  <label>
+                    📆 {appLanguage === "es" ? "Ciclo (días)" : appLanguage === "en" ? "Cycle (days)" : "保全周期（日）"}
+                    <input
+                      type="number"
+                      min="1"
+                      value={newReport.pmCycleDays || 90}
+                      onChange={(e) => setReport("pmCycleDays", Math.max(1, Number(e.target.value || 1)))}
+                    />
+                  </label>
+
+                  <label>
+                    👤 {appLanguage === "es" ? "Responsable" : appLanguage === "en" ? "Owner" : "担当者"}
+                    <input
+                      value={newReport.pmOwner || ""}
+                      onChange={(e) => setReport("pmOwner", e.target.value)}
+                      placeholder={currentUserName}
+                    />
+                  </label>
+
+                  <label className="miyamaPhase2Wide">
+                    🔧 {appLanguage === "es" ? "Contenido del mantenimiento" : appLanguage === "en" ? "Maintenance Action" : "保全内容"}
+                    <input
+                      value={newReport.pmActionDetail || ""}
+                      onChange={(e) => setReport("pmActionDetail", e.target.value)}
+                      placeholder={
+                        appLanguage === "es"
+                          ? "Ej.: inspeccionar y reemplazar el rodamiento cada 90 días"
+                          : appLanguage === "en"
+                            ? "Example: inspect and replace bearing every 90 days"
+                            : "例：90日ごとにベアリング点検・交換"
+                      }
+                    />
+                  </label>
+                </div>
+              )}
+
+              {newReport.maintenanceStrategy === "CM" && (
+                <div className="reportGrid miyamaPhase2Grid">
+                  <label>
+                    📅 {appLanguage === "es" ? "Fecha objetivo" : appLanguage === "en" ? "Target Date" : "目標日"}
+                    <input
+                      type="date"
+                      value={newReport.cmTargetDate || ""}
+                      onChange={(e) => setReport("cmTargetDate", e.target.value)}
+                    />
+                  </label>
+
+                  <label>
+                    👤 {appLanguage === "es" ? "Responsable" : appLanguage === "en" ? "Owner" : "担当者"}
+                    <input
+                      value={newReport.cmOwner || ""}
+                      onChange={(e) => setReport("cmOwner", e.target.value)}
+                      placeholder={currentUserName}
+                    />
+                  </label>
+
+                  <label className="miyamaPhase2Wide">
+                    🏗️ {appLanguage === "es" ? "Título del trabajo de mejora" : appLanguage === "en" ? "Improvement Work Title" : "改良工事件名"}
+                    <input
+                      value={newReport.cmWorkTitle || ""}
+                      onChange={(e) => setReport("cmWorkTitle", e.target.value)}
+                      placeholder={
+                        appLanguage === "es"
+                          ? "Ej.: mejorar la estructura de fijación del sensor"
+                          : appLanguage === "en"
+                            ? "Example: improve sensor mounting structure"
+                            : "例：センサー固定構造の改善"
+                      }
+                    />
+                  </label>
+                </div>
+              )}
+
+              <div className="miyamaPhase2Info">
+                {newReport.maintenanceStrategy === "PM"
+                  ? (appLanguage === "es"
+                      ? "Al guardar el informe, se creará automáticamente un elemento en Mantenimiento periódico."
+                      : appLanguage === "en"
+                        ? "When the report is saved, a Preventive Maintenance item will be created automatically."
+                        : "報告書を保存すると、定期保全に保全項目が自動作成されます。")
+                  : (appLanguage === "es"
+                      ? "Al guardar el informe, se creará automáticamente un trabajo de mejora y una entrada de calendario."
+                      : appLanguage === "en"
+                        ? "When the report is saved, an improvement work item and calendar entry will be created automatically."
+                        : "報告書を保存すると、工事管理に改良工事が自動作成され、カレンダーにも反映されます。")}
+              </div>
+            </div>
+          )}
 
           <h3 style={{ marginTop: "18px" }}>
             📝 {appLanguage === "es" ? "Motivo de la decisión" : appLanguage === "en" ? "Reason for Strategy" : "判定理由"}
