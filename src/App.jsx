@@ -5739,14 +5739,6 @@ Rules:
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="📌 基本情報・設備情報">
           <div className="reportGrid">
             <label>📅 作成日<input type="date" value={dateOnlyInputValue(newReport.createdAt)} onChange={(e) => setReport("createdAt", e.target.value)} /></label>
-            <label>🗂️ 保全分類
-              <select value={newReport.maintenanceType || "CM"} onChange={(e) => setReport("maintenanceType", e.target.value)}>
-                <option value="CM">CM</option>
-                <option value="BM">BM</option>
-                <option value="PM">PM</option>
-                <option value="その他">その他</option>
-              </select>
-            </label>
             <label>👥 グループ名<input value={newReport.groupName || ""} onChange={(e) => setReport("groupName", e.target.value)} /></label>
             <label>🏭 ライン名<input value={newReport.lineName || ""} onChange={(e) => setReport("lineName", e.target.value)} /></label>
             <label>⚙️ 設備名<input value={newReport.equipment || ""} onChange={(e) => setReport("equipment", e.target.value)} /></label>
@@ -6007,7 +5999,7 @@ Rules:
                 ? "MIYAMA Elite Maintenance - Fase 1"
                 : appLanguage === "en"
                   ? "MIYAMA Elite Maintenance - Phase 1"
-                  : "MIYAMA Elite Maintenance - Phase 1"}
+                  : "MIYAMA Elite Maintenance - フェーズ1"}
             </strong>
             <div style={{ marginTop: "4px", fontSize: "13px" }}>
               {appLanguage === "es"
@@ -6031,22 +6023,22 @@ Rules:
                 <option value="">
                   {appLanguage === "es" ? "Seleccione..." : appLanguage === "en" ? "Select..." : "選択してください"}
                 </option>
-                <option value="摩耗">摩耗 / Wear / Desgaste</option>
-                <option value="破損">破損 / Breakage / Rotura</option>
-                <option value="断線・配線">断線・配線 / Wiring / Cableado</option>
-                <option value="位置ズレ・調整">位置ズレ・調整 / Misalignment / Desajuste</option>
-                <option value="給油・潤滑">給油・潤滑 / Lubrication / Lubricación</option>
-                <option value="汚れ・異物">汚れ・異物 / Contamination / Suciedad</option>
-                <option value="制御・電気">制御・電気 / Control-Electrical / Control-Eléctrico</option>
-                <option value="センサー">センサー / Sensor / Sensor</option>
-                <option value="空圧・油圧">空圧・油圧 / Pneumatic-Hydraulic / Neumática-Hidráulica</option>
-                <option value="ワーク・材料">ワーク・材料 / Workpiece-Material / Pieza-Material</option>
-                <option value="プログラム">プログラム / Program / Programa</option>
-                <option value="操作・作業">操作・作業 / Operation / Operación</option>
-                <option value="保全不備">保全不備 / Maintenance Issue / Falla de mantenimiento</option>
-                <option value="設計・構造">設計・構造 / Design-Structure / Diseño-Estructura</option>
-                <option value="寿命">寿命 / End of Life / Fin de vida</option>
-                <option value="不明">不明 / Unknown / Desconocido</option>
+                <option value="摩耗">{appLanguage === "es" ? "Desgaste" : appLanguage === "en" ? "Wear" : "摩耗"}</option>
+                <option value="破損">{appLanguage === "es" ? "Rotura" : appLanguage === "en" ? "Breakage" : "破損"}</option>
+                <option value="断線・配線">{appLanguage === "es" ? "Cableado / desconexión" : appLanguage === "en" ? "Wiring / disconnection" : "断線・配線"}</option>
+                <option value="位置ズレ・調整">{appLanguage === "es" ? "Desalineación / ajuste" : appLanguage === "en" ? "Misalignment / adjustment" : "位置ズレ・調整"}</option>
+                <option value="給油・潤滑">{appLanguage === "es" ? "Lubricación" : appLanguage === "en" ? "Lubrication" : "給油・潤滑"}</option>
+                <option value="汚れ・異物">{appLanguage === "es" ? "Suciedad / material extraño" : appLanguage === "en" ? "Contamination / foreign material" : "汚れ・異物"}</option>
+                <option value="制御・電気">{appLanguage === "es" ? "Control / eléctrico" : appLanguage === "en" ? "Control / electrical" : "制御・電気"}</option>
+                <option value="センサー">{appLanguage === "es" ? "Sensor" : appLanguage === "en" ? "Sensor" : "センサー"}</option>
+                <option value="空圧・油圧">{appLanguage === "es" ? "Neumática / hidráulica" : appLanguage === "en" ? "Pneumatic / hydraulic" : "空圧・油圧"}</option>
+                <option value="ワーク・材料">{appLanguage === "es" ? "Pieza / material" : appLanguage === "en" ? "Workpiece / material" : "ワーク・材料"}</option>
+                <option value="プログラム">{appLanguage === "es" ? "Programa" : appLanguage === "en" ? "Program" : "プログラム"}</option>
+                <option value="操作・作業">{appLanguage === "es" ? "Operación / trabajo" : appLanguage === "en" ? "Operation / work" : "操作・作業"}</option>
+                <option value="保全不備">{appLanguage === "es" ? "Falla de mantenimiento" : appLanguage === "en" ? "Maintenance issue" : "保全不備"}</option>
+                <option value="設計・構造">{appLanguage === "es" ? "Diseño / estructura" : appLanguage === "en" ? "Design / structure" : "設計・構造"}</option>
+                <option value="寿命">{appLanguage === "es" ? "Fin de vida" : appLanguage === "en" ? "End of life" : "寿命"}</option>
+                <option value="不明">{appLanguage === "es" ? "Desconocido" : appLanguage === "en" ? "Unknown" : "不明"}</option>
               </select>
             </label>
 
@@ -6059,39 +6051,39 @@ Rules:
                 <option value="">
                   {appLanguage === "es" ? "Seleccione..." : appLanguage === "en" ? "Select..." : "選択してください"}
                 </option>
-                <option value="構造問題">構造問題 / Structural issue / Problema estructural</option>
-                <option value="寿命超過">寿命超過 / Life exceeded / Vida excedida</option>
-                <option value="給油不足">給油不足 / Insufficient lubrication / Lubricación insuficiente</option>
-                <option value="点検不足">点検不足 / Inspection gap / Inspección insuficiente</option>
-                <option value="調整不良">調整不良 / Adjustment issue / Ajuste incorrecto</option>
-                <option value="操作ミス">操作ミス / Operation error / Error de operación</option>
-                <option value="使用環境">使用環境 / Operating environment / Entorno de uso</option>
-                <option value="部品品質">部品品質 / Part quality / Calidad de pieza</option>
-                <option value="施工・組付不良">施工・組付不良 / Assembly issue / Error de montaje</option>
-                <option value="プログラム・設定">プログラム・設定 / Program-setting / Programa-ajuste</option>
-                <option value="異物混入">異物混入 / Foreign material / Material extraño</option>
-                <option value="原因調査中">原因調査中 / Under investigation / En investigación</option>
-                <option value="その他">その他 / Other / Otro</option>
+                <option value="構造問題">{appLanguage === "es" ? "Problema estructural" : appLanguage === "en" ? "Structural issue" : "構造問題"}</option>
+                <option value="寿命超過">{appLanguage === "es" ? "Vida excedida" : appLanguage === "en" ? "Life exceeded" : "寿命超過"}</option>
+                <option value="給油不足">{appLanguage === "es" ? "Lubricación insuficiente" : appLanguage === "en" ? "Insufficient lubrication" : "給油不足"}</option>
+                <option value="点検不足">{appLanguage === "es" ? "Inspección insuficiente" : appLanguage === "en" ? "Inspection gap" : "点検不足"}</option>
+                <option value="調整不良">{appLanguage === "es" ? "Ajuste incorrecto" : appLanguage === "en" ? "Adjustment issue" : "調整不良"}</option>
+                <option value="操作ミス">{appLanguage === "es" ? "Error de operación" : appLanguage === "en" ? "Operation error" : "操作ミス"}</option>
+                <option value="使用環境">{appLanguage === "es" ? "Entorno de uso" : appLanguage === "en" ? "Operating environment" : "使用環境"}</option>
+                <option value="部品品質">{appLanguage === "es" ? "Calidad de pieza" : appLanguage === "en" ? "Part quality" : "部品品質"}</option>
+                <option value="施工・組付不良">{appLanguage === "es" ? "Error de montaje" : appLanguage === "en" ? "Assembly issue" : "施工・組付不良"}</option>
+                <option value="プログラム・設定">{appLanguage === "es" ? "Programa / ajuste" : appLanguage === "en" ? "Program / setting" : "プログラム・設定"}</option>
+                <option value="異物混入">{appLanguage === "es" ? "Material extraño" : appLanguage === "en" ? "Foreign material" : "異物混入"}</option>
+                <option value="原因調査中">{appLanguage === "es" ? "En investigación" : appLanguage === "en" ? "Under investigation" : "原因調査中"}</option>
+                <option value="その他">{appLanguage === "es" ? "Otro" : appLanguage === "en" ? "Other" : "その他"}</option>
               </select>
             </label>
 
             <label>
               🚦 {appLanguage === "es" ? "Criticidad" : appLanguage === "en" ? "Criticality" : "重要度"}
               <select value={newReport.criticality || "B"} onChange={(e) => setReport("criticality", e.target.value)}>
-                <option value="S">S - Safety / Quality Critical</option>
-                <option value="A">A - High Production Impact</option>
-                <option value="B">B - Medium Impact</option>
-                <option value="C">C - Low Impact</option>
+                <option value="S">{appLanguage === "es" ? "S - Seguridad / calidad crítica" : appLanguage === "en" ? "S - Safety / quality critical" : "S - 安全・品質重大"}</option>
+                <option value="A">{appLanguage === "es" ? "A - Alto impacto en producción" : appLanguage === "en" ? "A - High production impact" : "A - 生産影響大"}</option>
+                <option value="B">{appLanguage === "es" ? "B - Impacto medio" : appLanguage === "en" ? "B - Medium impact" : "B - 影響中"}</option>
+                <option value="C">{appLanguage === "es" ? "C - Impacto bajo" : appLanguage === "en" ? "C - Low impact" : "C - 影響小"}</option>
               </select>
             </label>
 
             <label>
               🔁 {appLanguage === "es" ? "Recurrencia" : appLanguage === "en" ? "Recurrence" : "再発レベル"}
               <select value={newReport.recurrenceLevel || "初回"} onChange={(e) => setReport("recurrenceLevel", e.target.value)}>
-                <option value="初回">初回 / First occurrence / Primera vez</option>
-                <option value="再発">再発 / Repeated / Repetición</option>
-                <option value="頻発">頻発 / Frequent / Frecuente</option>
-                <option value="慢性">慢性 / Chronic / Crónico</option>
+                <option value="初回">{appLanguage === "es" ? "Primera vez" : appLanguage === "en" ? "First occurrence" : "初回"}</option>
+                <option value="再発">{appLanguage === "es" ? "Repetición" : appLanguage === "en" ? "Repeated" : "再発"}</option>
+                <option value="頻発">{appLanguage === "es" ? "Frecuente" : appLanguage === "en" ? "Frequent" : "頻発"}</option>
+                <option value="慢性">{appLanguage === "es" ? "Crónico" : appLanguage === "en" ? "Chronic" : "慢性"}</option>
               </select>
             </label>
           </div>
