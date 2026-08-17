@@ -1791,3 +1791,24 @@
     grid-template-columns: 1fr 70px;
   }
 }
+
+
+/* Historical repair-report compatibility note */
+.miyamaLegacyCompatibilityNote {
+  margin-left: auto;
+  max-width: 330px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 12px;
+  background: rgba(255,255,255,.09);
+  color: #e8efff;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 850px) {
+  .miyamaLegacyCompatibilityNote {
+    margin-left: 0;
+    max-width: 100%;
+  }
+}

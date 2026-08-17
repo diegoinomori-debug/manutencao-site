@@ -1597,6 +1597,25 @@ function makeProductionLogDuplicateKey(row = {}) {
   ].join("|");
 }
 
+function getMaintenanceStrategyCompatible(row = {}) {
+  // New MIYAMA Maintenance reports store BM/PM/CBM/CM in maintenanceStrategy.
+  const modern = String(row.maintenanceStrategy || "").trim().toUpperCase();
+  if (["BM", "PM", "CBM", "CM"].includes(modern)) return modern;
+
+  // Historical repair reports stored the same classification in maintenanceType.
+  const legacy = String(row.maintenanceType || row.reportType || "").trim().toUpperCase();
+  if (["BM", "PM", "CBM", "CM"].includes(legacy)) return legacy;
+
+  // Be tolerant of labels imported from older Excel files.
+  const combined = `${row.maintenanceType || ""} ${row.reportType || ""} ${row.reportTitle || ""}`.toUpperCase();
+  if (/\bCBM\b/.test(combined)) return "CBM";
+  if (/\bPM\b/.test(combined)) return "PM";
+  if (/\bBM\b/.test(combined)) return "BM";
+  if (/\bCM\b/.test(combined)) return "CM";
+
+  return "";
+}
+
 function makeMaintenanceReportDuplicateKey(row = {}) {
   return [
     normalizeDateTime(row.troubleDateTime || row.workStartDateTime || row.createdAt || ""),
@@ -4513,7 +4532,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       date: reportToSave.createdAt || todayText(),
       time: "",
       title: `保全修理報告書：${reportToSave.equipment || "設備名なし"}`,
-      detail: `${reportToSave.maintenanceStrategy || reportToSave.maintenanceType || ""} ${reportToSave.lineName || ""} ${reportToSave.phenomenon || ""} ${reportToSave.action || ""}`,
+      detail: `${getMaintenanceStrategyCompatible(reportToSave)} ${reportToSave.lineName || ""} ${reportToSave.phenomenon || ""} ${reportToSave.action || ""}`,
       owner: reportToSave.worker || reportToSave.createdBy || "",
       importance: reportToSave.approvalStatus === "承認済み" ? "通常" : "重要",
       category: "保全修理報告書",
@@ -10885,7 +10904,10 @@ function renderHome() {
     const totalRepairHours = filtered.reduce((sum, row) => sum + toNumber(row.laborHours ?? calculateReport(row).laborHours, 0), 0);
     const totalCost = filtered.reduce((sum, row) => sum + toNumber(row.totalCost ?? calculateReport(row).totalCost, 0), 0);
     const mttr = totalReports > 0 ? totalStopHours / totalReports : 0;
-    const emergencyCount = filtered.filter((row) => String(row.maintenanceType || row.reportType || "").includes("CM") || String(row.reportTitle || "").includes("修理")).length;
+    const emergencyCount = filtered.filter((row) => {
+      const strategy = getMaintenanceStrategyCompatible(row);
+      return strategy === "CM" || (!strategy && String(row.reportTitle || "").includes("修理"));
+    }).length;
     const plannedCount = Math.max(0, totalReports - emergencyCount);
 
     const groupBy = (getter) => Object.values(filtered.reduce((acc, row) => {
@@ -10916,7 +10938,7 @@ function renderHome() {
 
     const eliteStrategyStats = eliteStrategyOrder.map((strategy) => {
       const rows = filtered.filter((row) => {
-        const current = String(row.maintenanceStrategy || "").trim();
+        const current = getMaintenanceStrategyCompatible(row);
         return strategy === "未分類" ? !current : current === strategy;
       });
       return {
@@ -10927,7 +10949,7 @@ function renderHome() {
       };
     });
 
-    const eliteClassifiedCount = filtered.filter((row) => String(row.maintenanceStrategy || "").trim()).length;
+    const eliteClassifiedCount = filtered.filter((row) => Boolean(getMaintenanceStrategyCompatible(row))).length;
     const eliteClassifiedRate = totalReports > 0 ? (eliteClassifiedCount / totalReports) * 100 : 0;
 
     const eliteRecurringRows = filtered.filter((row) =>
@@ -10944,7 +10966,7 @@ function renderHome() {
 
     const eliteActionCreatedCount = filtered.filter((row) => row.strategyActionCreated === true).length;
     const eliteActionEligibleCount = filtered.filter((row) =>
-      ["PM", "CM"].includes(String(row.maintenanceStrategy || ""))
+      ["PM", "CM"].includes(getMaintenanceStrategyCompatible(row))
     ).length;
     const eliteActionConversionRate =
       eliteActionEligibleCount > 0 ? (eliteActionCreatedCount / eliteActionEligibleCount) * 100 : 0;
@@ -11071,6 +11093,14 @@ function renderHome() {
                   : "修理報告を『再発をなくすための経営指標』に変換し、どこから改善するかを判断します。"}
             </p>
           </div>
+          <div className="miyamaLegacyCompatibilityNote">
+            {appLanguage === "es"
+              ? "Los informes antiguos también se clasifican usando el campo histórico BM / PM / CM."
+              : appLanguage === "en"
+                ? "Historical reports are also classified using the old BM / PM / CM field."
+                : "旧修理報告書の保全分類（BM / PM / CM）も自動的に集計へ引き継ぎます。"}
+          </div>
+
           <div className="miyamaEliteHeroStatus">
             <small>{appLanguage === "es" ? "Datos clasificados" : appLanguage === "en" ? "Classified Data" : "戦略分類率"}</small>
             <strong>{eliteClassifiedRate.toFixed(0)}%</strong>
