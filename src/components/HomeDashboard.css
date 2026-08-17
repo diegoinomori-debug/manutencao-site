@@ -1283,3 +1283,293 @@
   }
   .miyamaEliteCauseRow .miyamaEliteBarTrack { grid-column: 2 / -1; }
 }
+
+
+/* =========================================================
+   MIYAMA ELITE MAINTENANCE - PHASE 5
+   NEW EQUIPMENT MANAGEMENT
+   ========================================================= */
+.miyamaNewEquipmentPage {
+  display: grid;
+  gap: 16px;
+}
+
+.miyamaNewEquipmentHero {
+  padding: 25px 27px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 25%, rgba(34,197,94,.18), transparent 28%),
+    linear-gradient(120deg,#0b2447,#13556e 55%,#16806f);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  box-shadow: 0 15px 34px rgba(11,59,76,.14);
+}
+
+.miyamaNewEquipmentHero h1 {
+  margin: 8px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.miyamaNewEquipmentHero p {
+  margin: 0;
+  color: #d9f4ef;
+}
+
+.miyamaNewEquipmentHeroMetric {
+  min-width: 135px;
+  padding: 13px 17px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 14px;
+  background: rgba(255,255,255,.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.miyamaNewEquipmentHeroMetric strong { font-size: 34px; }
+
+.miyamaNewEquipmentCreate {
+  padding: 20px;
+  border: 1px solid #e0e7f1;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(17,36,75,.045);
+}
+
+.miyamaNewEquipmentForm {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(180px,1fr));
+  gap: 11px;
+}
+
+.miyamaNewEquipmentForm label,
+.miyamaNewEquipmentNote {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.miyamaNewEquipmentForm input,
+.miyamaNewEquipmentForm select,
+.miyamaNewEquipmentNote textarea {
+  min-height: 44px;
+  border: 1px solid #d7e0ed;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.miyamaNewEquipmentNote {
+  margin: 12px 0;
+}
+
+.miyamaNewEquipmentSummary {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 10px;
+}
+
+.miyamaNewEquipmentSummary > div {
+  min-height: 95px;
+  padding: 14px;
+  border: 1px solid #e0e7f1;
+  border-radius: 15px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.miyamaNewEquipmentSummary small { color: #718097; }
+.miyamaNewEquipmentSummary strong { font-size: 26px; }
+
+.miyamaNewEquipmentProjects {
+  display: grid;
+  gap: 15px;
+}
+
+.miyamaNewEquipmentProject {
+  padding: 20px;
+  border: 1px solid #dfe7f0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(17,36,75,.05);
+}
+
+.miyamaNewEquipmentProjectHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.miyamaNewEquipmentProjectTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.miyamaNewEquipmentProjectTitle h2 { margin: 0; }
+.miyamaNewEquipmentProjectTitle p { margin: 4px 0 0; color: #718097; }
+
+.miyamaNewEquipmentProgressCircle {
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  border-radius: 50%;
+  background: #f0f8f6;
+  border: 5px solid #28a58a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.miyamaNewEquipmentProgressCircle strong { font-size: 17px; }
+.miyamaNewEquipmentProgressCircle small { color: #718097; }
+
+.miyamaNewEquipmentMeta {
+  margin-top: 13px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.miyamaNewEquipmentMeta span {
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: #f5f8fb;
+  color: #54647a;
+  font-size: 11px;
+}
+.miyamaNewEquipmentMeta select {
+  min-height: 34px;
+  border: 1px solid #d8e1ed;
+  border-radius: 9px;
+}
+
+.miyamaNewEquipmentProgressBar {
+  height: 9px;
+  margin: 13px 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #edf1f5;
+}
+.miyamaNewEquipmentProgressBar > div {
+  height: 100%;
+  background: linear-gradient(90deg,#22c55e,#0f9f8a);
+  border-radius: inherit;
+}
+
+.miyamaNewEquipmentReady {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #bce4ca;
+  border-radius: 11px;
+  background: #effaf3;
+  color: #197548;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.miyamaNewEquipmentChecklistGroups {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 10px;
+}
+
+.miyamaNewEquipmentChecklistGroup {
+  padding: 12px;
+  border: 1px solid #e3e9f1;
+  border-radius: 13px;
+  background: #fafcff;
+}
+.miyamaNewEquipmentChecklistGroup h4 {
+  margin: 0 0 9px;
+  color: #3e5068;
+}
+
+.miyamaNewEquipmentCheck {
+  width: 100%;
+  min-height: 47px;
+  margin-top: 6px;
+  padding: 8px 9px !important;
+  border: 1px solid #dfe6ef !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #24324a !important;
+  display: grid !important;
+  grid-template-columns: 22px 1fr;
+  gap: 7px !important;
+  align-items: center !important;
+  text-align: left !important;
+  font-size: 11px !important;
+}
+.miyamaNewEquipmentCheck.done {
+  border-color: #bce2c8 !important;
+  background: #f0faf3 !important;
+  color: #1c7045 !important;
+}
+.miyamaNewEquipmentCheck small {
+  grid-column: 2;
+  color: #718097;
+  font-size: 9px;
+}
+
+.miyamaNewEquipmentProjectNote {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f6f8fb;
+  color: #5f6e83;
+  font-size: 11px;
+}
+
+.miyamaNewEquipmentProjectActions {
+  margin-top: 13px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.miyamaNewEquipmentProjectActions button {
+  min-height: 36px;
+  border: 1px solid #d9e2ee;
+  border-radius: 9px;
+  background: #fff;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.miyamaNewEquipmentProjectActions .danger {
+  color: #b4232f;
+  background: #fff5f5;
+  border-color: #f0c7ca;
+}
+
+.miyamaNewEquipmentEmpty {
+  padding: 25px;
+  border: 1px dashed #cbd6e3;
+  border-radius: 15px;
+  text-align: center;
+  color: #718097;
+  background: #fbfcfe;
+}
+
+@media (max-width: 1200px) {
+  .miyamaNewEquipmentChecklistGroups { grid-template-columns: repeat(2,1fr); }
+  .miyamaNewEquipmentForm { grid-template-columns: repeat(2,1fr); }
+}
+
+@media (max-width: 700px) {
+  .miyamaNewEquipmentHero { flex-direction: column; align-items: flex-start; }
+  .miyamaNewEquipmentHeroMetric { width: 100%; }
+  .miyamaNewEquipmentForm,
+  .miyamaNewEquipmentSummary,
+  .miyamaNewEquipmentChecklistGroups { grid-template-columns: 1fr; }
+}

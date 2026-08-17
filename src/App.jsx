@@ -25,6 +25,10 @@ import {
   Users,
   UserPlus,
   RefreshCw,
+  Factory,
+  ClipboardCheck,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import "./index.css";
 import "./components/HomeDashboard.css";
@@ -805,6 +809,7 @@ const MIYAMA_TRANSLATIONS = {
     "工事管理": "Work Management",
     "修理報告": "Repair Reports",
     "ユーザー管理": "User Management",
+    "新規設備管理": "New Equipment Management",
     "AI統合検索": "AI Unified Search",
     "保全分析センター": "Maintenance Analytics Center",
     "CSV分析センター": "CSV Analysis Center",
@@ -1131,6 +1136,7 @@ const MIYAMA_TRANSLATIONS = {
     "工事管理": "Gestión de trabajos",
     "修理報告": "Informes de reparación",
     "ユーザー管理": "Gestión de usuarios",
+    "新規設備管理": "Gestión de equipos nuevos",
     "AI統合検索": "Búsqueda unificada con IA",
     "言語": "Idioma",
     "日本語": "Japonés",
@@ -3059,6 +3065,24 @@ export default function App() {
   );
 }
 
+const NEW_EQUIPMENT_CHECKLIST = [
+  { id: "productDrawingDR", jp: "製品図面DRチェックシート", en: "Product Drawing DR Checklist", es: "Checklist DR del plano de producto", group: "DR / FMEA" },
+  { id: "processStudy", jp: "工程検討書", en: "Process Study Document", es: "Documento de estudio de proceso", group: "DR / FMEA" },
+  { id: "processFMEA", jp: "工程FMEA", en: "Process FMEA", es: "FMEA de proceso", group: "DR / FMEA" },
+  { id: "commonSpecification", jp: "設備共通基本仕様書", en: "Common Equipment Specification", es: "Especificación común del equipo", group: "仕様 / DR" },
+  { id: "individualSpecification", jp: "設備個別基本仕様書", en: "Individual Equipment Specification", es: "Especificación individual del equipo", group: "仕様 / DR" },
+  { id: "manufacturingSpecification", jp: "設備製作仕様書", en: "Equipment Manufacturing Specification", es: "Especificación de fabricación del equipo", group: "仕様 / DR" },
+  { id: "equipmentDrawingDR", jp: "設備図面DRチェックシート", en: "Equipment Drawing DR Checklist", es: "Checklist DR del plano del equipo", group: "仕様 / DR" },
+  { id: "processInspection", jp: "工程点検チェックシート", en: "Process Inspection Checklist", es: "Checklist de inspección del proceso", group: "点検 / 保全" },
+  { id: "maintenancePolicy", jp: "保全ポリシー・設備保全方針書", en: "Maintenance Policy", es: "Política de mantenimiento", group: "点検 / 保全" },
+  { id: "periodicInspection", jp: "定期・定量点検表", en: "Time / Production Based Inspection Sheet", es: "Hoja de inspección periódica / por producción", group: "点検 / 保全" },
+  { id: "preventiveList", jp: "予防保全リスト", en: "Preventive Maintenance List", es: "Lista de mantenimiento preventivo", group: "点検 / 保全" },
+  { id: "sparePartsList", jp: "予備品リスト", en: "Spare Parts List", es: "Lista de repuestos", group: "引渡し準備" },
+  { id: "lubricationGuide", jp: "給油指導票", en: "Lubrication Guide", es: "Guía de lubricación", group: "引渡し準備" },
+  { id: "backupBatteryList", jp: "バックアップ電池使用リスト", en: "Backup Battery List", es: "Lista de baterías de respaldo", group: "引渡し準備" },
+  { id: "equipmentHandover", jp: "設備引き渡し書", en: "Equipment Handover Document", es: "Documento de entrega del equipo", group: "引渡し準備" },
+];
+
 function MaintenanceApp({ currentUser, userProfile }) {
   const currentUserName =
     String(
@@ -3249,6 +3273,21 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [reports, setReports] = useState([]);
   const [similarProblems, setSimilarProblems] = useState([]);
   const [plannedWorks, setPlannedWorks] = useState([]);
+
+  // ===== MIYAMA Elite Phase 5: new equipment management =====
+  const [newEquipmentProjects, setNewEquipmentProjects] = useState([]);
+  const [newEquipmentLoading, setNewEquipmentLoading] = useState(false);
+  const [newEquipmentMessage, setNewEquipmentMessage] = useState("");
+  const [newEquipmentDraft, setNewEquipmentDraft] = useState({
+    equipmentName: "",
+    lineName: "",
+    projectName: "",
+    productionEngineeringOwner: "",
+    maintenanceOwner: "",
+    targetStartDate: "",
+    status: "計画中",
+    note: "",
+  });
 
   // ===== Admin: user management =====
   const [systemUsers, setSystemUsers] = useState([]);
@@ -3530,13 +3569,14 @@ function MaintenanceApp({ currentUser, userProfile }) {
       loadCalendar(),
       loadReports(),
       loadPlannedWorks(),
+      loadNewEquipmentProjects(),
       loadProductionLogs(),
       loadDailyProductions(),
     ]);
 
     results.forEach((result, index) => {
       if (result.status === "rejected") {
-        const names = ["parts", "calendar", "maintenanceReports", "plannedWorks", "productionLogs", "dailyProductions"];
+        const names = ["parts", "calendar", "maintenanceReports", "plannedWorks", "newEquipmentProjects", "productionLogs", "dailyProductions"];
         console.error(`Failed to load ${names[index]}:`, result.reason);
       }
     });
@@ -3565,6 +3605,158 @@ function MaintenanceApp({ currentUser, userProfile }) {
     } catch (err) {
       console.error("plannedWorks load error:", err);
       setPlannedWorks([]);
+    }
+  }
+
+
+  async function loadNewEquipmentProjects() {
+    setNewEquipmentLoading(true);
+    try {
+      const snap = await getDocs(collection(db, "newEquipmentProjects"));
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      setNewEquipmentProjects(rows);
+    } catch (err) {
+      console.error("newEquipmentProjects load error:", err);
+      setNewEquipmentProjects([]);
+      setNewEquipmentMessage(
+        appLanguage === "es"
+          ? "No se pudieron cargar los proyectos. Si aparece 'permission-denied', será necesario ajustar Firestore Rules."
+          : appLanguage === "en"
+            ? "Projects could not be loaded. If 'permission-denied' appears, Firestore Rules must be updated."
+            : "新規設備プロジェクトを読み込めませんでした。permission-deniedの場合はFirestore Rulesの調整が必要です。"
+      );
+    } finally {
+      setNewEquipmentLoading(false);
+    }
+  }
+
+  async function createNewEquipmentProject() {
+    const equipmentName = String(newEquipmentDraft.equipmentName || "").trim();
+    const projectName = String(newEquipmentDraft.projectName || "").trim();
+
+    if (!equipmentName && !projectName) {
+      alert(
+        appLanguage === "es"
+          ? "Ingrese el nombre del equipo o del proyecto."
+          : appLanguage === "en"
+            ? "Enter the equipment or project name."
+            : "設備名またはプロジェクト名を入力してください。"
+      );
+      return;
+    }
+
+    const checklist = {};
+    NEW_EQUIPMENT_CHECKLIST.forEach((item) => {
+      checklist[item.id] = {
+        completed: false,
+        completedAt: "",
+        completedBy: "",
+        note: "",
+      };
+    });
+
+    try {
+      setNewEquipmentMessage("");
+      await addDoc(collection(db, "newEquipmentProjects"), {
+        ...newEquipmentDraft,
+        equipmentName,
+        projectName: projectName || equipmentName,
+        checklist,
+        createdAt: new Date().toISOString(),
+        createdBy: currentUserName,
+        createdByUid: currentUser?.uid || "",
+        handoverReady: false,
+      });
+
+      setNewEquipmentDraft({
+        equipmentName: "",
+        lineName: "",
+        projectName: "",
+        productionEngineeringOwner: "",
+        maintenanceOwner: currentUserName || "",
+        targetStartDate: "",
+        status: "計画中",
+        note: "",
+      });
+
+      await loadNewEquipmentProjects();
+      setNewEquipmentMessage(
+        appLanguage === "es"
+          ? "✅ Proyecto creado."
+          : appLanguage === "en"
+            ? "✅ Project created."
+            : "✅ 新規設備プロジェクトを作成しました。"
+      );
+    } catch (error) {
+      console.error("Create new equipment project error:", error);
+      setNewEquipmentMessage(`❌ ${error?.message || error}`);
+    }
+  }
+
+  async function toggleNewEquipmentChecklist(project, itemId) {
+    if (!project?.id || !itemId) return;
+    const currentItem = project.checklist?.[itemId] || {};
+    const nextCompleted = !currentItem.completed;
+    const nextChecklist = {
+      ...(project.checklist || {}),
+      [itemId]: {
+        ...currentItem,
+        completed: nextCompleted,
+        completedAt: nextCompleted ? new Date().toISOString() : "",
+        completedBy: nextCompleted ? currentUserName : "",
+      },
+    };
+
+    const completedCount = NEW_EQUIPMENT_CHECKLIST.filter((item) => nextChecklist[item.id]?.completed).length;
+    const handoverReady = completedCount === NEW_EQUIPMENT_CHECKLIST.length;
+
+    try {
+      await updateDoc(doc(db, "newEquipmentProjects", project.id), {
+        checklist: nextChecklist,
+        handoverReady,
+        progress: Math.round((completedCount / NEW_EQUIPMENT_CHECKLIST.length) * 100),
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUserName,
+      });
+      await loadNewEquipmentProjects();
+    } catch (error) {
+      console.error("Checklist update error:", error);
+      alert(error?.message || String(error));
+    }
+  }
+
+  async function updateNewEquipmentStatus(projectId, status) {
+    if (!projectId) return;
+    try {
+      await updateDoc(doc(db, "newEquipmentProjects", projectId), {
+        status,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUserName,
+      });
+      await loadNewEquipmentProjects();
+    } catch (error) {
+      console.error("New equipment status update error:", error);
+      alert(error?.message || String(error));
+    }
+  }
+
+  async function deleteNewEquipmentProject(projectId) {
+    if (!projectId) return;
+    const ok = window.confirm(
+      appLanguage === "es"
+        ? "¿Eliminar este proyecto?"
+        : appLanguage === "en"
+          ? "Delete this project?"
+          : "この新規設備プロジェクトを削除しますか？"
+    );
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, "newEquipmentProjects", projectId));
+      await loadNewEquipmentProjects();
+    } catch (error) {
+      console.error("Delete new equipment project error:", error);
+      alert(error?.message || String(error));
     }
   }
 
@@ -12527,6 +12719,262 @@ Requirements:
     );
   }
 
+  function renderNewEquipmentManagement() {
+    const labelForItem = (item) =>
+      appLanguage === "es" ? item.es : appLanguage === "en" ? item.en : item.jp;
+
+    const groupedChecklist = NEW_EQUIPMENT_CHECKLIST.reduce((acc, item) => {
+      if (!acc[item.group]) acc[item.group] = [];
+      acc[item.group].push(item);
+      return acc;
+    }, {});
+
+    const progressForProject = (project) => {
+      const completed = NEW_EQUIPMENT_CHECKLIST.filter((item) => project.checklist?.[item.id]?.completed).length;
+      return {
+        completed,
+        total: NEW_EQUIPMENT_CHECKLIST.length,
+        percent: Math.round((completed / NEW_EQUIPMENT_CHECKLIST.length) * 100),
+      };
+    };
+
+    return (
+      <div className="miyamaNewEquipmentPage">
+        <section className="miyamaNewEquipmentHero">
+          <div>
+            <span className="miyamaElitePhaseBadge">
+              {appLanguage === "es" ? "FASE 5" : appLanguage === "en" ? "PHASE 5" : "フェーズ5"}
+            </span>
+            <h1>
+              <Factory size={30} />
+              {appLanguage === "es"
+                ? "Gestión de equipos nuevos"
+                : appLanguage === "en"
+                  ? "New Equipment Management"
+                  : "新規設備管理"}
+            </h1>
+            <p>
+              {appLanguage === "es"
+                ? "Incorporar mantenimiento desde DR/FMEA hasta la entrega del equipo."
+                : appLanguage === "en"
+                  ? "Build maintenance into new equipment from DR/FMEA through final handover."
+                  : "新規設備のDR・FMEA段階から保全を参画させ、設備引渡しまでを一元管理します。"}
+            </p>
+          </div>
+          <div className="miyamaNewEquipmentHeroMetric">
+            <small>{appLanguage === "es" ? "Proyectos" : appLanguage === "en" ? "Projects" : "プロジェクト"}</small>
+            <strong>{newEquipmentProjects.length}</strong>
+          </div>
+        </section>
+
+        {newEquipmentMessage && <div className="miyamaUserAdminMessage">{newEquipmentMessage}</div>}
+
+        <section className="miyamaNewEquipmentCreate">
+          <div className="miyamaPanelTitle">
+            <h3>➕ {appLanguage === "es" ? "Nuevo proyecto" : appLanguage === "en" ? "New Project" : "新規プロジェクト"}</h3>
+          </div>
+
+          <div className="miyamaNewEquipmentForm">
+            <label>
+              {appLanguage === "es" ? "Nombre del proyecto" : appLanguage === "en" ? "Project Name" : "プロジェクト名"}
+              <input
+                value={newEquipmentDraft.projectName}
+                onChange={(e) => setNewEquipmentDraft((p) => ({ ...p, projectName: e.target.value }))}
+                placeholder={appLanguage === "ja" ? "例：76-060 新規かしめ機" : ""}
+              />
+            </label>
+
+            <label>
+              {appLanguage === "es" ? "Equipo" : appLanguage === "en" ? "Equipment" : "設備名"}
+              <input
+                value={newEquipmentDraft.equipmentName}
+                onChange={(e) => setNewEquipmentDraft((p) => ({ ...p, equipmentName: e.target.value }))}
+              />
+            </label>
+
+            <label>
+              {appLanguage === "es" ? "Línea" : appLanguage === "en" ? "Line" : "ライン名"}
+              <input
+                value={newEquipmentDraft.lineName}
+                onChange={(e) => setNewEquipmentDraft((p) => ({ ...p, lineName: e.target.value }))}
+              />
+            </label>
+
+            <label>
+              {appLanguage === "es" ? "Inicio previsto" : appLanguage === "en" ? "Target Start" : "稼働予定日"}
+              <input
+                type="date"
+                value={newEquipmentDraft.targetStartDate}
+                onChange={(e) => setNewEquipmentDraft((p) => ({ ...p, targetStartDate: e.target.value }))}
+              />
+            </label>
+
+            <label>
+              {appLanguage === "es" ? "Responsable ingeniería" : appLanguage === "en" ? "Production Engineering Owner" : "生産技術担当"}
+              <input
+                value={newEquipmentDraft.productionEngineeringOwner}
+                onChange={(e) => setNewEquipmentDraft((p) => ({ ...p, productionEngineeringOwner: e.target.value }))}
+              />
+            </label>
+
+            <label>
+              {appLanguage === "es" ? "Responsable mantenimiento" : appLanguage === "en" ? "Maintenance Owner" : "保全担当"}
+              <input
+                value={newEquipmentDraft.maintenanceOwner}
+                onChange={(e) => setNewEquipmentDraft((p) => ({ ...p, maintenanceOwner: e.target.value }))}
+                placeholder={currentUserName}
+              />
+            </label>
+          </div>
+
+          <label className="miyamaNewEquipmentNote">
+            {appLanguage === "es" ? "Notas" : appLanguage === "en" ? "Notes" : "備考"}
+            <textarea
+              value={newEquipmentDraft.note}
+              onChange={(e) => setNewEquipmentDraft((p) => ({ ...p, note: e.target.value }))}
+            />
+          </label>
+
+          <button type="button" className="primaryButton" onClick={createNewEquipmentProject}>
+            <Plus size={16} />
+            {appLanguage === "es" ? "Crear proyecto" : appLanguage === "en" ? "Create Project" : "プロジェクト作成"}
+          </button>
+        </section>
+
+        <section className="miyamaNewEquipmentSummary">
+          <div>
+            <small>{appLanguage === "es" ? "En preparación" : appLanguage === "en" ? "In Preparation" : "準備中"}</small>
+            <strong>{newEquipmentProjects.filter((p) => !p.handoverReady).length}</strong>
+          </div>
+          <div>
+            <small>{appLanguage === "es" ? "Listos para entrega" : appLanguage === "en" ? "Handover Ready" : "引渡し可能"}</small>
+            <strong>{newEquipmentProjects.filter((p) => p.handoverReady).length}</strong>
+          </div>
+          <div>
+            <small>{appLanguage === "es" ? "Promedio de avance" : appLanguage === "en" ? "Average Progress" : "平均進捗"}</small>
+            <strong>
+              {newEquipmentProjects.length
+                ? Math.round(newEquipmentProjects.reduce((sum, p) => sum + progressForProject(p).percent, 0) / newEquipmentProjects.length)
+                : 0}%
+            </strong>
+          </div>
+        </section>
+
+        {newEquipmentLoading && (
+          <div className="miyamaNewEquipmentEmpty">
+            {appLanguage === "es" ? "Cargando..." : appLanguage === "en" ? "Loading..." : "読込中..."}
+          </div>
+        )}
+
+        {!newEquipmentLoading && newEquipmentProjects.length === 0 && (
+          <div className="miyamaNewEquipmentEmpty">
+            {appLanguage === "es"
+              ? "Todavía no hay proyectos."
+              : appLanguage === "en"
+                ? "No projects yet."
+                : "まだ新規設備プロジェクトがありません。"}
+          </div>
+        )}
+
+        <div className="miyamaNewEquipmentProjects">
+          {newEquipmentProjects.map((project) => {
+            const progress = progressForProject(project);
+            return (
+              <article className="miyamaNewEquipmentProject" key={project.id}>
+                <div className="miyamaNewEquipmentProjectHeader">
+                  <div>
+                    <div className="miyamaNewEquipmentProjectTitle">
+                      <Factory size={21} />
+                      <div>
+                        <h2>{project.projectName || project.equipmentName || "-"}</h2>
+                        <p>{project.lineName || "-"} / {project.equipmentName || "-"}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="miyamaNewEquipmentProgressCircle">
+                    <strong>{progress.percent}%</strong>
+                    <small>{progress.completed}/{progress.total}</small>
+                  </div>
+                </div>
+
+                <div className="miyamaNewEquipmentMeta">
+                  <span>📅 {project.targetStartDate || "-"}</span>
+                  <span>🧑‍💼 {project.productionEngineeringOwner || "-"}</span>
+                  <span>🔧 {project.maintenanceOwner || "-"}</span>
+                  <select
+                    value={project.status || "計画中"}
+                    onChange={(e) => updateNewEquipmentStatus(project.id, e.target.value)}
+                  >
+                    <option value="計画中">{appLanguage === "es" ? "Planificación" : appLanguage === "en" ? "Planning" : "計画中"}</option>
+                    <option value="製作中">{appLanguage === "es" ? "Fabricación" : appLanguage === "en" ? "Manufacturing" : "製作中"}</option>
+                    <option value="立会い中">{appLanguage === "es" ? "Validación" : appLanguage === "en" ? "Validation" : "立会い中"}</option>
+                    <option value="引渡し準備">{appLanguage === "es" ? "Preparando entrega" : appLanguage === "en" ? "Handover Preparation" : "引渡し準備"}</option>
+                    <option value="完了">{appLanguage === "es" ? "Completado" : appLanguage === "en" ? "Completed" : "完了"}</option>
+                  </select>
+                </div>
+
+                <div className="miyamaNewEquipmentProgressBar">
+                  <div style={{ width: `${progress.percent}%` }} />
+                </div>
+
+                {project.handoverReady && (
+                  <div className="miyamaNewEquipmentReady">
+                    <CheckCircle2 size={18} />
+                    {appLanguage === "es"
+                      ? "Todos los requisitos de mantenimiento están completos. Listo para entrega."
+                      : appLanguage === "en"
+                        ? "All maintenance requirements are complete. Ready for handover."
+                        : "保全引渡し条件がすべて完了しています。設備引渡し可能です。"}
+                  </div>
+                )}
+
+                <div className="miyamaNewEquipmentChecklistGroups">
+                  {Object.entries(groupedChecklist).map(([group, items]) => (
+                    <div className="miyamaNewEquipmentChecklistGroup" key={group}>
+                      <h4>{group}</h4>
+                      {items.map((item) => {
+                        const completed = Boolean(project.checklist?.[item.id]?.completed);
+                        return (
+                          <button
+                            type="button"
+                            className={`miyamaNewEquipmentCheck ${completed ? "done" : ""}`}
+                            key={item.id}
+                            onClick={() => toggleNewEquipmentChecklist(project, item.id)}
+                          >
+                            {completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                            <span>{labelForItem(item)}</span>
+                            {completed && <small>{project.checklist?.[item.id]?.completedBy || ""}</small>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+
+                {project.note && <div className="miyamaNewEquipmentProjectNote">📝 {project.note}</div>}
+
+                <div className="miyamaNewEquipmentProjectActions">
+                  <button type="button" onClick={loadNewEquipmentProjects}>
+                    <RefreshCw size={15} />
+                    {appLanguage === "es" ? "Actualizar" : appLanguage === "en" ? "Refresh" : "更新"}
+                  </button>
+
+                  {isAdmin && (
+                    <button type="button" className="danger" onClick={() => deleteNewEquipmentProject(project.id)}>
+                      <Trash2 size={15} />
+                      {appLanguage === "es" ? "Eliminar" : appLanguage === "en" ? "Delete" : "削除"}
+                    </button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function renderUserManagement() {
     if (!isAdmin) {
       return (
@@ -12705,6 +13153,7 @@ Requirements:
     if (page === "csvAnalytics") return renderCsvAnalysis();
     if (page === "production") return renderCsvAnalysis();
     if (page === "work") return renderPlannedWorks();
+    if (page === "newEquipment") return renderNewEquipmentManagement();
     if (page === "miyamaAi") return renderMiyamaAi();
     if (page === "users") return isAdmin ? renderUserManagement() : renderHome();
     return renderHome();
@@ -12717,6 +13166,7 @@ Requirements:
     { key: "report", label: "修理報告", icon: <FileText size={16} /> },
     { key: "maintenance", label: "定期保全", icon: <Wrench size={16} /> },
     { key: "work", label: "工事管理", icon: <Hammer size={16} /> },
+    { key: "newEquipment", label: "新規設備管理", icon: <Factory size={16} /> },
     { key: "spare", label: "予備品管理", icon: <Package size={16} /> },
     { key: "analytics", label: "保全分析", icon: <BarChart3 size={16} /> },
     { key: "dailyProduction", label: "生産数DB", icon: <BarChart3 size={16} /> },
