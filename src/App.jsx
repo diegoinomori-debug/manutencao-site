@@ -1523,6 +1523,110 @@ Object.assign(MIYAMA_TRANSLATIONS.es, {
   "計画CSV出力": "Exportar plan CSV"
 });
 
+
+MIYAMA_TRANSLATIONS.en['初回 / First occurrence / Primera vez'] = 'First Occurrence';
+MIYAMA_TRANSLATIONS.es['初回 / First occurrence / Primera vez'] = 'Primera ocurrencia';
+
+MIYAMA_TRANSLATIONS.en['再発 / Repeated / Repetición'] = 'Repeated';
+MIYAMA_TRANSLATIONS.es['再発 / Repeated / Repetición'] = 'Repetición';
+
+MIYAMA_TRANSLATIONS.en['頻発 / Frequent / Frecuente'] = 'Frequent';
+MIYAMA_TRANSLATIONS.es['頻発 / Frequent / Frecuente'] = 'Frecuente';
+
+MIYAMA_TRANSLATIONS.en['慢性 / Chronic / Crónico'] = 'Chronic';
+MIYAMA_TRANSLATIONS.es['慢性 / Chronic / Crónico'] = 'Crónico';
+
+// ===== MIYAMA: complete single-language terminology patch =====
+Object.assign(MIYAMA_TRANSLATIONS.en, {
+  "原因別 停止時間Pareto":"Downtime Pareto by Cause",
+  "原因別停止時間Pareto":"Downtime Pareto by Cause",
+  "センサー":"Sensor",
+  "空圧・油圧":"Pneumatic / Hydraulic",
+  "制御・電気":"Controls / Electrical",
+  "断線・配線":"Wiring / Disconnection",
+  "プログラム":"Program / Software",
+  "給油・潤滑":"Lubrication",
+  "汚れ・異物":"Contamination / Foreign Material",
+  "摩耗":"Wear",
+  "破損":"Damage / Breakage",
+  "寿命":"End of Life",
+  "位置ズレ・調整":"Misalignment / Adjustment",
+  "ワーク・材料":"Workpiece / Material",
+  "操作・作業":"Operation / Work",
+  "保全不備":"Maintenance Deficiency",
+  "設計・構造":"Design / Structure",
+  "不明":"Unknown",
+  "未分類":"Unclassified",
+  "保全戦略構成":"Maintenance Strategy Mix",
+  "基本情報・設備情報":"Basic / Equipment Information",
+  "作成日":"Created Date",
+  "保全分類":"Maintenance Classification",
+  "グループ名":"Group",
+  "ライン名":"Line",
+  "設備名":"Equipment",
+  "保全作業報告書":"Maintenance Work Report",
+  "承認":"Approval",
+  "作成":"Created By",
+  "状態":"Status",
+  "点検依頼":"Request Inspection",
+  "保存済み":"Saved",
+  "PDF/印刷":"PDF / Print",
+  "表示テーマを選択":"Select Display Section",
+  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"Show only the sections you need instead of the entire report.",
+  "概要":"Overview",
+  "基本":"Basic",
+  "不具合":"Failure",
+  "原因":"Cause",
+  "再発防止":"Recurrence Prevention",
+  "費用":"Cost",
+  "写真":"Photos",
+  "全部":"All"
+});
+Object.assign(MIYAMA_TRANSLATIONS.es, {
+  "原因別 停止時間Pareto":"Pareto de tiempo de parada por causa",
+  "原因別停止時間Pareto":"Pareto de tiempo de parada por causa",
+  "センサー":"Sensor",
+  "空圧・油圧":"Neumática / Hidráulica",
+  "制御・電気":"Control / Electricidad",
+  "断線・配線":"Cableado / Desconexión",
+  "プログラム":"Programa / Software",
+  "給油・潤滑":"Lubricación",
+  "汚れ・異物":"Suciedad / Material extraño",
+  "摩耗":"Desgaste",
+  "破損":"Daño / Rotura",
+  "寿命":"Fin de vida útil",
+  "位置ズレ・調整":"Desalineación / Ajuste",
+  "ワーク・材料":"Pieza / Material",
+  "操作・作業":"Operación / Trabajo",
+  "保全不備":"Deficiencia de mantenimiento",
+  "設計・構造":"Diseño / Estructura",
+  "不明":"Desconocido",
+  "未分類":"Sin clasificar",
+  "保全戦略構成":"Distribución de estrategias de mantenimiento",
+  "基本情報・設備情報":"Información básica / del equipo",
+  "作成日":"Fecha de creación",
+  "保全分類":"Clasificación de mantenimiento",
+  "グループ名":"Grupo",
+  "ライン名":"Línea",
+  "設備名":"Equipo",
+  "保全作業報告書":"Informe de trabajo de mantenimiento",
+  "承認":"Aprobación",
+  "作成":"Creado por",
+  "状態":"Estado",
+  "点検依頼":"Solicitar inspección",
+  "保存済み":"Guardado",
+  "PDF/印刷":"PDF / Imprimir",
+  "表示テーマを選択":"Seleccionar sección",
+  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"Muestra solo las secciones necesarias en lugar del informe completo.",
+  "概要":"Resumen",
+  "基本":"Básico",
+  "不具合":"Falla",
+  "原因":"Causa",
+  "再発防止":"Prevención de recurrencia",
+  "費用":"Costo",
+  "写真":"Fotos",
+  "全部":"Todo"
+});
 const MIYAMA_BLOCKED_TRANSLATION_KEYS = new Set(["分", "日", "月", "年", "火", "水", "木", "金", "土"]);
 
 Object.keys(MIYAMA_TRANSLATIONS).forEach((lang) => {
@@ -1614,6 +1718,82 @@ function getMaintenanceStrategyCompatible(row = {}) {
   if (/\bCM\b/.test(combined)) return "CM";
 
   return "";
+}
+
+function getFailureCauseCategoryCompatible(row = {}) {
+  // New reports: use the standardized cause category directly.
+  const modern = String(row.failureCauseCategory || "").trim();
+  if (modern) return modern;
+
+  // Historical reports did not have failureCauseCategory.
+  // Classify their old free-text fields into the current MIYAMA categories.
+  const text = [
+    row.why3,
+    row.why2,
+    row.why1,
+    row.failureCause,
+    row.cause,
+    row.troublePoint,
+    row.phenomenon,
+    row.action,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (!text) return "不明";
+
+  const has = (...words) => words.some((word) => text.includes(String(word).toLowerCase()));
+
+  // Specific categories first so generic words do not steal the classification.
+  if (has("センサ", "sensor", "photoeye", "近接", "ファイバ", "fiber", "光電", "画像センサ", "ロードセル"))
+    return "センサー";
+
+  if (has("エア", "air", "空圧", "油圧", "hydraulic", "pneumatic", "シリンダ", "cylinder", "バルブ", "valve", "solenoid", "ソレノイド", "圧力"))
+    return "空圧・油圧";
+
+  if (has("plc", "電気", "電源", "ブレーカ", "breaker", "リレー", "relay", "サーボ", "servo", "iai", "インバータ", "inverter", "モータ", "motor", "基板"))
+    return "制御・電気";
+
+  if (has("断線", "配線", "wire", "wiring", "connector", "コネクタ", "端子", "ケーブル", "cable", "接触不良"))
+    return "断線・配線";
+
+  if (has("program", "プログラム", "software", "ソフト", "設定値", "parameter", "パラメータ", "タイマー"))
+    return "プログラム";
+
+  if (has("グリス", "grease", "給油", "潤滑", "lubric", "油切れ"))
+    return "給油・潤滑";
+
+  if (has("異物", "汚れ", "ゴミ", "切粉", "油", "contamin", "debris", "dust", "詰まり", "つまり", "clog"))
+    return "汚れ・異物";
+
+  if (has("摩耗", "wear", "磨耗", "すり減", "ガタ"))
+    return "摩耗";
+
+  if (has("破損", "折損", "割れ", "亀裂", "broken", "break", "crack", "欠け", "曲がり"))
+    return "破損";
+
+  if (has("寿命", "life", "劣化", "老朽", "経年"))
+    return "寿命";
+
+  if (has("位置", "ズレ", "ずれ", "調整", "芯", "alignment", "misalign", "offset"))
+    return "位置ズレ・調整";
+
+  if (has("ワーク", "work", "材料", "material", "製品", "部品不良", "リベット", "ボルト", "ナット"))
+    return "ワーク・材料";
+
+  if (has("操作", "作業ミス", "人為", "operator", "手順", "取付ミス", "組付ミス"))
+    return "操作・作業";
+
+  if (has("点検不足", "保全不足", "maintenance", "メンテ", "交換忘れ", "清掃不足"))
+    return "保全不備";
+
+  if (has("設計", "構造", "design", "structure", "強度", "干渉", "機構"))
+    return "設計・構造";
+
+  // Old records with useful cause text should not all collapse into 未分類.
+  // "不明" means there is historical text but no safe standardized match.
+  return "不明";
 }
 
 function makeMaintenanceReportDuplicateKey(row = {}) {
@@ -10973,7 +11153,7 @@ function renderHome() {
 
     const eliteCauseMap = {};
     filtered.forEach((row) => {
-      const key = String(row.failureCauseCategory || "未分類").trim() || "未分類";
+      const key = getFailureCauseCategoryCompatible(row);
       if (!eliteCauseMap[key]) eliteCauseMap[key] = { key, count: 0, stopHours: 0, cost: 0 };
       eliteCauseMap[key].count += 1;
       eliteCauseMap[key].stopHours += toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0);
@@ -11183,6 +11363,13 @@ function renderHome() {
             <div className="miyamaElitePanelTitle">
               <h3>🎯 {appLanguage === "es" ? "Pareto de causas por parada" : appLanguage === "en" ? "Cause Pareto by Downtime" : "原因別 停止時間Pareto"}</h3>
               <small>{formatHours(totalStopHours)}</small>
+            </div>
+            <div className="miyamaParetoLegacyNote">
+              {appLanguage === "es"
+                ? "Los informes antiguos se clasifican automáticamente a partir de sus campos de causa y 3 porqués."
+                : appLanguage === "en"
+                  ? "Historical reports are automatically classified from their cause and 3-Whys fields."
+                  : "旧修理報告書は、不具合原因・なぜなぜの内容から原因分類を自動判定して集計します。"}
             </div>
 
             <div className="miyamaEliteCauseList">

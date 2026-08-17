@@ -1812,3 +1812,11 @@
     max-width: 100%;
   }
 }
+
+
+.miyamaParetoLegacyNote {
+  margin: -2px 0 14px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.5;
+}
