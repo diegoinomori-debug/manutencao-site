@@ -143,6 +143,14 @@ function createBlankReport() {
     action: "",
     linkUrl: "",
 
+    // MIYAMA Elite Maintenance - Phase 1
+    failureCauseCategory: "",
+    failureCauseDetail: "",
+    maintenanceStrategy: "",
+    criticality: "B",
+    recurrenceLevel: "初回",
+    strategyReason: "",
+
     recurrenceCategory: "必要",
     recurrenceStatus: "未実施",
     recurrencePrevention: "",
@@ -3332,6 +3340,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     basic: true,
     trouble: true,
     why: false,
+    strategy: true,
     cost: false,
     other: false,
   });
@@ -5968,6 +5977,217 @@ Rules:
             🛠️ {appLanguage === "es" ? "Acción correctiva" : appLanguage === "en" ? "Corrective Action" : "処置内容"}
           </h3>
           <textarea value={newReport.action || ""} onChange={(e) => setReport("action", e.target.value)} />
+        </Section>
+
+        <Section
+          openSections={openSections}
+          toggleSection={toggleSection}
+          sectionKey="strategy"
+          title={
+            appLanguage === "es"
+              ? "🎯 Clasificación de causa y estrategia de mantenimiento"
+              : appLanguage === "en"
+                ? "🎯 Cause Classification & Maintenance Strategy"
+                : "🎯 原因分類・保全戦略判定"
+          }
+        >
+          <div
+            style={{
+              padding: "12px 14px",
+              marginBottom: "14px",
+              border: "1px solid #c7d2fe",
+              borderRadius: "14px",
+              background: "#f5f7ff",
+              color: "#334155",
+              lineHeight: 1.6,
+            }}
+          >
+            <strong>
+              {appLanguage === "es"
+                ? "MIYAMA Elite Maintenance - Fase 1"
+                : appLanguage === "en"
+                  ? "MIYAMA Elite Maintenance - Phase 1"
+                  : "MIYAMA Elite Maintenance - Phase 1"}
+            </strong>
+            <div style={{ marginTop: "4px", fontSize: "13px" }}>
+              {appLanguage === "es"
+                ? "Primero estandarizamos la causa, criticidad, recurrencia y estrategia. En la siguiente fase conectaremos esta decisión automáticamente con PM, trabajos de mejora, calendario y análisis."
+                : appLanguage === "en"
+                  ? "First we standardize cause, criticality, recurrence, and strategy. In the next phase this decision will connect automatically to PM, improvement work, calendar, and analytics."
+                  : "まず原因・重要度・再発性・保全戦略を標準化します。次のPhaseで、この判定を定期保全・改良工事・カレンダー・分析へ自動連携します。"}
+            </div>
+          </div>
+
+          <div className="reportGrid">
+            <label>
+              🧩 {appLanguage === "es" ? "Categoría de causa" : appLanguage === "en" ? "Cause Category" : "原因大分類"}
+              <select
+                value={newReport.failureCauseCategory || ""}
+                onChange={(e) => {
+                  setReport("failureCauseCategory", e.target.value);
+                  setReport("failureCauseDetail", "");
+                }}
+              >
+                <option value="">
+                  {appLanguage === "es" ? "Seleccione..." : appLanguage === "en" ? "Select..." : "選択してください"}
+                </option>
+                <option value="摩耗">摩耗 / Wear / Desgaste</option>
+                <option value="破損">破損 / Breakage / Rotura</option>
+                <option value="断線・配線">断線・配線 / Wiring / Cableado</option>
+                <option value="位置ズレ・調整">位置ズレ・調整 / Misalignment / Desajuste</option>
+                <option value="給油・潤滑">給油・潤滑 / Lubrication / Lubricación</option>
+                <option value="汚れ・異物">汚れ・異物 / Contamination / Suciedad</option>
+                <option value="制御・電気">制御・電気 / Control-Electrical / Control-Eléctrico</option>
+                <option value="センサー">センサー / Sensor / Sensor</option>
+                <option value="空圧・油圧">空圧・油圧 / Pneumatic-Hydraulic / Neumática-Hidráulica</option>
+                <option value="ワーク・材料">ワーク・材料 / Workpiece-Material / Pieza-Material</option>
+                <option value="プログラム">プログラム / Program / Programa</option>
+                <option value="操作・作業">操作・作業 / Operation / Operación</option>
+                <option value="保全不備">保全不備 / Maintenance Issue / Falla de mantenimiento</option>
+                <option value="設計・構造">設計・構造 / Design-Structure / Diseño-Estructura</option>
+                <option value="寿命">寿命 / End of Life / Fin de vida</option>
+                <option value="不明">不明 / Unknown / Desconocido</option>
+              </select>
+            </label>
+
+            <label>
+              🔎 {appLanguage === "es" ? "Detalle de causa" : appLanguage === "en" ? "Cause Detail" : "原因詳細"}
+              <select
+                value={newReport.failureCauseDetail || ""}
+                onChange={(e) => setReport("failureCauseDetail", e.target.value)}
+              >
+                <option value="">
+                  {appLanguage === "es" ? "Seleccione..." : appLanguage === "en" ? "Select..." : "選択してください"}
+                </option>
+                <option value="構造問題">構造問題 / Structural issue / Problema estructural</option>
+                <option value="寿命超過">寿命超過 / Life exceeded / Vida excedida</option>
+                <option value="給油不足">給油不足 / Insufficient lubrication / Lubricación insuficiente</option>
+                <option value="点検不足">点検不足 / Inspection gap / Inspección insuficiente</option>
+                <option value="調整不良">調整不良 / Adjustment issue / Ajuste incorrecto</option>
+                <option value="操作ミス">操作ミス / Operation error / Error de operación</option>
+                <option value="使用環境">使用環境 / Operating environment / Entorno de uso</option>
+                <option value="部品品質">部品品質 / Part quality / Calidad de pieza</option>
+                <option value="施工・組付不良">施工・組付不良 / Assembly issue / Error de montaje</option>
+                <option value="プログラム・設定">プログラム・設定 / Program-setting / Programa-ajuste</option>
+                <option value="異物混入">異物混入 / Foreign material / Material extraño</option>
+                <option value="原因調査中">原因調査中 / Under investigation / En investigación</option>
+                <option value="その他">その他 / Other / Otro</option>
+              </select>
+            </label>
+
+            <label>
+              🚦 {appLanguage === "es" ? "Criticidad" : appLanguage === "en" ? "Criticality" : "重要度"}
+              <select value={newReport.criticality || "B"} onChange={(e) => setReport("criticality", e.target.value)}>
+                <option value="S">S - Safety / Quality Critical</option>
+                <option value="A">A - High Production Impact</option>
+                <option value="B">B - Medium Impact</option>
+                <option value="C">C - Low Impact</option>
+              </select>
+            </label>
+
+            <label>
+              🔁 {appLanguage === "es" ? "Recurrencia" : appLanguage === "en" ? "Recurrence" : "再発レベル"}
+              <select value={newReport.recurrenceLevel || "初回"} onChange={(e) => setReport("recurrenceLevel", e.target.value)}>
+                <option value="初回">初回 / First occurrence / Primera vez</option>
+                <option value="再発">再発 / Repeated / Repetición</option>
+                <option value="頻発">頻発 / Frequent / Frecuente</option>
+                <option value="慢性">慢性 / Chronic / Crónico</option>
+              </select>
+            </label>
+          </div>
+
+          <h3 style={{ marginTop: "18px" }}>
+            🧭 {appLanguage === "es" ? "Estrategia recomendada" : appLanguage === "en" ? "Maintenance Strategy" : "保全戦略"}
+          </h3>
+
+          <div className="miyamaStrategyGrid">
+            {[
+              {
+                value: "BM",
+                jp: "事後保全",
+                en: "Breakdown Maintenance",
+                es: "Mantenimiento correctivo",
+                hintJa: "壊れてから対応してもリスク・損失が小さい",
+                hintEn: "Use when run-to-failure is acceptable and risk is low.",
+                hintEs: "Usar cuando operar hasta la falla es aceptable y el riesgo es bajo.",
+              },
+              {
+                value: "PM",
+                jp: "予防保全",
+                en: "Preventive Maintenance",
+                es: "Mantenimiento preventivo",
+                hintJa: "周期交換・点検で故障を未然に防ぐ",
+                hintEn: "Prevent failure with scheduled inspection or replacement.",
+                hintEs: "Prevenir fallas con inspección o reemplazo programado.",
+              },
+              {
+                value: "CBM",
+                jp: "状態基準保全",
+                en: "Condition-Based Maintenance",
+                es: "Mantenimiento basado en condición",
+                hintJa: "状態・数値・生産回数を見て最適な時期に保全する",
+                hintEn: "Maintain based on condition, measurements, or production count.",
+                hintEs: "Mantener según condición, mediciones o cantidad producida.",
+              },
+              {
+                value: "CM",
+                jp: "改良保全",
+                en: "Improvement Maintenance",
+                es: "Mantenimiento de mejora",
+                hintJa: "構造・設計・仕組みを改善して再発をなくす",
+                hintEn: "Improve design or structure to eliminate recurrence.",
+                hintEs: "Mejorar diseño o estructura para eliminar la recurrencia.",
+              },
+            ].map((strategy) => (
+              <button
+                type="button"
+                key={strategy.value}
+                className={`miyamaStrategyCard ${newReport.maintenanceStrategy === strategy.value ? "selected" : ""}`}
+                onClick={() => setReport("maintenanceStrategy", strategy.value)}
+              >
+                <span className="miyamaStrategyCode">{strategy.value}</span>
+                <strong>
+                  {appLanguage === "es"
+                    ? strategy.es
+                    : appLanguage === "en"
+                      ? strategy.en
+                      : strategy.jp}
+                </strong>
+                <small>
+                  {appLanguage === "es"
+                    ? strategy.hintEs
+                    : appLanguage === "en"
+                      ? strategy.hintEn
+                      : strategy.hintJa}
+                </small>
+              </button>
+            ))}
+          </div>
+
+          <h3 style={{ marginTop: "18px" }}>
+            📝 {appLanguage === "es" ? "Motivo de la decisión" : appLanguage === "en" ? "Reason for Strategy" : "判定理由"}
+          </h3>
+          <textarea
+            value={newReport.strategyReason || ""}
+            onChange={(e) => setReport("strategyReason", e.target.value)}
+            placeholder={
+              appLanguage === "es"
+                ? "Ej.: La misma falla ocurrió 3 veces en 6 meses. Se recomienda CM para eliminar la causa estructural."
+                : appLanguage === "en"
+                  ? "Example: The same failure occurred 3 times in 6 months. CM is recommended to eliminate the structural cause."
+                  : "例：6ヶ月で同じ故障が3回発生。構造原因をなくすためCMを選定。"
+            }
+          />
+
+          {!newReport.maintenanceStrategy && (
+            <div className="miyamaStrategyNotice">
+              💡 {appLanguage === "es"
+                ? "Seleccione BM / PM / CBM / CM antes de guardar si ya puede tomar una decisión. Si la causa aún está en investigación, puede dejarlo sin seleccionar."
+                : appLanguage === "en"
+                  ? "Select BM / PM / CBM / CM before saving when a decision is possible. If the cause is still under investigation, you may leave it blank."
+                  : "判定できる場合は保存前に BM / PM / CBM / CM を選択してください。原因調査中の場合は未選択でも保存できます。"}
+            </div>
+          )}
         </Section>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
