@@ -22,10 +22,14 @@ import {
   AlertTriangle,
   BarChart3,
   FileSpreadsheet,
+  Users,
+  UserPlus,
+  RefreshCw,
 } from "lucide-react";
 import "./index.css";
 import "./components/HomeDashboard.css";
 import { db, auth } from "./firebase";
+import { initializeApp, deleteApp, getApp } from "firebase/app";
 import { askMiyamaAI } from "./services/miyamaAI";
 import { searchHistory } from "./services/historySearch";
 import SimilarProblems from "./components/SimilarProblems";
@@ -39,8 +43,9 @@ import {
   doc,
   updateDoc,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 
 function toLocalDateText(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
@@ -771,6 +776,9 @@ const MIYAMA_TRANSLATIONS = {
     "保全分析": "Maintenance Analytics",
     "CSV分析": "CSV Analysis",
     "計画工事": "Planned Work",
+    "工事管理": "Work Management",
+    "修理報告": "Repair Reports",
+    "ユーザー管理": "User Management",
     "AI統合検索": "AI Unified Search",
     "保全分析センター": "Maintenance Analytics Center",
     "CSV分析センター": "CSV Analysis Center",
@@ -1094,6 +1102,9 @@ const MIYAMA_TRANSLATIONS = {
     "保全分析": "Análisis de mantenimiento",
     "CSV分析": "Análisis CSV",
     "計画工事": "Trabajo planificado",
+    "工事管理": "Gestión de trabajos",
+    "修理報告": "Informes de reparación",
+    "ユーザー管理": "Gestión de usuarios",
     "AI統合検索": "Búsqueda unificada con IA",
     "言語": "Idioma",
     "日本語": "Japonés",
@@ -3049,6 +3060,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     if (currentRole === "admin") return "管理者 / Admin";
     if (currentRole === "approver") return "承認者 / Approver";
     if (currentRole === "inspector") return "点検者 / Inspector";
+    if (currentRole === "viewer") return "閲覧のみ / View only";
     return "作業者 / Operator";
   }
 
@@ -3073,11 +3085,160 @@ function MaintenanceApp({ currentUser, userProfile }) {
     await signOut(auth);
   }
 
+  function permissionsForRole(role = "operator") {
+    const normalized = String(role || "operator").toLowerCase();
+    if (normalized === "admin") {
+      return { isAdmin: true, canApprove: true, canInspect: true, readOnly: false };
+    }
+    if (normalized === "approver") {
+      return { isAdmin: false, canApprove: true, canInspect: true, readOnly: false };
+    }
+    if (normalized === "inspector") {
+      return { isAdmin: false, canApprove: false, canInspect: true, readOnly: false };
+    }
+    if (normalized === "viewer") {
+      return { isAdmin: false, canApprove: false, canInspect: false, readOnly: true };
+    }
+    return { isAdmin: false, canApprove: false, canInspect: false, readOnly: false };
+  }
+
+  function userRoleJapanese(role = "operator") {
+    const normalized = String(role || "operator").toLowerCase();
+    if (normalized === "admin") return "管理者";
+    if (normalized === "approver") return "承認者";
+    if (normalized === "inspector") return "点検者";
+    if (normalized === "viewer") return "閲覧のみ";
+    return "一般ユーザー";
+  }
+
+  async function loadSystemUsers() {
+    if (!isAdmin) return;
+    setSystemUsersLoading(true);
+    setUserAdminMessage("");
+    try {
+      const snap = await getDocs(collection(db, "users"));
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => String(a.name || a.email || "").localeCompare(String(b.name || b.email || "")));
+      setSystemUsers(rows);
+    } catch (error) {
+      console.error("Load users error:", error);
+      setUserAdminMessage(`ユーザー一覧の読込に失敗しました: ${error?.message || error}`);
+    } finally {
+      setSystemUsersLoading(false);
+    }
+  }
+
+  async function createSystemUserAccount() {
+    if (!isAdmin) return;
+    const name = String(newSystemUser.name || "").trim();
+    const email = String(newSystemUser.email || "").trim().toLowerCase();
+    const password = String(newSystemUser.password || "");
+    const role = String(newSystemUser.role || "operator").toLowerCase();
+
+    if (!name) {
+      setUserAdminMessage("名前を入力してください。");
+      return;
+    }
+    if (!email || !email.includes("@")) {
+      setUserAdminMessage("正しいメールアドレスを入力してください。");
+      return;
+    }
+    if (password.length < 6) {
+      setUserAdminMessage("初期パスワードは6文字以上で入力してください。");
+      return;
+    }
+
+    setCreatingSystemUser(true);
+    setUserAdminMessage("");
+
+    let secondaryApp = null;
+    let secondaryAuth = null;
+
+    try {
+      // Secondary Firebase app creates the account without logging out the current admin.
+      secondaryApp = initializeApp(getApp().options, `miyama-user-create-${Date.now()}`);
+      secondaryAuth = getAuth(secondaryApp);
+
+      const credential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const permissions = permissionsForRole(role);
+
+      const profile = {
+        name,
+        email,
+        role,
+        active: true,
+        ...permissions,
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser?.uid || "",
+      };
+
+      await setDoc(doc(db, "users", credential.user.uid), profile);
+      await signOut(secondaryAuth);
+
+      setNewSystemUser({ name: "", email: "", password: "", role: "operator" });
+      setUserAdminMessage(`✅ ${name} のアカウントを作成しました。`);
+      await loadSystemUsers();
+    } catch (error) {
+      console.error("Create user error:", error);
+      const codeText = String(error?.code || "");
+      let message = error?.message || String(error);
+      if (codeText.includes("email-already-in-use")) message = "このメールアドレスはすでに使用されています。";
+      if (codeText.includes("invalid-email")) message = "メールアドレスが正しくありません。";
+      if (codeText.includes("weak-password")) message = "パスワードが弱すぎます。6文字以上にしてください。";
+      if (codeText.includes("permission-denied")) message = "Firestoreの権限でユーザー作成が拒否されました。";
+      setUserAdminMessage(`❌ ${message}`);
+    } finally {
+      try {
+        if (secondaryAuth?.currentUser) await signOut(secondaryAuth);
+      } catch {}
+      try {
+        if (secondaryApp) await deleteApp(secondaryApp);
+      } catch {}
+      setCreatingSystemUser(false);
+    }
+  }
+
+  async function updateSystemUserProfile(userId, patch = {}) {
+    if (!isAdmin || !userId) return;
+    if (userId === currentUser?.uid && patch.active === false) {
+      setUserAdminMessage("現在ログイン中の管理者アカウントは無効化できません。");
+      return;
+    }
+
+    try {
+      const nextPatch = { ...patch, updatedAt: new Date().toISOString() };
+      if (patch.role) Object.assign(nextPatch, permissionsForRole(patch.role));
+      await updateDoc(doc(db, "users", userId), nextPatch);
+      setUserAdminMessage("✅ ユーザー設定を更新しました。");
+      await loadSystemUsers();
+    } catch (error) {
+      console.error("Update user error:", error);
+      setUserAdminMessage(`❌ 更新に失敗しました: ${error?.message || error}`);
+    }
+  }
+
+  useEffect(() => {
+    if (isAdmin && page === "users") loadSystemUsers();
+  }, [isAdmin, page]);
+
   const [parts, setParts] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [reports, setReports] = useState([]);
   const [similarProblems, setSimilarProblems] = useState([]);
   const [plannedWorks, setPlannedWorks] = useState([]);
+
+  // ===== Admin: user management =====
+  const [systemUsers, setSystemUsers] = useState([]);
+  const [systemUsersLoading, setSystemUsersLoading] = useState(false);
+  const [userAdminMessage, setUserAdminMessage] = useState("");
+  const [newSystemUser, setNewSystemUser] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "operator",
+  });
+  const [creatingSystemUser, setCreatingSystemUser] = useState(false);
 
   // 編集中の報告書はローカル下書きで保持します。
   // 文字入力ごとにFirebase保存しないため、入力欄が消える・戻る不具合を防ぎます。
@@ -11295,6 +11456,172 @@ Requirements:
     );
   }
 
+  function renderUserManagement() {
+    if (!isAdmin) {
+      return (
+        <div className="tableWrap">
+          <h2>👥 ユーザー管理</h2>
+          <p>この画面は管理者のみ使用できます。</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="miyamaUserAdminPage">
+        <div className="miyamaUserAdminHeader">
+          <div>
+            <h2>👥 ユーザー管理</h2>
+            <p>MIYAMA Maintenanceのアカウント作成、権限変更、有効／無効を管理します。</p>
+          </div>
+          <button type="button" className="primaryButton" onClick={loadSystemUsers} disabled={systemUsersLoading}>
+            <RefreshCw size={16} /> {systemUsersLoading ? "読込中..." : "再読込"}
+          </button>
+        </div>
+
+        {userAdminMessage && <div className="miyamaUserAdminMessage">{userAdminMessage}</div>}
+
+        <div className="miyamaUserCreateCard">
+          <div className="miyamaUserCreateTitle">
+            <UserPlus size={20} />
+            <h3>新規ユーザー作成</h3>
+          </div>
+
+          <div className="miyamaUserCreateGrid">
+            <label>
+              <span>名前</span>
+              <input
+                value={newSystemUser.name}
+                onChange={(e) => setNewSystemUser((p) => ({ ...p, name: e.target.value }))}
+                placeholder="例：鈴木 太郎"
+              />
+            </label>
+
+            <label>
+              <span>メールアドレス</span>
+              <input
+                type="email"
+                value={newSystemUser.email}
+                onChange={(e) => setNewSystemUser((p) => ({ ...p, email: e.target.value }))}
+                placeholder="example@miyama.co.jp"
+              />
+            </label>
+
+            <label>
+              <span>初期パスワード</span>
+              <input
+                type="password"
+                value={newSystemUser.password}
+                onChange={(e) => setNewSystemUser((p) => ({ ...p, password: e.target.value }))}
+                placeholder="6文字以上"
+              />
+            </label>
+
+            <label>
+              <span>権限</span>
+              <select
+                value={newSystemUser.role}
+                onChange={(e) => setNewSystemUser((p) => ({ ...p, role: e.target.value }))}
+              >
+                <option value="operator">一般ユーザー</option>
+                <option value="inspector">点検者</option>
+                <option value="approver">承認者 / 管理者候補</option>
+                <option value="viewer">閲覧のみ</option>
+                <option value="admin">管理者 / Admin</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="miyamaUserPermissionHelp">
+            <b>{userRoleJapanese(newSystemUser.role)}</b>
+            {newSystemUser.role === "admin" && <span>：全機能・ユーザー管理・承認・点検</span>}
+            {newSystemUser.role === "approver" && <span>：通常操作＋点検＋承認</span>}
+            {newSystemUser.role === "inspector" && <span>：通常操作＋点検</span>}
+            {newSystemUser.role === "operator" && <span>：通常の保全入力・閲覧</span>}
+            {newSystemUser.role === "viewer" && <span>：閲覧専用として使用するアカウント</span>}
+          </div>
+
+          <button
+            type="button"
+            className="primaryButton miyamaCreateUserButton"
+            onClick={createSystemUserAccount}
+            disabled={creatingSystemUser}
+          >
+            <UserPlus size={16} />
+            {creatingSystemUser ? "作成中..." : "アカウントを作成"}
+          </button>
+        </div>
+
+        <div className="miyamaUserListCard">
+          <div className="miyamaUserListTop">
+            <h3>登録ユーザー</h3>
+            <span>{systemUsers.length}件</span>
+          </div>
+
+          <div className="miyamaUserTableHeader">
+            <span>ユーザー</span>
+            <span>メール</span>
+            <span>権限</span>
+            <span>状態</span>
+            <span>操作</span>
+          </div>
+
+          {systemUsersLoading ? (
+            <div className="miyamaUserEmpty">ユーザーを読み込んでいます...</div>
+          ) : systemUsers.length === 0 ? (
+            <div className="miyamaUserEmpty">ユーザーがありません。</div>
+          ) : (
+            systemUsers.map((u) => (
+              <div className="miyamaUserTableRow" key={u.id}>
+                <div className="miyamaUserIdentity">
+                  <div className="miyamaUserMiniAvatar">👤</div>
+                  <div>
+                    <strong>{u.name || "名前未設定"}</strong>
+                    {u.id === currentUser?.uid && <small>現在ログイン中</small>}
+                  </div>
+                </div>
+
+                <span className="miyamaUserEmail">{u.email || "-"}</span>
+
+                <select
+                  value={String(u.role || "operator").toLowerCase()}
+                  onChange={(e) => updateSystemUserProfile(u.id, { role: e.target.value })}
+                  disabled={u.id === currentUser?.uid}
+                >
+                  <option value="operator">一般ユーザー</option>
+                  <option value="inspector">点検者</option>
+                  <option value="approver">承認者</option>
+                  <option value="viewer">閲覧のみ</option>
+                  <option value="admin">管理者</option>
+                </select>
+
+                <span className={`miyamaAccountState ${u.active === false ? "off" : "on"}`}>
+                  {u.active === false ? "無効" : "有効"}
+                </span>
+
+                <button
+                  type="button"
+                  className={u.active === false ? "miyamaEnableButton" : "miyamaDisableButton"}
+                  disabled={u.id === currentUser?.uid}
+                  onClick={() => updateSystemUserProfile(u.id, { active: u.active === false })}
+                >
+                  {u.active === false ? "有効にする" : "無効にする"}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="miyamaUserSecurityNote">
+          <b>🔒 セキュリティについて</b>
+          <p>
+            アカウント作成はFirebase AuthenticationとFirestoreのusers設定を同時に作成します。
+            「閲覧のみ」を完全に保護するには、Firestore Security Rules側でもreadOnly/roleを使って書き込みを拒否する設定が必要です。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   function renderCurrentPage() {
     if (page === "home") return renderHome();
     if (page === "ai") return renderMiyamaAi();
@@ -11308,6 +11635,7 @@ Requirements:
     if (page === "production") return renderCsvAnalysis();
     if (page === "work") return renderPlannedWorks();
     if (page === "miyamaAi") return renderMiyamaAi();
+    if (page === "users") return isAdmin ? renderUserManagement() : renderHome();
     return renderHome();
   }
 
@@ -11322,6 +11650,7 @@ Requirements:
     { key: "analytics", label: "保全分析", icon: <BarChart3 size={16} /> },
     { key: "dailyProduction", label: "生産数DB", icon: <BarChart3 size={16} /> },
     { key: "csvAnalytics", label: "CSV分析", icon: <FileSpreadsheet size={16} /> },
+    ...(isAdmin ? [{ key: "users", label: "ユーザー管理", icon: <Users size={16} /> }] : []),
   ];
 
 return (
