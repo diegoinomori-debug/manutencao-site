@@ -1979,3 +1979,20 @@
   font-size: 11px;
   font-weight: 800;
 }
+
+
+/* Thai translated read-only fields */
+.miyamaTranslatedInputWrap {
+  display: grid;
+  gap: 6px;
+}
+.miyamaTranslationRetrySmall {
+  justify-self: start;
+  min-height: 30px !important;
+  padding: 4px 9px !important;
+  font-size: 10px !important;
+}
+.page[data-language="th"] .miyamaTranslatedInputWrap input,
+.page[data-language="th"] .miyamaTranslatedTextareaWrap textarea {
+  background: #fbfdff;
+}

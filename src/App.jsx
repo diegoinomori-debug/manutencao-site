@@ -1959,6 +1959,30 @@ Object.assign(MIYAMA_TRANSLATIONS.th, {
   "Open Improvement": "เปิดงานปรับปรุง"
 });
 
+
+// ===== Thai maintenance data display patch =====
+Object.assign(MIYAMA_TRANSLATIONS.th, {
+  "かしめ機": "เครื่องย้ำ",
+  "ねじ切り機": "เครื่องต๊าปเกลียว",
+  "箱替え機": "เครื่องเปลี่ยนกล่อง",
+  "保全G": "กลุ่มบำรุงรักษา G",
+  "リベット切出し吸着②": "ชุดดูดจ่ายรีเวท ②",
+  "調整": "ปรับตั้ง",
+  "交換": "เปลี่ยน",
+  "点検": "ตรวจสอบ",
+  "給油": "หล่อลื่น",
+  "清掃": "ทำความสะอาด",
+  "校正": "สอบเทียบ",
+  "修理": "ซ่อม",
+  "定期保全（日数）": "บำรุงรักษาตามเวลา (วัน)",
+  "定量保全（生産数）": "บำรุงรักษาตามจำนวนการผลิต",
+  "日": "วัน",
+  "回": "ครั้ง",
+  "個/日": "ชิ้น/วัน",
+  "設備名なし": "ยังไม่ได้ระบุเครื่องจักร",
+  "部位未入力": "ยังไม่ได้ระบุตำแหน่ง",
+  "内容未入力": "ยังไม่ได้ระบุรายละเอียด"
+});
 const MIYAMA_BLOCKED_TRANSLATION_KEYS = new Set(["分", "日", "月", "年", "火", "水", "木", "金", "土"]);
 
 Object.keys(MIYAMA_TRANSLATIONS).forEach((lang) => {
@@ -3563,6 +3587,8 @@ function AsyncTranslatedText({ text = "", language = "ja", as: Tag = "span", ...
 function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = "", ...props }) {
   const original = String(value ?? "");
   const [displayValue, setDisplayValue] = useState(original);
+  const [retryToken, setRetryToken] = useState(0);
+  const [translationFailed, setTranslationFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -3570,20 +3596,27 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
 
     if (language === "ja" || !shouldTranslateLongText(original, language)) {
       setDisplayValue(original);
+      setTranslationFailed(false);
       return () => controller.abort();
     }
 
+    setTranslationFailed(false);
     setDisplayValue(
       language === "th" ? "กำลังแปล..." : language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
     );
 
     translateJapaneseLongText(original, controller.signal, language)
       .then((translated) => {
-        if (!cancelled) setDisplayValue(translated || original);
+        if (cancelled) return;
+        const next = String(translated || original);
+        const failedThai = language === "th" && shouldTranslateLongText(original, "th") && !containsThaiText(next);
+        setTranslationFailed(failedThai);
+        setDisplayValue(next);
       })
       .catch((error) => {
         if (!cancelled && error?.name !== "AbortError") {
           console.warn("Input display translation failed:", error);
+          setTranslationFailed(language === "th");
           setDisplayValue(original);
         }
       });
@@ -3592,10 +3625,11 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
       cancelled = true;
       controller.abort();
     };
-  }, [original, language]);
+  }, [original, language, retryToken]);
 
   return (
-    <input
+    <div className="miyamaTranslatedInputWrap">
+      <input
       {...props}
       value={displayValue}
       placeholder={placeholder}
@@ -3610,6 +3644,16 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
               : undefined
       }
     />
+      {translationFailed && language === "th" && (
+        <button
+          type="button"
+          className="miyamaTranslationRetryButton miyamaTranslationRetrySmall"
+          onClick={() => setRetryToken((value) => value + 1)}
+        >
+          🔄 แปลอีกครั้ง
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -8605,9 +8649,13 @@ function renderHome() {
                 </div>
 
                 <div style={{ minWidth: "220px", textAlign: "right" }}>
-                  <div style={{ fontSize: "14px", color: "#64748b" }}>{appLanguage === "en" ? "Next Due Date" : "次回実施日"}</div>
+                  <div style={{ fontSize: "14px", color: "#64748b" }}>
+                    {appLanguage === "th" ? "วันที่ดำเนินการครั้งถัดไป" : appLanguage === "es" ? "Próxima fecha" : appLanguage === "en" ? "Next Due Date" : "次回実施日"}
+                  </div>
                   <div style={{ fontSize: "24px", fontWeight: "900" }}>{row.nextDate || (appLanguage === "en" ? "Not entered" : "未入力")}</div>
-                  <div style={{ fontSize: "14px", color: "#64748b", marginTop: "8px" }}>{appLanguage === "en" ? "Last Done Date" : "前回実施日"}</div>
+                  <div style={{ fontSize: "14px", color: "#64748b", marginTop: "8px" }}>
+                    {appLanguage === "th" ? "วันที่ดำเนินการครั้งก่อน" : appLanguage === "es" ? "Última fecha" : appLanguage === "en" ? "Last Done Date" : "前回実施日"}
+                  </div>
                   <div style={{ fontSize: "18px", fontWeight: "700" }}>{normalizeMaintenanceDateInput(row.lastDate) || (appLanguage === "en" ? "Not entered" : "未入力")}</div>
                 </div>
               </div>
@@ -8618,7 +8666,17 @@ function renderHome() {
                   <>
                     <div className="reportSummaryItem"><span>📦 {appLanguage === "en" ? "Maintenance Cycle" : "保全サイクル"}</span><strong>{row.cycleProductionCount ? `${Number(row.cycleProductionCount || 0).toLocaleString()}${appLanguage === "en" ? " cycles" : "回"}` : (appLanguage === "en" ? "Not entered" : "未入力")}</strong></div>
                     <div className="reportSummaryItem"><span>📊 {appLanguage === "en" ? "Daily Average Production" : "1日平均生産数"}</span><strong>{row.dailyAverageProduction ? `${Number(row.dailyAverageProduction || 0).toLocaleString()} ${appLanguage === "en" ? "pcs/day" : "個/日"}` : (appLanguage === "en" ? "Production DB not registered" : "生産数DB未登録")}</strong></div>
-                    <div className="reportSummaryItem"><span>⏳ 残り回数</span><strong>{row.productionRemain === "" ? "未入力" : `${Number(row.productionRemain || 0).toLocaleString()}回`}</strong></div>
+                    <div className="reportSummaryItem">
+                      <span>⏳ {appLanguage === "th" ? "จำนวนครั้งที่เหลือ" : appLanguage === "es" ? "Ciclos restantes" : appLanguage === "en" ? "Cycles Left" : "残り回数"}</span>
+                      <strong>{
+                        row.productionRemain === ""
+                          ? (appLanguage === "th" ? "ยังไม่ได้กรอก" : appLanguage === "es" ? "Sin datos" : appLanguage === "en" ? "Not entered" : "未入力")
+                          : appLanguage === "th" ? `${Number(row.productionRemain || 0).toLocaleString()} ครั้ง`
+                          : appLanguage === "es" ? `${Number(row.productionRemain || 0).toLocaleString()} ciclos`
+                          : appLanguage === "en" ? `${Number(row.productionRemain || 0).toLocaleString()} cycles`
+                          : `${Number(row.productionRemain || 0).toLocaleString()}回`
+                      }</strong>
+                    </div>
                   </>
                 ) : (
                   <div className="reportSummaryItem"><span>📅 {appLanguage === "en" ? "Maintenance Interval (Days)" : "保全周期（日）"}</span><strong>{row.cycle ? `${Number(row.cycle || 0).toLocaleString()}${appLanguage === "en" ? " days" : "日"}` : (appLanguage === "en" ? "Not entered" : "未入力")}</strong></div>
@@ -8638,11 +8696,15 @@ function renderHome() {
                   </select>
                 </label>
                 <label>🏭 {appLanguage === "en" ? "Equipment" : "設備名"}
-                  {appLanguage === "en" ? (
+                  {appLanguage !== "ja" ? (
                     <TranslatedReadOnlyInput
                       language={appLanguage}
                       value={row.equipment || ""}
-                      placeholder="Equipment not entered"
+                      placeholder={
+                        appLanguage === "th" ? "ยังไม่ได้ระบุเครื่องจักร"
+                        : appLanguage === "es" ? "Equipo no indicado"
+                        : "Equipment not entered"
+                      }
                     />
                   ) : (
                     <ImeSafeInput
@@ -8654,11 +8716,15 @@ function renderHome() {
                   )}
                 </label>
                 <label>📦 {appLanguage === "en" ? "Part Name" : "部品名"}
-                  {appLanguage === "en" ? (
+                  {appLanguage !== "ja" ? (
                     <TranslatedReadOnlyInput
                       language={appLanguage}
                       value={row.sectionName || row.equipment2Name || row.partName || ""}
-                      placeholder="Part not entered"
+                      placeholder={
+                        appLanguage === "th" ? "ยังไม่ได้ระบุชิ้นส่วน"
+                        : appLanguage === "es" ? "Pieza no indicada"
+                        : "Part not entered"
+                      }
                     />
                   ) : (
                     <ImeSafeInput
@@ -8679,20 +8745,77 @@ function renderHome() {
                 )}
 
                 <label>📆 {appLanguage === "en" ? "Last Done Date" : "前回実施日"}<input type="date" min="2000-01-01" max="2099-12-31" value={normalizeMaintenanceDateInput(row.lastDate)} onChange={(e) => updateMaintenanceSchedule(row, { lastDate: e.target.value })} /></label>
-                <label>👤 {appLanguage === "en" ? "Owner" : "担当者"}<ImeSafeInput value={row.owner || ""} onCommit={(value) => updateField("parts", row.id, "owner", value)} placeholder={appLanguage === "en" ? "Enter owner name" : "担当者名を入力"} /></label>
-                <label>🧮 {appLanguage === "en" ? "Next Due Date" : "次回実施日"}<input className="readOnlyCalc" value={row.nextDate || ""} readOnly /></label>
-                <label>⏳ {appLanguage === "en" ? "Days Left" : "残り日数"}<input className="readOnlyCalc" value={row.daysLeft === "" ? (appLanguage === "en" ? "Not entered" : "未入力") : `${row.daysLeft}${appLanguage === "en" ? " days" : "日"}`} readOnly /></label>
-                {normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" && <label>📦 残り回数<input className="readOnlyCalc" value={row.productionRemain === "" ? "未入力" : `${Number(row.productionRemain || 0).toLocaleString()}回`} readOnly /></label>}
+                <label>👤 {
+                  appLanguage === "th" ? "ผู้รับผิดชอบ"
+                  : appLanguage === "es" ? "Responsable"
+                  : appLanguage === "en" ? "Owner"
+                  : "担当者"
+                }
+                  {appLanguage !== "ja" ? (
+                    <TranslatedReadOnlyInput
+                      language={appLanguage}
+                      value={row.owner || ""}
+                      placeholder={
+                        appLanguage === "th" ? "ยังไม่ได้ระบุผู้รับผิดชอบ"
+                        : appLanguage === "es" ? "Responsable no indicado"
+                        : "Owner not entered"
+                      }
+                    />
+                  ) : (
+                    <ImeSafeInput
+                      value={row.owner || ""}
+                      onCommit={(value) => updateField("parts", row.id, "owner", value)}
+                      placeholder="担当者名を入力"
+                    />
+                  )}
+                </label>
+                <label>🧮 {appLanguage === "th" ? "วันที่ดำเนินการครั้งถัดไป" : appLanguage === "es" ? "Próxima fecha" : appLanguage === "en" ? "Next Due Date" : "次回実施日"}<input className="readOnlyCalc" value={row.nextDate || ""} readOnly /></label>
+                <label>⏳ {appLanguage === "th" ? "จำนวนวันที่เหลือ" : appLanguage === "es" ? "Días restantes" : appLanguage === "en" ? "Days Left" : "残り日数"}
+                  <input
+                    className="readOnlyCalc"
+                    value={
+                      row.daysLeft === ""
+                        ? (appLanguage === "th" ? "ยังไม่ได้กรอก" : appLanguage === "es" ? "Sin datos" : appLanguage === "en" ? "Not entered" : "未入力")
+                        : appLanguage === "th" ? `${row.daysLeft} วัน`
+                        : appLanguage === "es" ? `${row.daysLeft} días`
+                        : appLanguage === "en" ? `${row.daysLeft} days`
+                        : `${row.daysLeft}日`
+                    }
+                    readOnly
+                  />
+                </label>
+                {normalizeMaintenanceMode(row.maintenanceMode, row) === "定量保全" && (
+                  <label>📦 {appLanguage === "th" ? "จำนวนครั้งที่เหลือ" : appLanguage === "es" ? "Ciclos restantes" : appLanguage === "en" ? "Cycles Left" : "残り回数"}
+                    <input
+                      className="readOnlyCalc"
+                      value={
+                        row.productionRemain === ""
+                          ? (appLanguage === "th" ? "ยังไม่ได้กรอก" : appLanguage === "es" ? "Sin datos" : appLanguage === "en" ? "Not entered" : "未入力")
+                          : appLanguage === "th" ? `${Number(row.productionRemain || 0).toLocaleString()} ครั้ง`
+                          : appLanguage === "es" ? `${Number(row.productionRemain || 0).toLocaleString()} ciclos`
+                          : appLanguage === "en" ? `${Number(row.productionRemain || 0).toLocaleString()} cycles`
+                          : `${Number(row.productionRemain || 0).toLocaleString()}回`
+                      }
+                      readOnly
+                    />
+                  </label>
+                )}
               </div>
 
               <div style={{ marginTop: "12px" }}>
                 <label style={{ fontWeight: "700" }}>📝 {appLanguage === "en" ? "Memo" : "メモ"}
-                  {appLanguage === "en" ? (
+                  {appLanguage !== "ja" ? (
                     <TranslatedReadOnlyTextarea
                       language={appLanguage}
                       style={{ minHeight: "90px", fontSize: "16px" }}
                       value={row.note || row.maintenanceDetail || ""}
-                      placeholder="Replacement reason, cautions, or shop-floor notes"
+                      placeholder={
+                        appLanguage === "th"
+                          ? "เหตุผลในการเปลี่ยน ข้อควรระวัง หรือบันทึกหน้างาน"
+                          : appLanguage === "es"
+                            ? "Motivo del cambio, precauciones o notas de planta"
+                            : "Replacement reason, cautions, or shop-floor notes"
+                      }
                     />
                   ) : (
                     <ImeSafeTextarea
