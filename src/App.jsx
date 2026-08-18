@@ -4650,6 +4650,22 @@ function MaintenanceApp({ currentUser, userProfile }) {
     loadAll();
   }, []);
 
+  // Evita milhares de leituras desnecessárias no Firestore:
+  // carrega a base diária somente quando a tela de produção é aberta.
+  useEffect(() => {
+    if (page === "dailyProduction") {
+      loadDailyProductions();
+    }
+  }, [page]);
+
+  // productionLogs pode ser uma coleção muito grande.
+  // Por isso, só é carregada quando uma tela que realmente usa esses dados é aberta.
+  useEffect(() => {
+    if (page === "csvAnalytics" || page === "production") {
+      loadProductionLogs();
+    }
+  }, [page]);
+
   useEffect(() => {
     setReportPage(1);
   }, [reportSearch, reportViewMode]);
@@ -4788,19 +4804,26 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function loadAll() {
+    // Carrega apenas os dados essenciais na abertura do sistema.
+    // As coleções grandes (productionLogs e dailyProductions) são carregadas
+    // somente quando o usuário realmente abre as respectivas páginas.
     const results = await Promise.allSettled([
       loadParts(),
       loadCalendar(),
       loadReports(),
       loadPlannedWorks(),
       loadNewEquipmentProjects(),
-      loadProductionLogs(),
-      loadDailyProductions(),
     ]);
 
     results.forEach((result, index) => {
       if (result.status === "rejected") {
-        const names = ["parts", "calendar", "maintenanceReports", "plannedWorks", "newEquipmentProjects", "productionLogs", "dailyProductions"];
+        const names = [
+          "parts",
+          "calendar",
+          "maintenanceReports",
+          "plannedWorks",
+          "newEquipmentProjects",
+        ];
         console.error(`Failed to load ${names[index]}:`, result.reason);
       }
     });
