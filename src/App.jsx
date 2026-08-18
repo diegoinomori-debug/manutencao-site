@@ -49,7 +49,7 @@ import {
   getDoc,
   setDoc,
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 
 function toLocalDateText(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
@@ -4239,6 +4239,48 @@ function MaintenanceApp({ currentUser, userProfile }) {
         if (secondaryApp) await deleteApp(secondaryApp);
       } catch {}
       setCreatingSystemUser(false);
+    }
+  }
+
+  async function sendSystemUserPasswordReset(user = {}) {
+    if (!isAdmin) return;
+
+    const email = String(user?.email || "").trim();
+    const name = String(user?.name || email || "ユーザー").trim();
+
+    if (!email || !email.includes("@")) {
+      setUserAdminMessage(`❌ ${name} のメールアドレスが登録されていません。`);
+      return;
+    }
+
+    const ok = window.confirm(
+      `${name} (${email}) にパスワード再設定メールを送信しますか？`
+    );
+    if (!ok) return;
+
+    setUserAdminMessage("");
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setUserAdminMessage(
+        `✅ ${name} にパスワード再設定メールを送信しました。メール内のリンクから新しいパスワードを設定してください。`
+      );
+    } catch (error) {
+      console.error("Password reset error:", error);
+      const codeText = String(error?.code || "");
+      let message = error?.message || String(error);
+
+      if (codeText.includes("user-not-found")) {
+        message = "Firebase Authentication にこのメールアドレスのアカウントが見つかりません。";
+      } else if (codeText.includes("invalid-email")) {
+        message = "登録されているメールアドレスが正しくありません。";
+      } else if (codeText.includes("too-many-requests")) {
+        message = "短時間に送信回数が多すぎます。少し待ってから再度お試しください。";
+      } else if (codeText.includes("network-request-failed")) {
+        message = "ネットワークエラーが発生しました。接続を確認してください。";
+      }
+
+      setUserAdminMessage(`❌ パスワード再設定メールを送信できませんでした: ${message}`);
     }
   }
 
@@ -14842,14 +14884,27 @@ Requirements:
                   {u.active === false ? "無効" : "有効"}
                 </span>
 
-                <button
-                  type="button"
-                  className={u.active === false ? "miyamaEnableButton" : "miyamaDisableButton"}
-                  disabled={u.id === currentUser?.uid}
-                  onClick={() => updateSystemUserProfile(u.id, { active: u.active === false })}
-                >
-                  {u.active === false ? "有効にする" : "無効にする"}
-                </button>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    onClick={() => sendSystemUserPasswordReset(u)}
+                    disabled={!u.email}
+                    title="登録メールアドレスへパスワード再設定リンクを送信"
+                    style={{ whiteSpace: "nowrap", padding: "9px 12px" }}
+                  >
+                    🔑 パスワード再設定
+                  </button>
+
+                  <button
+                    type="button"
+                    className={u.active === false ? "miyamaEnableButton" : "miyamaDisableButton"}
+                    disabled={u.id === currentUser?.uid}
+                    onClick={() => updateSystemUserProfile(u.id, { active: u.active === false })}
+                  >
+                    {u.active === false ? "有効にする" : "無効にする"}
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -14859,6 +14914,7 @@ Requirements:
           <b>🔒 セキュリティについて</b>
           <p>
             アカウント作成はFirebase AuthenticationとFirestoreのusers設定を同時に作成します。
+            Firebaseでは現在のパスワードを表示することはできません。パスワードを忘れた場合は、登録ユーザーの「🔑 パスワード再設定」から本人の登録メールアドレスへ再設定リンクを送信してください。
             「閲覧のみ」を完全に保護するには、Firestore Security Rules側でもreadOnly/roleを使って書き込みを拒否する設定が必要です。
           </p>
         </div>
