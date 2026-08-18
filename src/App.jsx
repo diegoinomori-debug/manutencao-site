@@ -1683,6 +1683,95 @@ MIYAMA_TRANSLATIONS.th = {
   "長い報告書を全部出さず、必要なテーマだけ表示できます。":"แสดงเฉพาะหัวข้อที่จำเป็นแทนรายงานทั้งหมด"
 };
 
+
+// ===== Thai final UI patch: complete fixed labels used across reports / maintenance =====
+Object.assign(MIYAMA_TRANSLATIONS.th, {
+  "表示テーマを選択":"เลือกหัวข้อที่จะแสดง",
+  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"แสดงเฉพาะหัวข้อที่จำเป็น โดยไม่ต้องเปิดรายงานทั้งหมด",
+  "報告書概要":"สรุปรายงาน",
+  "概要未入力":"ยังไม่ได้กรอกข้อมูลสรุป",
+  "設備名未入力":"ยังไม่ได้กรอกชื่อเครื่องจักร",
+  "ライン未入力":"ยังไม่ได้กรอกชื่อไลน์",
+  "不具合現象未入力":"ยังไม่ได้กรอกอาการผิดปกติ",
+  "不具合内容":"รายละเอียดความผิดปกติ",
+  "不具合現象":"อาการผิดปกติ",
+  "不具合箇所":"ตำแหน่งที่ผิดปกติ",
+  "不具合原因":"สาเหตุของความผิดปกติ",
+  "リンク先":"ลิงก์ที่เกี่ยวข้อง",
+  "不具合原因・なぜなぜ分析":"สาเหตุและการวิเคราะห์ Why-Why",
+  "なぜなぜ分析":"การวิเคราะห์ Why-Why",
+  "なぜ1":"ทำไม 1",
+  "なぜ2":"ทำไม 2",
+  "なぜ3":"ทำไม 3",
+  "処置内容":"การแก้ไขที่ดำเนินการ",
+  "再発防止・流出防止・変化点":"ป้องกันการเกิดซ้ำ / ป้องกันการหลุดรอด / จุดเปลี่ยนแปลง",
+  "再発防止区分":"ประเภทการป้องกันการเกิดซ้ำ",
+  "変化点ランク":"ระดับจุดเปลี่ยนแปลง",
+  "FP点検":"ตรวจสอบ FP",
+  "再発防止・残工事":"ป้องกันการเกิดซ้ำ / งานคงค้าง",
+  "流出防止":"การป้องกันการหลุดรอด",
+  "参考費用":"ค่าใช้จ่ายโดยประมาณ",
+  "作業者数":"จำนวนผู้ปฏิบัติงาน",
+  "時間単価":"อัตราค่าแรงต่อชั่วโมง",
+  "保全工数H":"ชั่วโมงงานบำรุงรักษา",
+  "労務費":"ค่าแรง",
+  "部品費合計":"รวมค่าอะไหล่",
+  "参考費用合計":"รวมค่าใช้จ่ายโดยประมาณ",
+  "保全交換部品":"อะไหล่ที่เปลี่ยนในการบำรุงรักษา",
+  "部品名1":"ชื่ออะไหล่ 1", "部品名2":"ชื่ออะไหล่ 2", "部品名3":"ชื่ออะไหล่ 3",
+  "個数":"จำนวน", "単価":"ราคาต่อหน่วย", "部品費":"ค่าอะไหล่",
+  "確認・承認":"ตรวจสอบ / อนุมัติ",
+  "作成":"ผู้จัดทำ", "点検":"ตรวจสอบ", "承認":"อนุมัติ",
+  "未入力":"ยังไม่ได้กรอก", "下書き":"แบบร่าง", "編集中":"กำลังแก้ไข", "ロック対象":"ล็อกแล้ว",
+  "承認者":"ผู้อนุมัติ", "承認日":"วันที่อนุมัติ", "点検者":"ผู้ตรวจสอบ", "点検日":"วันที่ตรวจสอบ",
+  "状態":"สถานะ", "点検依頼":"ขอตรวจสอบ", "保存済み":"บันทึกแล้ว",
+  "概要":"ภาพรวม", "基本":"ข้อมูลพื้นฐาน", "時間":"เวลา", "不具合":"ความผิดปกติ", "原因":"สาเหตุ",
+  "再発防止":"ป้องกันการเกิดซ้ำ", "費用":"ค่าใช้จ่าย", "写真":"รูปภาพ", "全部":"ทั้งหมด",
+  "基本情報・設備情報":"ข้อมูลพื้นฐาน / ข้อมูลเครื่องจักร",
+  "作成日":"วันที่สร้าง", "保全分類":"ประเภทการบำรุงรักษา", "グループ名":"กลุ่ม", "ライン名":"ไลน์", "設備名":"เครื่องจักร", "作業者":"ผู้ปฏิบัติงาน",
+  "保全作業報告書":"รายงานงานบำรุงรักษา",
+  "区分":"หมวดหมู่", "担当":"ผู้รับผิดชอบ", "担当者":"ผู้รับผิดชอบ",
+  "予定":"กำหนดการ", "詳細なし":"ไม่มีรายละเอียด", "内容なし":"ไม่มีรายละเอียด", "内容未入力":"ยังไม่ได้กรอกรายละเอียด",
+  "対象設備":"เครื่องจักรเป้าหมาย", "設備":"เครื่องจักร", "ライン":"ไลน์",
+  "保全方式":"รูปแบบการบำรุงรักษา", "保全種類":"ประเภทการบำรุงรักษา",
+  "部品名":"ชื่ออะไหล่", "部品":"อะไหล่", "部品命数":"อายุการใช้งานอะไหล่",
+  "保全サイクル":"รอบการบำรุงรักษา", "保全サイクル（回）":"รอบการบำรุงรักษา (ครั้ง)", "保全周期（日）":"รอบการบำรุงรักษา (วัน)",
+  "1日平均生産数":"จำนวนผลิตเฉลี่ยต่อวัน", "前回実施日":"วันที่ดำเนินการครั้งก่อน", "次回実施日":"วันที่ดำเนินการครั้งถัดไป",
+  "残り日数":"จำนวนวันที่เหลือ", "残日数":"จำนวนวันที่เหลือ", "残り回数":"จำนวนครั้งที่เหลือ", "残り":"คงเหลือ",
+  "メモ":"บันทึก", "備考":"หมายเหตุ", "内容":"รายละเอียด", "日付":"วันที่", "時刻":"เวลา",
+  "予備品":"อะไหล่สำรอง", "在庫数":"จำนวนคงคลัง", "現在在庫":"สต็อกปัจจุบัน", "最低在庫":"สต็อกขั้นต่ำ",
+  "価格":"ราคา", "金額":"จำนวนเงิน", "メーカー":"ผู้ผลิต", "購入先":"ผู้จำหน่าย", "購入URL":"URL สำหรับซื้อ",
+  "使用設備":"เครื่องจักรที่ใช้", "カテゴリ":"หมวดหมู่", "保管場所":"สถานที่จัดเก็บ", "納期":"ระยะเวลาจัดส่ง",
+  "型式・品番":"รุ่น / หมายเลขชิ้นส่วน", "型式・図番":"รุ่น / หมายเลขแบบ", "型式":"รุ่น", "品番":"หมายเลขชิ้นส่วน", "品名":"ชื่อรายการ", "図番":"หมายเลขแบบ", "名称":"ชื่อ",
+  "停止時間":"เวลาหยุดเครื่อง", "停止時間合計":"เวลาหยุดรวม", "停止回数":"จำนวนครั้งที่หยุด", "停止原因分類":"ประเภทสาเหตุการหยุด", "機械停止時間":"เวลาหยุดเครื่องจักร",
+  "保全費用":"ค่าบำรุงรักษา", "保全費用合計":"รวมค่าบำรุงรักษา", "労務時間":"ชั่วโมงแรงงาน", "合計費用":"ค่าใช้จ่ายรวม",
+  "突発保全":"บำรุงรักษาฉุกเฉิน", "計画保全":"บำรุงรักษาตามแผน",
+  "正常":"ปกติ", "交換超過":"เกินกำหนดเปลี่ยน", "交換間近":"ใกล้ถึงกำหนดเปลี่ยน", "本日実施":"ดำเนินการวันนี้", "期限超過":"เกินกำหนด",
+  "実施完了":"ดำเนินการเสร็จแล้ว", "実施中":"กำลังดำเนินการ", "未実施":"ยังไม่ได้ดำเนินการ", "未登録":"ยังไม่ได้ลงทะเบียน", "未設定":"ยังไม่ได้ตั้งค่า",
+  "保存中":"กำลังบันทึก", "入力中":"กำลังกรอก", "在庫なし":"ไม่มีสต็อก", "在庫あり":"มีสต็อก", "在庫OK":"สต็อกปกติ", "在庫注意":"สต็อกใกล้ต่ำ", "在庫不足":"สต็อกไม่เพียงพอ",
+  "重要":"สำคัญ", "通常":"ปกติ", "注意":"ระวัง", "緊急":"ฉุกเฉิน", "必要":"จำเป็น", "不要":"ไม่จำเป็น", "点検不要":"ไม่ต้องตรวจสอบ",
+  "原因調査":"การตรวจสอบสาเหตุ", "推定原因":"สาเหตุที่คาดการณ์", "処置":"การแก้ไข", "対策":"มาตรการ", "推奨対策":"มาตรการที่แนะนำ", "確認ポイント":"จุดตรวจสอบ",
+  "承認状態":"สถานะการอนุมัติ", "承認ステータス":"สถานะการอนุมัติ", "承認済み":"อนุมัติแล้ว", "承認待ち":"รออนุมัติ", "点検待ち":"รอตรวจสอบ", "差戻し":"ส่งกลับแก้ไข",
+  "確認":"ยืนยัน", "確認・承認":"ตรวจสอบ / อนุมัติ", "操作":"การดำเนินการ", "新規":"ใหม่", "取込":"นำเข้า",
+  "点検":"ตรวจสอบ", "交換":"เปลี่ยน", "給油":"หล่อลื่น", "清掃":"ทำความสะอาด", "調整":"ปรับตั้ง", "修理":"ซ่อม", "校正":"สอบเทียบ", "保全":"บำรุงรักษา",
+  "リベット":"รีเวต", "リベットつまり":"รีเวตติดขัด", "つまり":"ติดขัด", "詰まり":"ติดขัด", "詰り":"ติดขัด", "供給不良":"การจ่ายไม่ปกติ",
+  "未到達":"ไม่ถึงตำแหน่ง", "未検出":"ตรวจไม่พบ", "異常停止":"หยุดผิดปกติ", "異常":"ผิดปกติ", "破損":"เสียหาย", "摩耗":"สึกหรอ", "劣化":"เสื่อมสภาพ",
+  "漏れ":"รั่ว", "油漏れ":"น้ำมันรั่ว", "エア漏れ":"ลมรั่ว", "水漏れ":"น้ำรั่ว", "折れ":"หัก", "割れ":"แตกร้าว", "欠け":"บิ่น", "汚れ":"สกปรก", "焼損":"ไหม้เสียหาย",
+  "センサー":"เซนเซอร์", "シリンダ":"กระบอกลม", "バルブ":"วาล์ว", "ロードセル":"โหลดเซลล์", "モーター":"มอเตอร์", "コンベア":"สายพานลำเลียง", "ベルト":"สายพาน", "カメラ":"กล้อง",
+  "画像":"รูปภาพ", "治具":"จิ๊ก", "ワーク":"ชิ้นงาน", "スライド":"สไลด์", "クランプ":"แคลมป์", "ピース":"ชิ้นส่วน", "ロッキング":"ล็อกกิ้ง",
+  "原点復帰":"กลับจุดอ้างอิง", "原点":"จุดอ้างอิง", "下降":"ลง", "前進":"เดินหน้า", "後退":"ถอยหลัง", "上昇":"ขึ้น", "下降端":"ตำแหน่งล่างสุด", "上昇端":"ตำแหน่งบนสุด",
+  "押し込み":"ดันเข้า", "圧入":"อัดประกอบ", "カシメ":"ย้ำ", "かしめ":"ย้ำ", "組付":"ประกอบ", "組立":"ประกอบ", "搬入":"นำเข้า", "搬出":"นำออก", "排出":"ปล่อยออก", "吸着":"ดูดจับ", "チャック":"หัวจับ",
+  "グリス":"จาระบี", "油圧":"ไฮดรอลิก", "空圧":"นิวเมติก", "電気":"ไฟฟ้า", "配線":"การเดินสาย", "端子":"ขั้วต่อ",
+  "確認リンク候補":"ลิงก์ตรวจสอบที่แนะนำ", "自動連携データ":"ข้อมูลเชื่อมโยงอัตโนมัติ", "所有者":"ผู้รับผิดชอบ", "責任者":"ผู้รับผิดชอบ", "最新":"ล่าสุด", "件数":"จำนวน", "件":"รายการ", "回":"ครั้ง", "個":"ชิ้น", "個/日":"ชิ้น/วัน", "円":"เยน",
+  "データがありません。":"ไม่มีข้อมูล", "重複データ削除":"ลบข้อมูลซ้ำ", "重複":"ข้อมูลซ้ำ",
+  "設備別 停止時間ランキング":"อันดับเวลาหยุดตามเครื่องจักร", "アラーム別 TOP10":"10 อันดับสัญญาณเตือน", "CSVアラーム 件数":"จำนวนสัญญาณเตือน CSV", "最多アラーム":"สัญญาณเตือนที่พบบ่อยที่สุด", "最多原因分類":"ประเภทสาเหตุที่พบบ่อยที่สุด", "最多設備":"เครื่องจักรที่พบมากที่สุด", "発生回数":"จำนวนครั้งที่เกิด", "生産数":"จำนวนการผลิต", "登録件数":"จำนวนที่ลงทะเบียน", "登録設備":"เครื่องจักรที่ลงทะเบียน",
+  "定期保全（日数）":"บำรุงรักษาตามเวลา (วัน)", "定量保全（生産数）":"บำรุงรักษาตามจำนวนการผลิต", "日数計算":"คำนวณตามวัน", "生産数計算":"คำนวณตามการผลิต", "生産数で自動計算":"คำนวณอัตโนมัติตามจำนวนการผลิต",
+  "この部品は何回使用できますか？":"ชิ้นส่วนนี้ใช้งานได้กี่ครั้ง?", "定期保全は日数":"การบำรุงรักษาตามเวลาใช้จำนวนวัน", "定量保全は生産数で次回実施日を自動計算します":"การบำรุงรักษาตามปริมาณจะคำนวณวันที่ครั้งถัดไปจากจำนวนการผลิตโดยอัตโนมัติ",
+  "定期保全から外す":"นำออกจากการบำรุงรักษาเชิงป้องกัน", "選択日の予定追加":"เพิ่มกำหนดการในวันที่เลือก", "予定編集":"แก้ไขกำหนดการ", "新しい予定":"กำหนดการใหม่", "予定はありません":"ไม่มีกำหนดการ", "月カレンダー":"ปฏิทินรายเดือน",
+  "新規設備管理":"จัดการเครื่องจักรใหม่", "プロジェクト名":"ชื่อโครงการ", "稼働予定日":"วันที่วางแผนเริ่มใช้งาน", "生産技術担当":"ผู้รับผิดชอบวิศวกรรมการผลิต", "保全担当":"ผู้รับผิดชอบงานบำรุงรักษา",
+  "製品図面DRチェックシート":"เช็กลิสต์ DR แบบผลิตภัณฑ์", "工程検討書":"เอกสารศึกษากระบวนการ", "工程FMEA":"FMEA กระบวนการ", "設備共通基本仕様書":"ข้อกำหนดพื้นฐานร่วมของเครื่องจักร", "設備個別基本仕様書":"ข้อกำหนดพื้นฐานเฉพาะเครื่องจักร", "設備製作仕様書":"ข้อกำหนดการผลิตเครื่องจักร", "設備図面DRチェックシート":"เช็กลิสต์ DR แบบเครื่องจักร", "工程点検チェックシート":"เช็กลิสต์ตรวจสอบกระบวนการ", "保全ポリシー・設備保全方針書":"นโยบายการบำรุงรักษา", "定期・定量点検表":"แบบตรวจตามเวลา / ปริมาณ", "予防保全リスト":"รายการบำรุงรักษาเชิงป้องกัน", "予備品リスト":"รายการอะไหล่สำรอง", "給油指導票":"คู่มือการหล่อลื่น", "バックアップ電池使用リスト":"รายการแบตเตอรี่สำรอง", "設備引き渡し書":"เอกสารส่งมอบเครื่องจักร"
+});
+
 const MIYAMA_BLOCKED_TRANSLATION_KEYS = new Set(["分", "日", "月", "年", "火", "水", "木", "金", "土"]);
 
 Object.keys(MIYAMA_TRANSLATIONS).forEach((lang) => {
@@ -2029,7 +2118,7 @@ async function applyMiyamaLanguage(language = "ja", signal) {
     // Campos longos do relatório usam os componentes de tradução dedicados.
     // Limitar a tradução automática do DOM evita centenas de chamadas ao abrir a página.
     .filter((value) => value.length <= 140)
-    .slice(0, 80);
+    .slice(0, selectedLanguage === "th" ? 160 : 80);
 
   const translatedByOriginal = {};
   const concurrency = 6;
@@ -3249,7 +3338,7 @@ function AsyncTranslatedText({ text = "", language = "ja", as: Tag = "span", ...
     let cancelled = false;
     const controller = new AbortController();
 
-    if (language === "ja" || !containsJapaneseText(original)) {
+    if (language === "ja" || !shouldTranslateLongText(original, language)) {
       setDisplayText(original);
       return () => controller.abort();
     }
@@ -3284,13 +3373,13 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
     let cancelled = false;
     const controller = new AbortController();
 
-    if (language === "ja" || !containsJapaneseText(original)) {
+    if (language === "ja" || !shouldTranslateLongText(original, language)) {
       setDisplayValue(original);
       return () => controller.abort();
     }
 
     setDisplayValue(
-      language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
+      language === "th" ? "กำลังแปล..." : language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
     );
 
     translateJapaneseLongText(original, controller.signal, language)
@@ -3317,11 +3406,13 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
       placeholder={placeholder}
       readOnly
       title={
-        language === "es"
-          ? "Cambie a japonés para editar los datos originales."
-          : language === "en"
-            ? "Switch to Japanese to edit the original data."
-            : undefined
+        language === "th"
+          ? "เปลี่ยนเป็นภาษาญี่ปุ่นเพื่อแก้ไขข้อมูลต้นฉบับ"
+          : language === "es"
+            ? "Cambie a japonés para editar los datos originales."
+            : language === "en"
+              ? "Switch to Japanese to edit the original data."
+              : undefined
       }
     />
   );
@@ -3335,13 +3426,13 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
     let cancelled = false;
     const controller = new AbortController();
 
-    if (language === "ja" || !containsJapaneseText(original)) {
+    if (language === "ja" || !shouldTranslateLongText(original, language)) {
       setDisplayValue(original);
       return () => controller.abort();
     }
 
     setDisplayValue(
-      language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
+      language === "th" ? "กำลังแปล..." : language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
     );
 
     translateJapaneseLongText(original, controller.signal, language)
@@ -3368,11 +3459,13 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
       placeholder={placeholder}
       readOnly
       title={
-        language === "es"
-          ? "Cambie a japonés para editar los datos originales."
-          : language === "en"
-            ? "Switch to Japanese to edit the original data."
-            : undefined
+        language === "th"
+          ? "เปลี่ยนเป็นภาษาญี่ปุ่นเพื่อแก้ไขข้อมูลต้นฉบับ"
+          : language === "es"
+            ? "Cambie a japonés para editar los datos originales."
+            : language === "en"
+              ? "Switch to Japanese to edit the original data."
+              : undefined
       }
     />
   );
@@ -3389,6 +3482,25 @@ const MIYAMA_TRANSLATE_ENDPOINT =
 
 function containsJapaneseText(value = "") {
   return /[ぁ-んァ-ン一-龯々〆ヵヶ]/.test(String(value || ""));
+}
+
+function containsThaiText(value = "") {
+  return /[\u0E00-\u0E7F]/.test(String(value || ""));
+}
+
+function containsLatinText(value = "") {
+  return /[A-Za-z]/.test(String(value || ""));
+}
+
+function shouldTranslateLongText(value = "", targetLanguage = "en") {
+  const text = String(value || "").trim();
+  if (!text || targetLanguage === "ja") return false;
+  if (targetLanguage === "th") {
+    // For Thai display, translate historical Japanese OR English/Spanish text,
+    // but leave strings that are already Thai unchanged.
+    return !containsThaiText(text) && (containsJapaneseText(text) || containsLatinText(text));
+  }
+  return containsJapaneseText(text);
 }
 
 function makeLongTranslationKey(value = "") {
@@ -3466,7 +3578,7 @@ function splitTranslationText(value = "", maxLength = 1200) {
 
 async function translateJapaneseChunk(text, targetLanguage = "en", signal) {
   const original = String(text ?? "");
-  if (!original || !containsJapaneseText(original)) return original;
+  if (!original || !shouldTranslateLongText(original, targetLanguage)) return original;
 
   const response = await fetch("/api/translate", {
     method: "POST",
@@ -3475,7 +3587,7 @@ async function translateJapaneseChunk(text, targetLanguage = "en", signal) {
     },
     body: JSON.stringify({
       text: original,
-      targetLanguage: targetLanguage === "es" ? "es" : "en",
+      targetLanguage: ["en", "es", "th"].includes(targetLanguage) ? targetLanguage : "en",
     }),
     signal,
   });
@@ -3496,7 +3608,7 @@ async function translateJapaneseChunk(text, targetLanguage = "en", signal) {
 
 async function translateJapaneseLongText(value, signal, targetLanguage = "en") {
   const original = String(value || "");
-  if (!original || !containsJapaneseText(original)) return original;
+  if (!original || !shouldTranslateLongText(original, targetLanguage)) return original;
 
   const cacheKey = makeLongTranslationKey(`${targetLanguage}|${original}`);
   const cache = readLongTranslationCache();
@@ -4097,7 +4209,45 @@ function MaintenanceApp({ currentUser, userProfile }) {
     calendarEvents.length,
     plannedWorks.length,
     newEquipmentProjects.length,
+    reportViewMode,
+    reportPage,
   ]);
+
+
+  // Thai UI stabilization: React can re-render Japanese source labels after the
+  // language pass. Re-apply Thai translation only when DOM content changes.
+  useEffect(() => {
+    if (appLanguage !== "th" || typeof MutationObserver === "undefined") return undefined;
+
+    let timer = null;
+    let applying = false;
+    const controller = new AbortController();
+    const root = document.querySelector(".page");
+    if (!root) return undefined;
+
+    const observer = new MutationObserver(() => {
+      if (applying) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(async () => {
+        if (controller.signal.aborted) return;
+        applying = true;
+        try {
+          await applyMiyamaLanguage("th", controller.signal);
+        } catch (error) {
+          if (error?.name !== "AbortError") console.warn("Thai UI refresh failed:", error);
+        } finally {
+          applying = false;
+        }
+      }, 100);
+    });
+
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+      observer.disconnect();
+    };
+  }, [appLanguage, page]);
 
   useEffect(() => {
     setReportDrafts((current) => {
@@ -13888,7 +14038,13 @@ Requirements:
 
   function renderNewEquipmentManagement() {
     const labelForItem = (item) =>
-      appLanguage === "es" ? item.es : appLanguage === "en" ? item.en : item.jp;
+      appLanguage === "th"
+        ? (MIYAMA_TRANSLATIONS.th[item.jp] || item.jp)
+        : appLanguage === "es"
+          ? item.es
+          : appLanguage === "en"
+            ? item.en
+            : item.jp;
 
     const groupedChecklist = NEW_EQUIPMENT_CHECKLIST.reduce((acc, item) => {
       if (!acc[item.group]) acc[item.group] = [];
