@@ -1820,3 +1820,16 @@
   font-size: 11px;
   line-height: 1.5;
 }
+
+
+/* Calendar language-safe layout */
+.calendarTop h2 {
+  min-width: 220px;
+  text-align: center;
+}
+@media (max-width: 700px) {
+  .calendarTop h2 {
+    min-width: 0;
+    width: 100%;
+  }
+}

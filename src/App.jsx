@@ -9621,10 +9621,133 @@ function renderHome() {
   }
 
   function renderCalendar() {
+    const lang = MIYAMA_LANGUAGES[appLanguage] ? appLanguage : "ja";
+
+    const calendarText = {
+      ja: {
+        title: "カレンダー",
+        description: "月表示は「件数・区分」だけを見やすく表示し、詳細は下の予定一覧で確認できます。",
+        addSelected: "選択日の予定追加",
+        previous: "＜ 前月",
+        next: "翌月 ＞",
+        today: "今日",
+        weekdays: ["日", "月", "火", "水", "木", "金", "土"],
+        selectedSchedule: "の予定",
+        selectedDescription: "月カレンダーで選んだ日の詳細です。",
+        addThisDay: "この日に追加",
+        noSchedule: "予定はありません。",
+        important: "【重要】",
+        category: "区分",
+        owner: "担当",
+        noDetails: "詳細なし",
+        openRelated: "関連画面を開く",
+        edit: "編集",
+        delete: "削除",
+        autoLinked: "自動連携データ",
+        defaultSchedule: "予定",
+        items: "件",
+        categories: {
+          "計画工事": "計画工事",
+          "保全修理報告書": "保全修理報告書",
+          "保全報告書": "保全報告書",
+          "定期保全": "定期保全",
+          "改良保全": "改良保全",
+          "緊急": "緊急",
+          "会議": "会議",
+          "予定": "予定",
+        },
+      },
+      en: {
+        title: "Calendar",
+        description: "The monthly view shows only the number and category of schedules. Details are shown in the schedule list below.",
+        addSelected: "Add Schedule for Selected Date",
+        previous: "＜ Previous Month",
+        next: "Next Month ＞",
+        today: "Today",
+        weekdays: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        selectedSchedule: "Schedule",
+        selectedDescription: "Details for the date selected in the monthly calendar.",
+        addThisDay: "Add to This Date",
+        noSchedule: "No schedules.",
+        important: "【Important】",
+        category: "Category",
+        owner: "Owner",
+        noDetails: "No details",
+        openRelated: "Open Related Page",
+        edit: "Edit",
+        delete: "Delete",
+        autoLinked: "Automatically Linked Data",
+        defaultSchedule: "Schedule",
+        items: "items",
+        categories: {
+          "計画工事": "Planned Work",
+          "保全修理報告書": "Maintenance Repair Report",
+          "保全報告書": "Maintenance Report",
+          "定期保全": "Preventive Maintenance",
+          "改良保全": "Improvement Maintenance",
+          "緊急": "Emergency",
+          "会議": "Meeting",
+          "予定": "Schedule",
+        },
+      },
+      es: {
+        title: "Calendario",
+        description: "La vista mensual muestra solo la cantidad y la categoría de los eventos. Los detalles se consultan en la lista inferior.",
+        addSelected: "Agregar evento en la fecha seleccionada",
+        previous: "＜ Mes anterior",
+        next: "Mes siguiente ＞",
+        today: "Hoy",
+        weekdays: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"],
+        selectedSchedule: "Agenda",
+        selectedDescription: "Detalles de la fecha seleccionada en el calendario mensual.",
+        addThisDay: "Agregar a esta fecha",
+        noSchedule: "No hay eventos.",
+        important: "【Importante】",
+        category: "Categoría",
+        owner: "Responsable",
+        noDetails: "Sin detalles",
+        openRelated: "Abrir página relacionada",
+        edit: "Editar",
+        delete: "Eliminar",
+        autoLinked: "Datos vinculados automáticamente",
+        defaultSchedule: "Evento",
+        items: "eventos",
+        categories: {
+          "計画工事": "Trabajo planificado",
+          "保全修理報告書": "Informe de reparación de mantenimiento",
+          "保全報告書": "Informe de mantenimiento",
+          "定期保全": "Mantenimiento preventivo",
+          "改良保全": "Mantenimiento de mejora",
+          "緊急": "Emergencia",
+          "会議": "Reunión",
+          "予定": "Evento",
+        },
+      },
+    }[lang];
+
+    const monthNames = {
+      en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+      es: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+    };
+
+    const calendarMonthLabel = () => {
+      const year = calendarMonth.getFullYear();
+      const month = calendarMonth.getMonth();
+      if (lang === "en") return `${monthNames.en[month]} ${year}`;
+      if (lang === "es") return `${monthNames.es[month]} de ${year}`;
+      return `${year}年 ${month + 1}月`;
+    };
+
+    const categoryLabel = (category = "") => {
+      const raw = String(category || "予定");
+      return calendarText.categories[raw] || raw;
+    };
+
     const getCategoryIcon = (category = "") => {
       if (category.includes("計画工事")) return "🏗️";
-      if (category.includes("保全報告")) return "📝";
+      if (category.includes("保全報告") || category.includes("保全修理報告")) return "📝";
       if (category.includes("定期保全")) return "🔧";
+      if (category.includes("改良保全")) return "🛠️";
       if (category.includes("緊急")) return "🔴";
       if (category.includes("会議")) return "👥";
       return "📌";
@@ -9642,31 +9765,31 @@ function renderHome() {
     const selectedEvents = unifiedCalendarEvents.filter((event) => event.date === selectedDate);
 
     return (
-      <>
+      <div data-no-translate="true">
         <div className="header">
           <div>
-            <h2>📅 カレンダー</h2>
-            <p>月表示は「件数・区分」だけを見やすく表示し、詳細は下の予定一覧で確認できます。</p>
+            <h2>📅 {calendarText.title}</h2>
+            <p>{calendarText.description}</p>
           </div>
           <button className="primaryButton" onClick={() => startNewCalendarEvent(selectedDate)}>
-            <Plus size={16} /> 選択日の予定追加
+            <Plus size={16} /> {calendarText.addSelected}
           </button>
         </div>
 
         <div className="tableWrap">
           <div className="calendarTop">
-            <button onClick={() => changeMonth(-1)}>＜ 前月</button>
-            <h2>{calendarMonth.getFullYear()}年 {calendarMonth.getMonth() + 1}月</h2>
-            <button onClick={() => changeMonth(1)}>翌月 ＞</button>
+            <button onClick={() => changeMonth(-1)}>{calendarText.previous}</button>
+            <h2>{calendarMonthLabel()}</h2>
+            <button onClick={() => changeMonth(1)}>{calendarText.next}</button>
             <button onClick={() => {
               const now = todayText();
               setCalendarMonth(new Date());
               setSelectedDate(now);
-            }}>今日</button>
+            }}>{calendarText.today}</button>
           </div>
 
           <div className="calendarWeek">
-            <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+            {calendarText.weekdays.map((day) => <div key={day}>{day}</div>)}
           </div>
 
           <div className="calendarGrid">
@@ -9688,7 +9811,11 @@ function renderHome() {
                     <>
                       <div className="calendarDayHeader">
                         <span className="calendarDayNumber">{Number(date.slice(8, 10))}</span>
-                        {dayEvents.length > 0 && <span className="eventCount">{dayEvents.length}件</span>}
+                        {dayEvents.length > 0 && (
+                          <span className="eventCount">
+                            {lang === "ja" ? `${dayEvents.length}件` : `${dayEvents.length} ${calendarText.items}`}
+                          </span>
+                        )}
                       </div>
 
                       {dayEvents.length > 0 && (
@@ -9697,7 +9824,7 @@ function renderHome() {
                             <span
                               key={category}
                               className={`calendarSummaryPill ${dayEvents.some((e) => e.category === category && e.importance === "重要") ? "urgentPill" : ""}`}
-                              title={`${category}: ${count}件`}
+                              title={`${categoryLabel(category)}: ${lang === "ja" ? `${count}件` : `${count} ${calendarText.items}`}`}
                             >
                               {getCategoryIcon(category)} {count}
                             </span>
@@ -9706,8 +9833,8 @@ function renderHome() {
                       )}
 
                       {firstImportant && (
-                        <span className="calendarMiniText" title={firstImportant.title || "予定"}>
-                          {getCategoryIcon(firstImportant.category)} {firstImportant.time ? `${firstImportant.time} ` : ""}{firstImportant.title || "予定"}
+                        <span className="calendarMiniText" title={firstImportant.title || calendarText.defaultSchedule}>
+                          {getCategoryIcon(firstImportant.category)} {firstImportant.time ? `${firstImportant.time} ` : ""}{firstImportant.title || calendarText.defaultSchedule}
                         </span>
                       )}
                     </>
@@ -9719,19 +9846,23 @@ function renderHome() {
 
           <div className="selectedEventsHeader">
             <div>
-              <h3 style={{ margin: 0 }}>{selectedDate} の予定</h3>
+              <h3 style={{ margin: 0 }}>
+                {lang === "ja"
+                  ? `${selectedDate} ${calendarText.selectedSchedule}`
+                  : `${calendarText.selectedSchedule} — ${selectedDate}`}
+              </h3>
               <p style={{ margin: "4px 0 0", color: "#64748b" }}>
-                月カレンダーで選んだ日の詳細です。
+                {calendarText.selectedDescription}
               </p>
             </div>
             <button className="primaryButton" onClick={() => startNewCalendarEvent(selectedDate)}>
-              <Plus size={16} /> この日に追加
+              <Plus size={16} /> {calendarText.addThisDay}
             </button>
           </div>
 
           {selectedEvents.length === 0 && (
             <div className="calendarEditCard" style={{ marginTop: "12px" }}>
-              <p>予定はありません。</p>
+              <p>{calendarText.noSchedule}</p>
             </div>
           )}
 
@@ -9739,32 +9870,39 @@ function renderHome() {
             {selectedEvents.map((event) => (
               <div key={event.id} className="eventRow">
                 <div className="eventRowTitle">
-                  <b>{getCategoryIcon(event.category)} {event.importance === "重要" ? "【重要】" : ""}{event.title || "予定"}</b>
+                  <b>
+                    {getCategoryIcon(event.category)} {event.importance === "重要" ? calendarText.important : ""}
+                    {event.title || calendarText.defaultSchedule}
+                  </b>
                 </div>
 
                 <div className="eventMetaLine">
                   {event.time && <span className="eventMetaBadge">⏰ {event.time}</span>}
-                  <span className="eventMetaBadge">区分: {event.category || "-"}</span>
-                  <span className="eventMetaBadge">担当: {event.owner || "-"}</span>
+                  <span className="eventMetaBadge">{calendarText.category}: {categoryLabel(event.category || "予定")}</span>
+                  <span className="eventMetaBadge">{calendarText.owner}: {event.owner || "-"}</span>
                 </div>
 
-                <div className="eventDetailText">{event.detail || "詳細なし"}</div>
+                <div className="eventDetailText">{event.detail || calendarText.noDetails}</div>
 
                 {event.image && <img src={event.image} alt="" className="calendarPhoto" />}
 
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "12px" }}>
                   {event.page && event.page !== "calendar" && (
                     <button className="primaryButton" onClick={() => setPage(event.page)}>
-                      関連画面を開く
+                      {calendarText.openRelated}
                     </button>
                   )}
                   {event.deletable ? (
                     <>
-                      <button className="primaryButton" onClick={() => startEditCalendarEvent(event)}>✏️ 編集</button>
-                      <button className="deleteButton" onClick={() => removeItem("calendar", event.id)}><Trash2 size={16} /> 削除</button>
+                      <button className="primaryButton" onClick={() => startEditCalendarEvent(event)}>✏️ {calendarText.edit}</button>
+                      <button className="deleteButton" onClick={() => removeItem("calendar", event.id)}>
+                        <Trash2 size={16} /> {calendarText.delete}
+                      </button>
                     </>
                   ) : (
-                    <span style={{ color: "#64748b", fontSize: "12px", alignSelf: "center" }}>自動連携データ</span>
+                    <span style={{ color: "#64748b", fontSize: "12px", alignSelf: "center" }}>
+                      {calendarText.autoLinked}
+                    </span>
                   )}
                 </div>
               </div>
@@ -9773,7 +9911,7 @@ function renderHome() {
         </div>
 
         {renderCalendarModal()}
-      </>
+      </div>
     );
   }
 
