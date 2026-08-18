@@ -4158,11 +4158,124 @@ function MaintenanceApp({ currentUser, userProfile }) {
     if (!isAdmin) return;
     setSystemUsersLoading(true);
     setUserAdminMessage("");
+
     try {
+      // 1) Existing MIYAMA profiles/roles come from Firestore.
       const snap = await getDocs(collection(db, "users"));
-      const rows = snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => String(a.name || a.email || "").localeCompare(String(b.name || b.email || "")));
+      const firestoreRows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // 2) Authentication is the source of truth for login UID + email.
+      let authRows = [];
+      try {
+        const idToken = await currentUser?.getIdToken?.(true);
+        if (idToken) {
+          const response = await fetch("/api/admin-list-users", {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${idToken}`,
+            },
+          });
+
+          const raw = await response.text();
+          let data = {};
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch {
+            data = { error: raw || `HTTP ${response.status}` };
+          }
+
+          if (!response.ok) {
+            throw new Error(data?.error || `HTTP ${response.status}`);
+          }
+
+          authRows = Array.isArray(data?.users) ? data.users : [];
+        }
+      } catch (authError) {
+        console.warn("Authentication user sync failed:", authError);
+        // Keep Firestore list usable even if the server endpoint is temporarily unavailable.
+        setUserAdminMessage(
+          `⚠️ Firebase Authentication のユーザー情報を取得できませんでした: ${authError?.message || authError}`
+        );
+      }
+
+      const normalize = (value = "") =>
+        String(value || "")
+          .toLowerCase()
+          .normalize("NFKD")
+          .replace(/[^a-z0-9]/g, "");
+
+      const localPart = (email = "") => normalize(String(email || "").split("@")[0]);
+
+      const authByUid = new Map(authRows.map((u) => [String(u.uid || ""), u]));
+      const authByEmail = new Map(
+        authRows
+          .filter((u) => u.email)
+          .map((u) => [String(u.email).trim().toLowerCase(), u])
+      );
+
+      const usedAuthUids = new Set();
+
+      const mergedProfiles = firestoreRows.map((profile) => {
+        const profileEmail = String(profile.email || "").trim().toLowerCase();
+        let authUser = authByUid.get(String(profile.id || ""));
+
+        // Profiles created manually in Firestore may have a document id that is NOT
+        // the Authentication UID. Try exact e-mail next.
+        if (!authUser && profileEmail) {
+          authUser = authByEmail.get(profileEmail);
+        }
+
+        // For older profiles with no e-mail, use a conservative name-to-email-local
+        // match only for display/linking. Example: Kurata -> nkurata@...
+        if (!authUser && profile.name) {
+          const nameKey = normalize(profile.name);
+          const candidates = authRows.filter((u) => {
+            if (usedAuthUids.has(u.uid)) return false;
+            const lp = localPart(u.email);
+            if (!nameKey || nameKey.length < 4 || !lp) return false;
+            return lp.includes(nameKey) || nameKey.includes(lp);
+          });
+          if (candidates.length === 1) authUser = candidates[0];
+        }
+
+        if (authUser?.uid) usedAuthUids.add(authUser.uid);
+
+        return {
+          ...profile,
+          // Keep Firestore document id for role/active updates.
+          id: profile.id,
+          // Use Authentication UID for password/admin operations.
+          authUid: authUser?.uid || profile.authUid || "",
+          email: authUser?.email || profile.email || "",
+          authDisabled: Boolean(authUser?.disabled),
+          authCreatedAt: authUser?.creationTime || "",
+          authLastSignInAt: authUser?.lastSignInTime || "",
+          authLinked: Boolean(authUser?.uid),
+        };
+      });
+
+      // Add Authentication accounts that do not have any Firestore profile row.
+      // They remain visible so the admin can reset their password and see their email.
+      const extraAuthRows = authRows
+        .filter((u) => !usedAuthUids.has(u.uid))
+        .map((u) => ({
+          id: `auth-only:${u.uid}`,
+          authUid: u.uid,
+          name: u.displayName || String(u.email || "").split("@")[0] || "Firebase User",
+          email: u.email || "",
+          role: "operator",
+          active: !u.disabled,
+          authDisabled: Boolean(u.disabled),
+          authCreatedAt: u.creationTime || "",
+          authLastSignInAt: u.lastSignInTime || "",
+          authLinked: true,
+          authOnly: true,
+        }));
+
+      const rows = [...mergedProfiles, ...extraAuthRows].sort((a, b) =>
+        String(a.name || a.email || "").localeCompare(String(b.name || b.email || ""))
+      );
+
       setSystemUsers(rows);
     } catch (error) {
       console.error("Load users error:", error);
@@ -4245,7 +4358,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   async function adminSetSystemUserPassword(user = {}) {
     if (!isAdmin) return;
 
-    const uid = String(user?.id || "").trim();
+    const uid = String(user?.authUid || user?.id || "").trim();
     const name = String(user?.name || user?.email || "ユーザー").trim();
 
     const t = {
@@ -14950,12 +15063,19 @@ Requirements:
                   </div>
                 </div>
 
-                <span className="miyamaUserEmail">{u.email || "-"}</span>
+                <span className="miyamaUserEmail">
+                  {u.email || "-"}
+                  {u.authLinked && (
+                    <small style={{ display: "block", marginTop: "3px", color: "#16a34a", fontWeight: 800 }}>
+                      Firebase Auth ✓
+                    </small>
+                  )}
+                </span>
 
                 <select
                   value={String(u.role || "operator").toLowerCase()}
                   onChange={(e) => updateSystemUserProfile(u.id, { role: e.target.value })}
-                  disabled={u.id === currentUser?.uid}
+                  disabled={u.id === currentUser?.uid || u.authOnly}
                 >
                   <option value="operator">一般ユーザー</option>
                   <option value="inspector">点検者</option>
@@ -14973,7 +15093,8 @@ Requirements:
                     type="button"
                     className="primaryButton"
                     onClick={() => adminSetSystemUserPassword(u)}
-                    title="管理者がこのユーザーの新しいパスワードを直接設定します"
+                    disabled={!u.authUid && String(u.id || "").startsWith("auth-only:")}
+                    title="Firebase Authentication のUIDを使って新しいパスワードを設定します"
                     style={{ whiteSpace: "nowrap", padding: "9px 12px" }}
                   >
                     🔑 {appLanguage === "th" ? "เปลี่ยนรหัสผ่าน" : appLanguage === "es" ? "Cambiar contraseña" : appLanguage === "en" ? "Change Password" : "パスワード変更"}
@@ -14982,7 +15103,7 @@ Requirements:
                   <button
                     type="button"
                     className={u.active === false ? "miyamaEnableButton" : "miyamaDisableButton"}
-                    disabled={u.id === currentUser?.uid}
+                    disabled={u.id === currentUser?.uid || u.authOnly}
                     onClick={() => updateSystemUserProfile(u.id, { active: u.active === false })}
                   >
                     {u.active === false ? "有効にする" : "無効にする"}
