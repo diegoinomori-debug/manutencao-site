@@ -49,7 +49,7 @@ import {
   getDoc,
   setDoc,
 } from "firebase/firestore";
-import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 
 function toLocalDateText(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
@@ -4242,47 +4242,80 @@ function MaintenanceApp({ currentUser, userProfile }) {
     }
   }
 
-  async function sendSystemUserPasswordReset(user = {}) {
+  async function adminSetSystemUserPassword(user = {}) {
     if (!isAdmin) return;
 
-    const email = String(user?.email || "").trim();
-    const name = String(user?.name || email || "ユーザー").trim();
+    const uid = String(user?.id || "").trim();
+    const name = String(user?.name || user?.email || "ユーザー").trim();
 
-    if (!email || !email.includes("@")) {
-      setUserAdminMessage(`❌ ${name} のメールアドレスが登録されていません。`);
+    if (!uid) {
+      setUserAdminMessage("❌ ユーザーUIDが見つかりません。");
+      return;
+    }
+
+    const newPassword = window.prompt(
+      `${name} の新しいパスワードを入力してください。\n\n8文字以上を推奨します。`
+    );
+    if (newPassword === null) return;
+
+    if (String(newPassword).length < 6) {
+      setUserAdminMessage("❌ 新しいパスワードは6文字以上にしてください。");
+      return;
+    }
+
+    const confirmPassword = window.prompt(
+      "確認のため、同じ新しいパスワードをもう一度入力してください。"
+    );
+    if (confirmPassword === null) return;
+
+    if (newPassword !== confirmPassword) {
+      setUserAdminMessage("❌ パスワードが一致しません。");
       return;
     }
 
     const ok = window.confirm(
-      `${name} (${email}) にパスワード再設定メールを送信しますか？`
+      `${name} のパスワードを今入力した新しいパスワードへ変更しますか？`
     );
     if (!ok) return;
 
-    setUserAdminMessage("");
+    setUserAdminMessage("🔐 パスワードを変更しています...");
 
     try {
-      await sendPasswordResetEmail(auth, email);
-      setUserAdminMessage(
-        `✅ ${name} にパスワード再設定メールを送信しました。メール内のリンクから新しいパスワードを設定してください。`
-      );
-    } catch (error) {
-      console.error("Password reset error:", error);
-      const codeText = String(error?.code || "");
-      let message = error?.message || String(error);
+      const idToken = await currentUser?.getIdToken?.(true);
+      if (!idToken) throw new Error("管理者の認証トークンを取得できませんでした。");
 
-      if (codeText.includes("user-not-found")) {
-        message = "Firebase Authentication にこのメールアドレスのアカウントが見つかりません。";
-      } else if (codeText.includes("invalid-email")) {
-        message = "登録されているメールアドレスが正しくありません。";
-      } else if (codeText.includes("too-many-requests")) {
-        message = "短時間に送信回数が多すぎます。少し待ってから再度お試しください。";
-      } else if (codeText.includes("network-request-failed")) {
-        message = "ネットワークエラーが発生しました。接続を確認してください。";
+      const response = await fetch("/api/admin-set-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          uid,
+          newPassword,
+        }),
+      });
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {}
+
+      if (!response.ok) {
+        throw new Error(data?.error || `HTTP ${response.status}`);
       }
 
-      setUserAdminMessage(`❌ パスワード再設定メールを送信できませんでした: ${message}`);
+      setUserAdminMessage(
+        `✅ ${name} のパスワードを変更しました。新しいパスワードでログインできます。`
+      );
+    } catch (error) {
+      console.error("Admin password update error:", error);
+      setUserAdminMessage(
+        `❌ パスワード変更に失敗しました: ${error?.message || error}`
+      );
     }
   }
+
 
   async function updateSystemUserProfile(userId, patch = {}) {
     if (!isAdmin || !userId) return;
@@ -14888,12 +14921,12 @@ Requirements:
                   <button
                     type="button"
                     className="primaryButton"
-                    onClick={() => sendSystemUserPasswordReset(u)}
+                    onClick={() => adminSetSystemUserPassword(u)}
                     disabled={!u.email}
                     title="登録メールアドレスへパスワード再設定リンクを送信"
                     style={{ whiteSpace: "nowrap", padding: "9px 12px" }}
                   >
-                    🔑 パスワード再設定
+                    🔑 パスワード変更
                   </button>
 
                   <button
@@ -14914,7 +14947,7 @@ Requirements:
           <b>🔒 セキュリティについて</b>
           <p>
             アカウント作成はFirebase AuthenticationとFirestoreのusers設定を同時に作成します。
-            Firebaseでは現在のパスワードを表示することはできません。パスワードを忘れた場合は、登録ユーザーの「🔑 パスワード再設定」から本人の登録メールアドレスへ再設定リンクを送信してください。
+            Firebaseでは現在のパスワードを表示することはできません。パスワードを忘れた場合は、登録ユーザーの「🔑 パスワード変更」から本人の登録メールアドレスへ再設定リンクを送信してください。
             「閲覧のみ」を完全に保護するには、Firestore Security Rules側でもreadOnly/roleを使って書き込みを拒否する設定が必要です。
           </p>
         </div>
