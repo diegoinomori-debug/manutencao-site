@@ -787,6 +787,7 @@ const MIYAMA_LANGUAGES = {
   ja: "🇯🇵 日本語",
   en: "🇺🇸 English",
   es: "🇪🇸 Español",
+  th: "🇹🇭 ภาษาไทย",
 };
 
 const MIYAMA_TRANSLATIONS = {
@@ -1627,6 +1628,61 @@ Object.assign(MIYAMA_TRANSLATIONS.es, {
   "写真":"Fotos",
   "全部":"Todo"
 });
+// ===== Thai UI translation =====
+MIYAMA_TRANSLATIONS.th = {
+  "ホーム":"หน้าหลัก", "MIYAMA AI":"MIYAMA AI", "カレンダー":"ปฏิทิน",
+  "修理報告":"รายงานซ่อม", "修理報告書":"รายงานการซ่อม", "保全報告書":"รายงานบำรุงรักษา",
+  "保全修理報告書":"รายงานซ่อมบำรุง", "保全作業報告書":"รายงานงานบำรุงรักษา",
+  "定期保全":"บำรุงรักษาเชิงป้องกัน", "定量保全":"บำรุงรักษาตามปริมาณการผลิต",
+  "工事管理":"จัดการงานปรับปรุง", "計画工事":"งานที่วางแผน", "新規設備管理":"จัดการเครื่องจักรใหม่",
+  "予備品管理":"จัดการอะไหล่", "保全分析":"วิเคราะห์การบำรุงรักษา", "生産数DB":"ฐานข้อมูลการผลิต",
+  "CSV分析":"วิเคราะห์ CSV", "ユーザー管理":"จัดการผู้ใช้", "AI統合検索":"ค้นหารวมด้วย AI",
+  "保全分析センター":"ศูนย์วิเคราะห์การบำรุงรักษา", "CSV分析センター":"ศูนย์วิเคราะห์ CSV",
+  "生産分析・改善AIセンター":"ศูนย์ AI วิเคราะห์และปรับปรุงการผลิต",
+  "言語":"ภาษา", "日本語":"ภาษาญี่ปุ่น", "英語":"ภาษาอังกฤษ",
+  "検索":"ค้นหา", "再読込":"โหลดใหม่", "削除":"ลบ", "保存":"บันทึก", "保存確認":"บันทึก / ยืนยัน",
+  "保存して閉じる":"บันทึกและปิด", "交換完了":"เปลี่ยนเสร็จแล้ว", "追加":"เพิ่ม", "選択":"เลือก", "印刷":"พิมพ์",
+  "ダウンロード":"ดาวน์โหลด", "CSV取込":"นำเข้า CSV", "CSV全削除":"ลบ CSV ทั้งหมด", "CSV出力":"ส่งออก CSV",
+  "画像検索":"ค้นหารูปภาพ", "AI補完・画像検索":"AI ช่วยเติม / ค้นหารูปภาพ", "関連画面を開く":"เปิดหน้าที่เกี่ยวข้อง",
+  "概要":"ภาพรวม", "基本":"ข้อมูลพื้นฐาน", "基本情報":"ข้อมูลพื้นฐาน", "基本情報・設備情報":"ข้อมูลพื้นฐาน / เครื่องจักร",
+  "作成日":"วันที่สร้าง", "作業者":"ผู้ปฏิบัติงาน", "作成":"ผู้จัดทำ", "承認":"อนุมัติ", "承認状態":"สถานะอนุมัติ",
+  "状態":"สถานะ", "点検依頼":"ขอตรวจสอบ", "保存済み":"บันทึกแล้ว", "PDF/印刷":"PDF / พิมพ์", "PDF印刷":"PDF / พิมพ์",
+  "Excel/CSV":"Excel / CSV", "QRリンク":"ลิงก์ QR", "表示テーマを選択":"เลือกหัวข้อที่จะแสดง",
+  "不具合":"ปัญหา", "原因":"สาเหตุ", "再発防止":"ป้องกันการเกิดซ้ำ", "費用":"ค่าใช้จ่าย", "写真":"รูปภาพ", "全部":"ทั้งหมด",
+  "グループ名":"กลุ่ม", "ライン名":"ไลน์", "設備名":"เครื่องจักร", "保全分類":"ประเภทการบำรุงรักษา",
+  "ログアウト":"ออกจากระบบ", "管理者":"ผู้ดูแลระบบ", "承認者":"ผู้อนุมัติ", "点検者":"ผู้ตรวจสอบ", "閲覧のみ":"ดูอย่างเดียว",
+  "一般ユーザー":"ผู้ใช้ทั่วไป", "新規作成":"สร้างใหม่", "新規報告書":"รายงานใหม่", "更新":"อัปเดต", "読込中":"กำลังโหลด",
+  "原因大分類":"หมวดสาเหตุ", "原因詳細":"รายละเอียดสาเหตุ", "重要度":"ระดับความสำคัญ", "再発レベル":"ระดับการเกิดซ้ำ",
+  "保全戦略":"กลยุทธ์การบำรุงรักษา", "判定理由":"เหตุผลการตัดสิน", "推奨理由":"เหตุผลที่แนะนำ", "推奨保全戦略":"กลยุทธ์ที่แนะนำ",
+  "自動再発判定":"ตรวจการเกิดซ้ำอัตโนมัติ", "自動戦略診断":"วิเคราะห์กลยุทธ์อัตโนมัติ", "推奨判定を反映":"ใช้คำแนะนำ",
+  "類似履歴":"ประวัติที่คล้ายกัน", "近い過去事例":"กรณีที่ผ่านมาใกล้เคียง", "初回":"ครั้งแรก", "再発":"เกิดซ้ำ", "頻発":"เกิดบ่อย", "慢性":"เรื้อรัง",
+  "事後保全":"บำรุงรักษาหลังเสีย (BM)", "予防保全":"บำรุงรักษาเชิงป้องกัน (PM)", "状態基準保全":"บำรุงรักษาตามสภาพ (CBM)", "改良保全":"บำรุงรักษาเพื่อปรับปรุง (CM)",
+  "保全内容":"รายละเอียดการบำรุงรักษา", "目標日":"วันที่เป้าหมาย", "関連アクション":"การดำเนินการที่เกี่ยวข้อง",
+  "定期保全を開く":"เปิดบำรุงรักษาเชิงป้องกัน", "工事管理を開く":"เปิดจัดการงานปรับปรุง",
+  "戦略分類率":"อัตราการจำแนกกลยุทธ์", "再発率":"อัตราการเกิดซ้ำ", "高重要度 S/A":"ความสำคัญสูง S/A", "慢性・頻発":"เรื้อรัง / เกิดบ่อย",
+  "PM/CMアクション化率":"อัตราการดำเนินการ PM/CM", "参考MTBF":"MTBF อ้างอิง", "保全戦略構成":"สัดส่วนกลยุทธ์การบำรุงรักษา",
+  "原因別 停止時間Pareto":"พาเรโตเวลาหยุดตามสาเหตุ", "原因別停止時間Pareto":"พาเรโตเวลาหยุดตามสาเหตุ", "重点改善設備ランキング":"อันดับเครื่องจักรที่ควรปรับปรุง",
+  "未分類":"ยังไม่จำแนก", "不明":"ไม่ทราบ", "センサー":"เซนเซอร์", "空圧・油圧":"นิวเมติก / ไฮดรอลิก", "制御・電気":"ควบคุม / ไฟฟ้า",
+  "断線・配線":"สายไฟ / สายขาด", "プログラム":"โปรแกรม / ซอฟต์แวร์", "給油・潤滑":"การหล่อลื่น", "汚れ・異物":"สิ่งสกปรก / สิ่งแปลกปลอม",
+  "摩耗":"สึกหรอ", "破損":"เสียหาย / แตกหัก", "寿命":"หมดอายุการใช้งาน", "位置ズレ・調整":"ตำแหน่งคลาดเคลื่อน / ปรับตั้ง",
+  "ワーク・材料":"ชิ้นงาน / วัสดุ", "操作・作業":"การปฏิบัติงาน", "保全不備":"การบำรุงรักษาไม่เพียงพอ", "設計・構造":"การออกแบบ / โครงสร้าง",
+  "プロジェクト名":"ชื่อโครงการ", "稼働予定日":"วันที่คาดว่าจะเริ่มใช้งาน", "生産技術担当":"ผู้รับผิดชอบวิศวกรรมการผลิต", "保全担当":"ผู้รับผิดชอบบำรุงรักษา",
+  "プロジェクト":"โครงการ", "準備中":"กำลังเตรียม", "計画中":"กำลังวางแผน", "製作中":"กำลังผลิต", "完了":"เสร็จสิ้น",
+  "重要予備品":"อะไหล่สำคัญ", "欠品リスク":"ความเสี่ยงอะไหล่ขาด", "年間保全予算":"งบประมาณบำรุงรักษารายปี", "推奨発注額":"ยอดสั่งซื้อที่แนะนำ",
+  "登録部品":"อะไหล่ที่ลงทะเบียน", "在庫総額":"มูลค่าสต็อก", "発注予定額":"ยอดสั่งซื้อที่วางแผน", "予備品AI検索":"ค้นหาอะไหล่ด้วย AI",
+  "部品名なし":"ไม่มีชื่ออะไหล่", "写真なし":"ไม่มีรูป", "型式・品番":"รุ่น / หมายเลขชิ้นส่วน", "メーカー":"ผู้ผลิต", "カテゴリ":"หมวดหมู่",
+  "使用設備":"เครื่องจักรที่ใช้", "保管場所":"สถานที่จัดเก็บ", "在庫数":"จำนวนคงเหลือ", "最低在庫":"สต็อกขั้นต่ำ", "納期":"ระยะเวลาจัดส่ง",
+  "購入先":"ผู้จำหน่าย", "購入URL":"URL สำหรับสั่งซื้อ", "定期保全へ追加":"เพิ่มในบำรุงรักษาเชิงป้องกัน",
+  "交換超過":"เกินกำหนดเปลี่ยน", "交換間近":"ใกล้กำหนดเปลี่ยน", "点検":"ตรวจสอบ", "交換":"เปลี่ยน", "修理":"ซ่อม", "清掃":"ทำความสะอาด",
+  "給油":"หล่อลื่น", "締付":"ขันแน่น", "調整":"ปรับตั้ง", "全て":"ทั้งหมด", "全期間":"ทุกช่วงเวลา", "1ヶ月":"1 เดือน", "3ヶ月":"3 เดือน", "6ヶ月":"6 เดือน", "1年":"1 ปี",
+  "対象期間":"ช่วงเวลา", "計画CSV出力":"ส่งออกแผน CSV", "設備保全を、もっとスマートに。":"ทำให้การบำรุงรักษาเครื่องจักรฉลาดยิ่งขึ้น",
+  "設備・部品・トラブル詳細を検索してください":"ค้นหาเครื่องจักร อะไหล่ หรือรายละเอียดปัญหา", "システムへ入る":"เข้าสู่ระบบ",
+  "今月停止時間":"เวลาหยุดเดือนนี้", "今月修理時間":"เวลาซ่อมเดือนนี้", "今月参考費用":"ค่าใช้จ่ายโดยประมาณเดือนนี้", "今月報告書":"รายงานเดือนนี้",
+  "推定稼働率（2直16H基準）":"อัตราการเดินเครื่องโดยประมาณ (2 กะ / 16 ชม.)", "保全作業に使った時間":"เวลาที่ใช้ในงานบำรุงรักษา",
+  "労務費＋部品費":"ค่าแรง + ค่าอะไหล่", "統合AI":"AI แบบรวม", "対象期間":"ช่วงเวลา",
+  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"แสดงเฉพาะหัวข้อที่จำเป็นแทนรายงานทั้งหมด"
+};
+
 const MIYAMA_BLOCKED_TRANSLATION_KEYS = new Set(["分", "日", "月", "年", "火", "水", "木", "金", "土"]);
 
 Object.keys(MIYAMA_TRANSLATIONS).forEach((lang) => {
@@ -1859,7 +1915,14 @@ function translateMiyamaText(text = "", language = "ja") {
 
   // 2) UI prefixes that often appear together with DB data. Keep DB text original.
   let output = original;
-  const prefixDictionary = selectedLanguage === "es"
+  const prefixDictionary = selectedLanguage === "th"
+    ? [
+        ["【Important】 保全報告：", "【สำคัญ】 รายงานบำรุงรักษา: "],
+        ["区分:", "หมวดหมู่:"], ["Category:", "หมวดหมู่:"],
+        ["担当者:", "ผู้รับผิดชอบ:"], ["担当:", "ผู้รับผิดชอบ:"], ["Owner:", "ผู้รับผิดชอบ:"],
+        ["件数", "จำนวน"], ["最新", "ล่าสุด"], ["停止時間", "เวลาหยุด"],
+      ]
+    : selectedLanguage === "es"
     ? [
         ["【Important】 保全報告：", "【Importante】 Informe de mantenimiento: "],
         ["【Important】 保全報告 :", "【Importante】 Informe de mantenimiento: "],
@@ -3624,11 +3687,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
         operator: "Operator",
       },
       es: {
-        admin: "Administrador",
-        approver: "Aprobador",
-        inspector: "Inspector",
-        viewer: "Solo lectura",
-        operator: "Operador",
+        admin: "Administrador", approver: "Aprobador", inspector: "Inspector", viewer: "Solo lectura", operator: "Operador",
+      },
+      th: {
+        admin: "ผู้ดูแลระบบ", approver: "ผู้อนุมัติ", inspector: "ผู้ตรวจสอบ", viewer: "ดูอย่างเดียว", operator: "ผู้ปฏิบัติงาน",
       },
     };
     const safeRole = ["admin", "approver", "inspector", "viewer"].includes(currentRole)
@@ -5805,7 +5867,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
     try {
       const responseLanguage =
-        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+        appLanguage === "th" ? "Thai" : appLanguage === "th" ? "Thai" : appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
 
       const result = await askMiyamaAI({
         language: responseLanguage,
@@ -5874,7 +5936,7 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
         {globalSearch && (
           <div style={{ marginTop: "16px" }}>
             <h3>{appLanguage === "en" ? `Search results: ${globalResults.length}` : `検索結果：${globalResults.length}件`}</h3>
-            {globalResults.length === 0 && <p>{appLanguage === "en" ? "No related data was found." : "関連データが見つかりません。"}</p>}
+            {globalResults.length === 0 && <p>{appLanguage === "th" ? "ไม่พบข้อมูลที่เกี่ยวข้อง" : appLanguage === "en" ? "No related data was found." : "関連データが見つかりません。"}</p>}
             {appLanguage === "en" && globalTranslationLoading && (
               <p style={{ fontWeight: 700 }}>🌐 Translating the displayed reports...</p>
             )}
@@ -6520,7 +6582,7 @@ const handleBulkReportExcelUpload = async (e) => {
       }
 
       const responseLanguage =
-        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+        appLanguage === "th" ? "Thai" : appLanguage === "th" ? "Thai" : appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
 
       setWhyAiLoading(true);
       setWhyAiError("");
@@ -6606,7 +6668,7 @@ Rules:
       }
 
       const responseLanguage =
-        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+        appLanguage === "th" ? "Thai" : appLanguage === "th" ? "Thai" : appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
 
       const historyRows = similarProblems.slice(0, 8);
       const historyContext = historyRows.length
@@ -9723,6 +9785,19 @@ function renderHome() {
           "予定": "Evento",
         },
       },
+      th: {
+        title: "ปฏิทิน",
+        description: "มุมมองรายเดือนแสดงเฉพาะจำนวนและประเภทของกำหนดการ โดยดูรายละเอียดได้จากรายการด้านล่าง",
+        addSelected: "เพิ่มกำหนดการในวันที่เลือก", previous: "＜ เดือนก่อน", next: "เดือนถัดไป ＞", today: "วันนี้",
+        weekdays: ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."],
+        selectedSchedule: "กำหนดการ", selectedDescription: "รายละเอียดของวันที่เลือกในปฏิทินรายเดือน",
+        addThisDay: "เพิ่มในวันนี้", noSchedule: "ไม่มีกำหนดการ", important: "【สำคัญ】", category: "หมวดหมู่", owner: "ผู้รับผิดชอบ",
+        noDetails: "ไม่มีรายละเอียด", openRelated: "เปิดหน้าที่เกี่ยวข้อง", edit: "แก้ไข", delete: "ลบ", autoLinked: "ข้อมูลเชื่อมโยงอัตโนมัติ", defaultSchedule: "กำหนดการ", items: "รายการ",
+        categories: {
+          "計画工事": "งานที่วางแผน", "保全修理報告書": "รายงานซ่อมบำรุง", "保全報告書": "รายงานบำรุงรักษา",
+          "定期保全": "บำรุงรักษาเชิงป้องกัน", "改良保全": "บำรุงรักษาเพื่อปรับปรุง", "緊急": "ฉุกเฉิน", "会議": "ประชุม", "予定": "กำหนดการ",
+        },
+      },
     }[lang];
 
     const monthNames = {
@@ -9735,6 +9810,7 @@ function renderHome() {
       const month = calendarMonth.getMonth();
       if (lang === "en") return `${monthNames.en[month]} ${year}`;
       if (lang === "es") return `${monthNames.es[month]} de ${year}`;
+      if (lang === "th") return `${month + 1}/${year}`;
       return `${year}年 ${month + 1}月`;
     };
 
@@ -13089,7 +13165,7 @@ function renderHome() {
       ].join("\n")).join("\n\n---\n\n");
 
       const responseLanguage =
-        appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
+        appLanguage === "th" ? "Thai" : appLanguage === "th" ? "Thai" : appLanguage === "es" ? "Spanish" : appLanguage === "en" ? "English" : "Japanese";
 
       setPaidAiLoading(true);
       setPaidAiError("");
@@ -14293,6 +14369,11 @@ Requirements:
       csvAnalytics: "Análisis CSV",
       users: "Usuarios",
     },
+    th: {
+      home: "หน้าหลัก", miyamaAi: "MIYAMA AI", calendar: "ปฏิทิน", report: "รายงานซ่อม",
+      maintenance: "บำรุงป้องกัน", work: "จัดการงาน", newEquipment: "เครื่องจักรใหม่", spare: "อะไหล่",
+      analytics: "วิเคราะห์", dailyProduction: "ฐานข้อมูลผลิต", csvAnalytics: "วิเคราะห์ CSV", users: "ผู้ใช้",
+    },
   }[appLanguage] || {};
 
   const menuItems = [
@@ -14321,8 +14402,8 @@ return (
           className="miyamaNavArrow"
           onClick={() => topMenuRef.current?.scrollBy({ left: -420, behavior: "smooth" })}
           data-no-translate="true"
-          aria-label={appLanguage === "es" ? "Menú anterior" : appLanguage === "en" ? "Previous menu" : "前のメニュー"}
-          title={appLanguage === "es" ? "Menú anterior" : appLanguage === "en" ? "Previous menu" : "前のメニュー"}
+          aria-label={appLanguage === "th" ? "เมนูก่อนหน้า" : appLanguage === "es" ? "Menú anterior" : appLanguage === "en" ? "Previous menu" : "前のメニュー"}
+          title={appLanguage === "th" ? "เมนูก่อนหน้า" : appLanguage === "es" ? "Menú anterior" : appLanguage === "en" ? "Previous menu" : "前のメニュー"}
         >
           ‹
         </button>
@@ -14357,7 +14438,7 @@ return (
               onClick={logoutCurrentUser}
               className="miyamaLogout"
             >
-              {appLanguage === "es" ? "Cerrar sesión" : appLanguage === "en" ? "Logout" : "ログアウト"}
+              {appLanguage === "th" ? "ออกจากระบบ" : appLanguage === "es" ? "Cerrar sesión" : appLanguage === "en" ? "Logout" : "ログアウト"}
             </button>
           </div>
         </div>
@@ -14382,8 +14463,8 @@ return (
           className="miyamaNavArrow"
           onClick={() => topMenuRef.current?.scrollBy({ left: 420, behavior: "smooth" })}
           data-no-translate="true"
-          aria-label={appLanguage === "es" ? "Menú siguiente" : appLanguage === "en" ? "Next menu" : "次のメニュー"}
-          title={appLanguage === "es" ? "Menú siguiente" : appLanguage === "en" ? "Next menu" : "次のメニュー"}
+          aria-label={appLanguage === "th" ? "เมนูถัดไป" : appLanguage === "es" ? "Menú siguiente" : appLanguage === "en" ? "Next menu" : "次のメニュー"}
+          title={appLanguage === "th" ? "เมนูถัดไป" : appLanguage === "es" ? "Menú siguiente" : appLanguage === "en" ? "Next menu" : "次のメニュー"}
         >
           ›
         </button>
