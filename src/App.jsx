@@ -3616,6 +3616,8 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
 function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder = "", ...props }) {
   const original = String(value ?? "");
   const [displayValue, setDisplayValue] = useState(original);
+  const [retryToken, setRetryToken] = useState(0);
+  const [translationFailed, setTranslationFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -3623,20 +3625,27 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
 
     if (language === "ja" || !shouldTranslateLongText(original, language)) {
       setDisplayValue(original);
+      setTranslationFailed(false);
       return () => controller.abort();
     }
 
+    setTranslationFailed(false);
     setDisplayValue(
-      language === "th" ? "กำลังแปล..." : language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
+      language === "th" ? "กำลังแปลเนื้อหา..." : language === "es" ? "Traduciendo..." : language === "en" ? "Translating..." : original
     );
 
     translateJapaneseLongText(original, controller.signal, language)
       .then((translated) => {
-        if (!cancelled) setDisplayValue(translated || original);
+        if (cancelled) return;
+        const next = String(translated || original);
+        const failedThai = language === "th" && shouldTranslateLongText(original, "th") && !containsThaiText(next);
+        setTranslationFailed(failedThai);
+        setDisplayValue(next);
       })
       .catch((error) => {
         if (!cancelled && error?.name !== "AbortError") {
           console.warn("Textarea display translation failed:", error);
+          setTranslationFailed(language === "th");
           setDisplayValue(original);
         }
       });
@@ -3645,32 +3654,42 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
       cancelled = true;
       controller.abort();
     };
-  }, [original, language]);
+  }, [original, language, retryToken]);
 
   return (
-    <textarea
-      {...props}
-      value={displayValue}
-      placeholder={placeholder}
-      readOnly
-      title={
-        language === "th"
-          ? "เปลี่ยนเป็นภาษาญี่ปุ่นเพื่อแก้ไขข้อมูลต้นฉบับ"
-          : language === "es"
-            ? "Cambie a japonés para editar los datos originales."
-            : language === "en"
-              ? "Switch to Japanese to edit the original data."
-              : undefined
-      }
-    />
+    <div className="miyamaTranslatedTextareaWrap">
+      <textarea
+        {...props}
+        value={displayValue}
+        placeholder={placeholder}
+        readOnly
+        title={
+          language === "th"
+            ? "ข้อมูลต้นฉบับจะไม่ถูกแก้ไข การแปลนี้ใช้เพื่อการแสดงผลเท่านั้น"
+            : language === "es"
+              ? "Cambie a japonés para editar los datos originales."
+              : language === "en"
+                ? "Switch to Japanese to edit the original data."
+                : undefined
+        }
+      />
+      {translationFailed && language === "th" && (
+        <button
+          type="button"
+          className="miyamaTranslationRetryButton"
+          onClick={() => setRetryToken((value) => value + 1)}
+        >
+          🔄 แปลเนื้อหาอีกครั้ง
+        </button>
+      )}
+    </div>
   );
 }
-
 
 // ===== V15 Firebase長文の表示翻訳（日本語 → 英語） =====
 // Firebaseの原文は変更せず、AI検索結果に表示する長文だけを翻訳します。
 // 翻訳結果はブラウザにキャッシュし、同じ文章を何度も通信しません。
-const MIYAMA_LONG_TRANSLATION_CACHE_KEY = "miyamaLongTranslationCacheV1";
+const MIYAMA_LONG_TRANSLATION_CACHE_KEY = "miyamaLongTranslationCacheV2_thai_content";
 const MIYAMA_TRANSLATE_ENDPOINT =
   import.meta.env.VITE_TRANSLATION_API_URL ||
   "https://translate.googleapis.com/translate_a/single";
@@ -3835,9 +3854,22 @@ async function translateJapaneseLongText(value, signal, targetLanguage = "en") {
   }
 
   const translated = translatedChunks.join("");
-  cache[cacheKey] = translated;
-  writeLongTranslationCache(cache);
-  return translated;
+
+  // Never persist a failed/no-op Thai translation. Earlier builds could cache the
+  // original English text as if it were translated, which prevented future retries.
+  const normalizedOriginal = original.trim();
+  const normalizedTranslated = String(translated || "").trim();
+  const looksUntranslatedThai =
+    targetLanguage === "th" &&
+    shouldTranslateLongText(normalizedOriginal, "th") &&
+    (!normalizedTranslated || normalizedTranslated === normalizedOriginal || !containsThaiText(normalizedTranslated));
+
+  if (!looksUntranslatedThai) {
+    cache[cacheKey] = translated;
+    writeLongTranslationCache(cache);
+  }
+
+  return looksUntranslatedThai ? original : translated;
 }
 
 function makeAiTranslationItemKey(item = {}, index = 0) {
@@ -4230,6 +4262,17 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const savedLanguage = localStorage.getItem("miyamaLanguage") || "ja";
     return MIYAMA_LANGUAGES[savedLanguage] ? savedLanguage : "ja";
   });
+
+  useEffect(() => {
+    // One-time migration: remove stale translation caches created before Thai
+    // historical English/Japanese content translation was fixed.
+    try {
+      localStorage.removeItem("miyamaLongTranslationCacheV1");
+      localStorage.removeItem("miyamaLongTranslationCacheV2");
+    } catch {
+      // Ignore storage restrictions.
+    }
+  }, []);
 
   useEffect(() => {
     if (isAdmin && page === "users") loadSystemUsers();
