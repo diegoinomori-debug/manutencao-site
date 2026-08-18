@@ -4156,130 +4156,45 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   async function loadSystemUsers() {
     if (!isAdmin) return;
+
     setSystemUsersLoading(true);
     setUserAdminMessage("");
 
     try {
-      // 1) Existing MIYAMA profiles/roles come from Firestore.
+      // Firestore is the MIYAMA user registry.
+      // IMPORTANT:
+      // Do not call Firebase Admin listUsers() here. The users page can be opened/reloaded
+      // many times, and listing all Authentication users is unnecessary for day-to-day use.
+      //
+      // New MIYAMA accounts save authUid explicitly.
+      // Older accounts are linked lazily the first time an admin changes their password:
+      // the admin supplies the Firebase Authentication email once, and the server stores
+      // the resolved authUid + email back into this Firestore profile.
       const snap = await getDocs(collection(db, "users"));
-      const firestoreRows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      // 2) Authentication is the source of truth for login UID + email.
-      let authRows = [];
-      try {
-        const idToken = await currentUser?.getIdToken?.(true);
-        if (idToken) {
-          const response = await fetch("/api/admin-list-users", {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${idToken}`,
-            },
-          });
-
-          const raw = await response.text();
-          let data = {};
-          try {
-            data = raw ? JSON.parse(raw) : {};
-          } catch {
-            data = { error: raw || `HTTP ${response.status}` };
-          }
-
-          if (!response.ok) {
-            throw new Error(data?.error || `HTTP ${response.status}`);
-          }
-
-          authRows = Array.isArray(data?.users) ? data.users : [];
-        }
-      } catch (authError) {
-        console.warn("Authentication user sync failed:", authError);
-        // Keep Firestore list usable even if the server endpoint is temporarily unavailable.
-        setUserAdminMessage(
-          `⚠️ Firebase Authentication のユーザー情報を取得できませんでした: ${authError?.message || authError}`
+      const rows = snap.docs
+        .map((d) => {
+          const data = d.data() || {};
+          return {
+            id: d.id,
+            ...data,
+            authUid: String(data.authUid || "").trim(),
+            email: String(data.email || "").trim(),
+            authLinked: Boolean(String(data.authUid || "").trim()),
+          };
+        })
+        .sort((a, b) =>
+          String(a.name || a.email || "").localeCompare(
+            String(b.name || b.email || "")
+          )
         );
-      }
-
-      const normalize = (value = "") =>
-        String(value || "")
-          .toLowerCase()
-          .normalize("NFKD")
-          .replace(/[^a-z0-9]/g, "");
-
-      const localPart = (email = "") => normalize(String(email || "").split("@")[0]);
-
-      const authByUid = new Map(authRows.map((u) => [String(u.uid || ""), u]));
-      const authByEmail = new Map(
-        authRows
-          .filter((u) => u.email)
-          .map((u) => [String(u.email).trim().toLowerCase(), u])
-      );
-
-      const usedAuthUids = new Set();
-
-      const mergedProfiles = firestoreRows.map((profile) => {
-        const profileEmail = String(profile.email || "").trim().toLowerCase();
-        let authUser = authByUid.get(String(profile.id || ""));
-
-        // Profiles created manually in Firestore may have a document id that is NOT
-        // the Authentication UID. Try exact e-mail next.
-        if (!authUser && profileEmail) {
-          authUser = authByEmail.get(profileEmail);
-        }
-
-        // For older profiles with no e-mail, use a conservative name-to-email-local
-        // match only for display/linking. Example: Kurata -> nkurata@...
-        if (!authUser && profile.name) {
-          const nameKey = normalize(profile.name);
-          const candidates = authRows.filter((u) => {
-            if (usedAuthUids.has(u.uid)) return false;
-            const lp = localPart(u.email);
-            if (!nameKey || nameKey.length < 4 || !lp) return false;
-            return lp.includes(nameKey) || nameKey.includes(lp);
-          });
-          if (candidates.length === 1) authUser = candidates[0];
-        }
-
-        if (authUser?.uid) usedAuthUids.add(authUser.uid);
-
-        return {
-          ...profile,
-          // Keep Firestore document id for role/active updates.
-          id: profile.id,
-          // Use Authentication UID for password/admin operations.
-          authUid: authUser?.uid || profile.authUid || "",
-          email: authUser?.email || profile.email || "",
-          authDisabled: Boolean(authUser?.disabled),
-          authCreatedAt: authUser?.creationTime || "",
-          authLastSignInAt: authUser?.lastSignInTime || "",
-          authLinked: Boolean(authUser?.uid),
-        };
-      });
-
-      // Add Authentication accounts that do not have any Firestore profile row.
-      // They remain visible so the admin can reset their password and see their email.
-      const extraAuthRows = authRows
-        .filter((u) => !usedAuthUids.has(u.uid))
-        .map((u) => ({
-          id: `auth-only:${u.uid}`,
-          authUid: u.uid,
-          name: u.displayName || String(u.email || "").split("@")[0] || "Firebase User",
-          email: u.email || "",
-          role: "operator",
-          active: !u.disabled,
-          authDisabled: Boolean(u.disabled),
-          authCreatedAt: u.creationTime || "",
-          authLastSignInAt: u.lastSignInTime || "",
-          authLinked: true,
-          authOnly: true,
-        }));
-
-      const rows = [...mergedProfiles, ...extraAuthRows].sort((a, b) =>
-        String(a.name || a.email || "").localeCompare(String(b.name || b.email || ""))
-      );
 
       setSystemUsers(rows);
     } catch (error) {
       console.error("Load users error:", error);
-      setUserAdminMessage(`ユーザー一覧の読込に失敗しました: ${error?.message || error}`);
+      setUserAdminMessage(
+        `ユーザー一覧の読込に失敗しました: ${error?.message || error}`
+      );
     } finally {
       setSystemUsersLoading(false);
     }
@@ -4324,6 +4239,9 @@ function MaintenanceApp({ currentUser, userProfile }) {
         email,
         role,
         active: true,
+        authUid: credential.user.uid,
+        authProvider: "password",
+        authLinkedAt: new Date().toISOString(),
         ...permissions,
         createdAt: new Date().toISOString(),
         createdBy: currentUser?.uid || "",
@@ -4358,74 +4276,92 @@ function MaintenanceApp({ currentUser, userProfile }) {
   async function adminSetSystemUserPassword(user = {}) {
     if (!isAdmin) return;
 
-    const uid = String(user?.authUid || user?.id || "").trim();
-    const name = String(user?.name || user?.email || "ユーザー").trim();
+    const firestoreUserId = String(user?.id || "").trim();
+    const savedAuthUid = String(user?.authUid || "").trim();
+    const savedEmail = String(user?.email || "").trim().toLowerCase();
+    const name = String(user?.name || savedEmail || "ユーザー").trim();
 
-    const t = {
+    const labels = {
       ja: {
-        noUid: "ユーザーUIDが見つかりません。",
-        ask: `${name} の新しいパスワードを入力してください。\n\n6文字以上で入力してください。`,
+        emailAsk:
+          `${name} はFirebase Authenticationとの連携情報がありません。\n` +
+          `Firebase Authenticationに登録されているメールアドレスを入力してください。\n\n` +
+          `このメールアドレスは確認後、ユーザー設定に保存されます。`,
+        emailInvalid: "正しいメールアドレスを入力してください。",
+        passwordAsk: `${name} の新しいパスワードを入力してください。\n\n6文字以上で入力してください。`,
         tooShort: "新しいパスワードは6文字以上にしてください。",
         confirm: "確認のため、同じ新しいパスワードをもう一度入力してください。",
         mismatch: "パスワードが一致しません。",
-        final: `${name} のパスワードを今入力した新しいパスワードへ変更しますか？`,
-        changing: "🔐 パスワードを変更しています...",
-        done: `✅ ${name} のパスワードを変更しました。新しいパスワードでログインできます。`,
+        final: `${name} のパスワードを変更しますか？`,
+        changing: "🔐 Firebase Authenticationのパスワードを変更しています...",
+        done: `✅ ${name} のパスワードを変更しました。Firebase Authenticationとの連携情報も更新しました。`,
         failed: "パスワード変更に失敗しました",
       },
       en: {
-        noUid: "User UID was not found.",
-        ask: `Enter a new password for ${name}.\n\nUse at least 6 characters.`,
+        emailAsk:
+          `${name} is not linked to a Firebase Authentication account.\n` +
+          `Enter the email registered in Firebase Authentication.\n\n` +
+          `After verification, the email and UID will be saved to the user's MIYAMA profile.`,
+        emailInvalid: "Enter a valid email address.",
+        passwordAsk: `Enter a new password for ${name}.\n\nUse at least 6 characters.`,
         tooShort: "The new password must contain at least 6 characters.",
-        confirm: "Enter the same new password again to confirm.",
+        confirm: "Enter the same password again to confirm.",
         mismatch: "The passwords do not match.",
-        final: `Change ${name}'s password to the new password you entered?`,
-        changing: "🔐 Changing password...",
-        done: `✅ ${name}'s password was changed. The user can now sign in with the new password.`,
+        final: `Change ${name}'s password?`,
+        changing: "🔐 Changing the Firebase Authentication password...",
+        done: `✅ ${name}'s password was changed and the Authentication link was updated.`,
         failed: "Password change failed",
       },
       es: {
-        noUid: "No se encontró el UID del usuario.",
-        ask: `Ingrese una nueva contraseña para ${name}.\n\nUse al menos 6 caracteres.`,
+        emailAsk:
+          `${name} no está vinculado a Firebase Authentication.\n` +
+          `Ingrese el correo registrado en Firebase Authentication.\n\n` +
+          `Después de verificarlo, el correo y UID se guardarán en el perfil de MIYAMA.`,
+        emailInvalid: "Ingrese un correo electrónico válido.",
+        passwordAsk: `Ingrese una nueva contraseña para ${name}.\n\nUse al menos 6 caracteres.`,
         tooShort: "La nueva contraseña debe tener al menos 6 caracteres.",
         confirm: "Ingrese nuevamente la misma contraseña para confirmar.",
         mismatch: "Las contraseñas no coinciden.",
-        final: `¿Cambiar la contraseña de ${name} por la nueva contraseña ingresada?`,
-        changing: "🔐 Cambiando contraseña...",
-        done: `✅ Se cambió la contraseña de ${name}. Ya puede iniciar sesión con la nueva contraseña.`,
+        final: `¿Cambiar la contraseña de ${name}?`,
+        changing: "🔐 Cambiando la contraseña de Firebase Authentication...",
+        done: `✅ Se cambió la contraseña de ${name} y se actualizó la vinculación con Authentication.`,
         failed: "No se pudo cambiar la contraseña",
       },
       th: {
-        noUid: "ไม่พบ UID ของผู้ใช้",
-        ask: `กรอกรหัสผ่านใหม่สำหรับ ${name}\n\nกรุณาใช้อย่างน้อย 6 ตัวอักษร`,
+        emailAsk:
+          `${name} ยังไม่ได้เชื่อมโยงกับ Firebase Authentication\n` +
+          `กรอกอีเมลที่ลงทะเบียนไว้ใน Firebase Authentication\n\n` +
+          `หลังจากตรวจสอบแล้ว ระบบจะบันทึกอีเมลและ UID ในโปรไฟล์ MIYAMA`,
+        emailInvalid: "กรุณากรอกอีเมลที่ถูกต้อง",
+        passwordAsk: `กรอกรหัสผ่านใหม่สำหรับ ${name}\n\nกรุณาใช้อย่างน้อย 6 ตัวอักษร`,
         tooShort: "รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร",
-        confirm: "กรอกรหัสผ่านใหม่เดิมอีกครั้งเพื่อยืนยัน",
+        confirm: "กรอกรหัสผ่านเดิมอีกครั้งเพื่อยืนยัน",
         mismatch: "รหัสผ่านไม่ตรงกัน",
-        final: `เปลี่ยนรหัสผ่านของ ${name} เป็นรหัสผ่านใหม่ที่กรอกหรือไม่?`,
-        changing: "🔐 กำลังเปลี่ยนรหัสผ่าน...",
-        done: `✅ เปลี่ยนรหัสผ่านของ ${name} แล้ว สามารถเข้าสู่ระบบด้วยรหัสผ่านใหม่ได้`,
+        final: `เปลี่ยนรหัสผ่านของ ${name} หรือไม่?`,
+        changing: "🔐 กำลังเปลี่ยนรหัสผ่าน Firebase Authentication...",
+        done: `✅ เปลี่ยนรหัสผ่านของ ${name} และอัปเดตการเชื่อมโยง Authentication แล้ว`,
         failed: "เปลี่ยนรหัสผ่านไม่สำเร็จ",
       },
-    }[appLanguage] || null;
-
-    const ui = t || {
-      noUid: "ユーザーUIDが見つかりません。",
-      ask: `${name} の新しいパスワードを入力してください。\n\n6文字以上で入力してください。`,
-      tooShort: "新しいパスワードは6文字以上にしてください。",
-      confirm: "確認のため、同じ新しいパスワードをもう一度入力してください。",
-      mismatch: "パスワードが一致しません。",
-      final: `${name} のパスワードを変更しますか？`,
-      changing: "🔐 パスワードを変更しています...",
-      done: `✅ ${name} のパスワードを変更しました。`,
-      failed: "パスワード変更に失敗しました",
     };
 
-    if (!uid) {
-      setUserAdminMessage(`❌ ${ui.noUid}`);
-      return;
+    const ui = labels[appLanguage] || labels.ja;
+
+    let email = savedEmail;
+
+    // Legacy accounts created outside the MIYAMA screen may have no email/authUid
+    // in Firestore. Ask for the Firebase Authentication email once.
+    if (!savedAuthUid && !email) {
+      const enteredEmail = window.prompt(ui.emailAsk);
+      if (enteredEmail === null) return;
+
+      email = String(enteredEmail || "").trim().toLowerCase();
+      if (!email || !email.includes("@")) {
+        setUserAdminMessage(`❌ ${ui.emailInvalid}`);
+        return;
+      }
     }
 
-    const newPassword = window.prompt(ui.ask);
+    const newPassword = window.prompt(ui.passwordAsk);
     if (newPassword === null) return;
 
     if (String(newPassword).length < 6) {
@@ -4447,7 +4383,9 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
     try {
       const idToken = await currentUser?.getIdToken?.(true);
-      if (!idToken) throw new Error("Could not obtain the administrator authentication token.");
+      if (!idToken) {
+        throw new Error("Could not obtain the administrator authentication token.");
+      }
 
       const response = await fetch("/api/admin-set-password", {
         method: "POST",
@@ -4456,7 +4394,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
           Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          uid,
+          firestoreUserId,
+          authUid: savedAuthUid,
+          candidateUid: firestoreUserId,
+          email,
           newPassword,
         }),
       });
@@ -4474,6 +4415,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       }
 
       setUserAdminMessage(ui.done);
+      await loadSystemUsers();
     } catch (error) {
       console.error("Admin password update error:", error);
       setUserAdminMessage(`❌ ${ui.failed}: ${error?.message || error}`);
@@ -15065,9 +15007,19 @@ Requirements:
 
                 <span className="miyamaUserEmail">
                   {u.email || "-"}
-                  {u.authLinked && (
+                  {u.authUid ? (
                     <small style={{ display: "block", marginTop: "3px", color: "#16a34a", fontWeight: 800 }}>
                       Firebase Auth ✓
+                    </small>
+                  ) : (
+                    <small style={{ display: "block", marginTop: "3px", color: "#d97706", fontWeight: 800 }}>
+                      {appLanguage === "th"
+                        ? "ยังไม่ได้เชื่อมโยง"
+                        : appLanguage === "es"
+                          ? "Sin vincular"
+                          : appLanguage === "en"
+                            ? "Not linked"
+                            : "未連携"}
                     </small>
                   )}
                 </span>
@@ -15093,7 +15045,6 @@ Requirements:
                     type="button"
                     className="primaryButton"
                     onClick={() => adminSetSystemUserPassword(u)}
-                    disabled={!u.authUid && String(u.id || "").startsWith("auth-only:")}
                     title="Firebase Authentication のUIDを使って新しいパスワードを設定します"
                     style={{ whiteSpace: "nowrap", padding: "9px 12px" }}
                   >
@@ -15116,12 +15067,12 @@ Requirements:
 
         <div className="miyamaUserSecurityNote">
           <p style={{ marginTop: 0, fontWeight: 800, color: "#334155" }}>
-            🔑 パスワード変更はメールアドレスが「-」のユーザーでも使用できます。Firebase Authentication の UID を使って直接変更します。
+            🔑 新規アカウントは自動連携されます。旧アカウントは最初のパスワード変更時にAuthenticationのメールアドレスを1回入力すると、UIDとメールがFirestoreへ保存され、以後は自動連携されます。
           </p>
           <b>🔒 セキュリティについて</b>
           <p>
             アカウント作成はFirebase AuthenticationとFirestoreのusers設定を同時に作成します。
-            Firebaseでは現在のパスワードを表示することはできません。パスワードを忘れた場合は、登録ユーザーの「🔑 パスワード変更」から本人の登録メールアドレスへ再設定リンクを送信してください。
+            Firebaseでは現在のパスワードを表示することはできません。パスワードを忘れた場合は、管理者が「🔑 パスワード変更」から新しいパスワードを直接設定します。旧アカウントで未連携の場合は、最初の変更時だけFirebase Authenticationの登録メールアドレスを入力してUIDを連携します。
             「閲覧のみ」を完全に保護するには、Firestore Security Rules側でもreadOnly/roleを使って書き込みを拒否する設定が必要です。
           </p>
         </div>
