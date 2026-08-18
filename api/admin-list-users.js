@@ -9,25 +9,13 @@ function getServiceAccount() {
     throw new Error("FIREBASE_SERVICE_ACCOUNT is not configured.");
   }
 
-  let parsed;
+  const account = JSON.parse(raw);
 
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT contains invalid JSON.");
+  if (account.private_key) {
+    account.private_key = account.private_key.replace(/\\n/g, "\n");
   }
 
-  if (parsed.private_key) {
-    parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
-  }
-
-  if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
-    throw new Error(
-      "FIREBASE_SERVICE_ACCOUNT is missing required fields."
-    );
-  }
-
-  return parsed;
+  return account;
 }
 
 function getAdminApp() {
@@ -40,134 +28,119 @@ function getAdminApp() {
   });
 }
 
-async function requireActiveAdmin(req) {
+async function checkAdmin(request) {
+  const authorization = request.headers.get("authorization") || "";
+
+  if (!authorization.startsWith("Bearer ")) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Authentication required.",
+    };
+  }
+
+  const token = authorization.slice(7).trim();
+
   const app = getAdminApp();
   const adminAuth = getAuth(app);
   const adminDb = getFirestore(app);
 
-  const authHeader = String(req.headers.authorization || "");
+  const decoded = await adminAuth.verifyIdToken(token);
 
-  if (!authHeader.startsWith("Bearer ")) {
-    const error = new Error("Authentication required.");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const idToken = authHeader.slice(7).trim();
-
-  if (!idToken) {
-    const error = new Error("Authentication token is empty.");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const decoded = await adminAuth.verifyIdToken(idToken);
-
-  const profileSnap = await adminDb
+  const profileSnapshot = await adminDb
     .collection("users")
     .doc(decoded.uid)
     .get();
 
-  if (!profileSnap.exists) {
-    const error = new Error("Administrator profile not found.");
-    error.statusCode = 403;
-    throw error;
+  if (!profileSnapshot.exists) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Administrator profile not found.",
+    };
   }
 
-  const profile = profileSnap.data() || {};
-  const role = String(profile.role || "").toLowerCase();
+  const profile = profileSnapshot.data() || {};
 
-  if (role !== "admin" || profile.active === false) {
-    const error = new Error("Administrator permission required.");
-    error.statusCode = 403;
-    throw error;
+  if (
+    String(profile.role || "").toLowerCase() !== "admin" ||
+    profile.active === false
+  ) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Administrator permission required.",
+    };
   }
 
   return {
-    decoded,
+    ok: true,
     adminAuth,
-    adminDb,
   };
 }
 
-export default async function handler(req, res) {
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Cache-Control", "no-store");
-
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
-
-    return res.status(405).json({
-      error: "Method not allowed. Use GET.",
-    });
-  }
-
-  try {
-    const { adminAuth } = await requireActiveAdmin(req);
-
-    const users = [];
-    let pageToken;
-
-    do {
-      const page = await adminAuth.listUsers(1000, pageToken);
-
-      const pageUsers = Array.isArray(page?.users)
-        ? page.users
-        : [];
-
-      for (const u of pageUsers) {
-        users.push({
-          uid: String(u.uid || ""),
-          email: String(u.email || ""),
-          displayName: String(u.displayName || ""),
-          disabled: Boolean(u.disabled),
-
-          creationTime: String(
-            u.metadata?.creationTime || ""
-          ),
-
-          lastSignInTime: String(
-            u.metadata?.lastSignInTime || ""
-          ),
-
-          providerIds: Array.isArray(u.providerData)
-            ? u.providerData
-                .map((provider) =>
-                  String(provider?.providerId || "")
-                )
-                .filter(Boolean)
-            : [],
-        });
-      }
-
-      pageToken = page?.pageToken || undefined;
-    } while (pageToken);
-
-    return res.status(200).json({
-      ok: true,
-      count: users.length,
-      users,
-    });
-  } catch (error) {
-    console.error("Admin list users error:", error);
-
-    const code = String(error?.code || "");
-
-    let message =
-      error?.message ||
-      "Could not load Firebase Authentication users.";
-
-    if (code.includes("auth/id-token-expired")) {
-      message =
-        "Administrator session expired. Please sign in again.";
-    } else if (code.includes("auth/argument-error")) {
-      message =
-        "Administrator authentication token is invalid.";
+export default {
+  async fetch(request) {
+    if (request.method !== "GET") {
+      return Response.json(
+        { error: "Method not allowed. Use GET." },
+        { status: 405 }
+      );
     }
 
-    return res.status(error?.statusCode || 500).json({
-      error: message,
-      code: code || undefined,
-    });
-  }
-}
+    try {
+      const adminCheck = await checkAdmin(request);
+
+      if (!adminCheck.ok) {
+        return Response.json(
+          { error: adminCheck.error },
+          { status: adminCheck.status }
+        );
+      }
+
+      const users = [];
+      let pageToken;
+
+      do {
+        const result = await adminCheck.adminAuth.listUsers(
+          1000,
+          pageToken
+        );
+
+        const pageUsers = Array.isArray(result?.users)
+          ? result.users
+          : [];
+
+        for (const user of pageUsers) {
+          users.push({
+            uid: user.uid || "",
+            email: user.email || "",
+            displayName: user.displayName || "",
+            disabled: Boolean(user.disabled),
+            creationTime: user.metadata?.creationTime || "",
+            lastSignInTime: user.metadata?.lastSignInTime || "",
+          });
+        }
+
+        pageToken = result?.pageToken || undefined;
+      } while (pageToken);
+
+      return Response.json({
+        ok: true,
+        count: users.length,
+        users,
+      });
+    } catch (error) {
+      console.error("admin-list-users:", error);
+
+      return Response.json(
+        {
+          error:
+            error?.message ||
+            "Could not load Firebase Authentication users.",
+        },
+        { status: 500 }
+      );
+    }
+  },
+};
