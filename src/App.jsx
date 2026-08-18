@@ -4248,41 +4248,93 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const uid = String(user?.id || "").trim();
     const name = String(user?.name || user?.email || "ユーザー").trim();
 
+    const t = {
+      ja: {
+        noUid: "ユーザーUIDが見つかりません。",
+        ask: `${name} の新しいパスワードを入力してください。\n\n6文字以上で入力してください。`,
+        tooShort: "新しいパスワードは6文字以上にしてください。",
+        confirm: "確認のため、同じ新しいパスワードをもう一度入力してください。",
+        mismatch: "パスワードが一致しません。",
+        final: `${name} のパスワードを今入力した新しいパスワードへ変更しますか？`,
+        changing: "🔐 パスワードを変更しています...",
+        done: `✅ ${name} のパスワードを変更しました。新しいパスワードでログインできます。`,
+        failed: "パスワード変更に失敗しました",
+      },
+      en: {
+        noUid: "User UID was not found.",
+        ask: `Enter a new password for ${name}.\n\nUse at least 6 characters.`,
+        tooShort: "The new password must contain at least 6 characters.",
+        confirm: "Enter the same new password again to confirm.",
+        mismatch: "The passwords do not match.",
+        final: `Change ${name}'s password to the new password you entered?`,
+        changing: "🔐 Changing password...",
+        done: `✅ ${name}'s password was changed. The user can now sign in with the new password.`,
+        failed: "Password change failed",
+      },
+      es: {
+        noUid: "No se encontró el UID del usuario.",
+        ask: `Ingrese una nueva contraseña para ${name}.\n\nUse al menos 6 caracteres.`,
+        tooShort: "La nueva contraseña debe tener al menos 6 caracteres.",
+        confirm: "Ingrese nuevamente la misma contraseña para confirmar.",
+        mismatch: "Las contraseñas no coinciden.",
+        final: `¿Cambiar la contraseña de ${name} por la nueva contraseña ingresada?`,
+        changing: "🔐 Cambiando contraseña...",
+        done: `✅ Se cambió la contraseña de ${name}. Ya puede iniciar sesión con la nueva contraseña.`,
+        failed: "No se pudo cambiar la contraseña",
+      },
+      th: {
+        noUid: "ไม่พบ UID ของผู้ใช้",
+        ask: `กรอกรหัสผ่านใหม่สำหรับ ${name}\n\nกรุณาใช้อย่างน้อย 6 ตัวอักษร`,
+        tooShort: "รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร",
+        confirm: "กรอกรหัสผ่านใหม่เดิมอีกครั้งเพื่อยืนยัน",
+        mismatch: "รหัสผ่านไม่ตรงกัน",
+        final: `เปลี่ยนรหัสผ่านของ ${name} เป็นรหัสผ่านใหม่ที่กรอกหรือไม่?`,
+        changing: "🔐 กำลังเปลี่ยนรหัสผ่าน...",
+        done: `✅ เปลี่ยนรหัสผ่านของ ${name} แล้ว สามารถเข้าสู่ระบบด้วยรหัสผ่านใหม่ได้`,
+        failed: "เปลี่ยนรหัสผ่านไม่สำเร็จ",
+      },
+    }[appLanguage] || null;
+
+    const ui = t || {
+      noUid: "ユーザーUIDが見つかりません。",
+      ask: `${name} の新しいパスワードを入力してください。\n\n6文字以上で入力してください。`,
+      tooShort: "新しいパスワードは6文字以上にしてください。",
+      confirm: "確認のため、同じ新しいパスワードをもう一度入力してください。",
+      mismatch: "パスワードが一致しません。",
+      final: `${name} のパスワードを変更しますか？`,
+      changing: "🔐 パスワードを変更しています...",
+      done: `✅ ${name} のパスワードを変更しました。`,
+      failed: "パスワード変更に失敗しました",
+    };
+
     if (!uid) {
-      setUserAdminMessage("❌ ユーザーUIDが見つかりません。");
+      setUserAdminMessage(`❌ ${ui.noUid}`);
       return;
     }
 
-    const newPassword = window.prompt(
-      `${name} の新しいパスワードを入力してください。\n\n8文字以上を推奨します。`
-    );
+    const newPassword = window.prompt(ui.ask);
     if (newPassword === null) return;
 
     if (String(newPassword).length < 6) {
-      setUserAdminMessage("❌ 新しいパスワードは6文字以上にしてください。");
+      setUserAdminMessage(`❌ ${ui.tooShort}`);
       return;
     }
 
-    const confirmPassword = window.prompt(
-      "確認のため、同じ新しいパスワードをもう一度入力してください。"
-    );
+    const confirmPassword = window.prompt(ui.confirm);
     if (confirmPassword === null) return;
 
     if (newPassword !== confirmPassword) {
-      setUserAdminMessage("❌ パスワードが一致しません。");
+      setUserAdminMessage(`❌ ${ui.mismatch}`);
       return;
     }
 
-    const ok = window.confirm(
-      `${name} のパスワードを今入力した新しいパスワードへ変更しますか？`
-    );
-    if (!ok) return;
+    if (!window.confirm(ui.final)) return;
 
-    setUserAdminMessage("🔐 パスワードを変更しています...");
+    setUserAdminMessage(ui.changing);
 
     try {
       const idToken = await currentUser?.getIdToken?.(true);
-      if (!idToken) throw new Error("管理者の認証トークンを取得できませんでした。");
+      if (!idToken) throw new Error("Could not obtain the administrator authentication token.");
 
       const response = await fetch("/api/admin-set-password", {
         method: "POST",
@@ -4296,23 +4348,22 @@ function MaintenanceApp({ currentUser, userProfile }) {
         }),
       });
 
+      const raw = await response.text();
       let data = {};
       try {
-        data = await response.json();
-      } catch {}
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = { error: raw || `HTTP ${response.status}` };
+      }
 
       if (!response.ok) {
         throw new Error(data?.error || `HTTP ${response.status}`);
       }
 
-      setUserAdminMessage(
-        `✅ ${name} のパスワードを変更しました。新しいパスワードでログインできます。`
-      );
+      setUserAdminMessage(ui.done);
     } catch (error) {
       console.error("Admin password update error:", error);
-      setUserAdminMessage(
-        `❌ パスワード変更に失敗しました: ${error?.message || error}`
-      );
+      setUserAdminMessage(`❌ ${ui.failed}: ${error?.message || error}`);
     }
   }
 
@@ -14922,11 +14973,10 @@ Requirements:
                     type="button"
                     className="primaryButton"
                     onClick={() => adminSetSystemUserPassword(u)}
-                    disabled={!u.email}
-                    title="登録メールアドレスへパスワード再設定リンクを送信"
+                    title="管理者がこのユーザーの新しいパスワードを直接設定します"
                     style={{ whiteSpace: "nowrap", padding: "9px 12px" }}
                   >
-                    🔑 パスワード変更
+                    🔑 {appLanguage === "th" ? "เปลี่ยนรหัสผ่าน" : appLanguage === "es" ? "Cambiar contraseña" : appLanguage === "en" ? "Change Password" : "パスワード変更"}
                   </button>
 
                   <button
@@ -14944,6 +14994,9 @@ Requirements:
         </div>
 
         <div className="miyamaUserSecurityNote">
+          <p style={{ marginTop: 0, fontWeight: 800, color: "#334155" }}>
+            🔑 パスワード変更はメールアドレスが「-」のユーザーでも使用できます。Firebase Authentication の UID を使って直接変更します。
+          </p>
           <b>🔒 セキュリティについて</b>
           <p>
             アカウント作成はFirebase AuthenticationとFirestoreのusers設定を同時に作成します。
