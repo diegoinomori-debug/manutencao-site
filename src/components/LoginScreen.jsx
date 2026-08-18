@@ -9,7 +9,7 @@ export default function LoginScreen({ message = "" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const ui = {
+  const translations = {
     ja: {
       subtitle: "設備保全システムへログイン",
       email: "メールアドレス",
@@ -37,7 +37,18 @@ export default function LoginScreen({ message = "" }) {
       help: "Contacte a un administrador si no tiene una cuenta.",
       invalid: "Verifique el correo electrónico y la contraseña.",
     },
-  }[language];
+    th: {
+      subtitle: "เข้าสู่ระบบบำรุงรักษาเครื่องจักร",
+      email: "อีเมล",
+      password: "รหัสผ่าน",
+      login: "เข้าสู่ระบบ",
+      loading: "กำลังเข้าสู่ระบบ...",
+      help: "หากไม่มีบัญชี กรุณาติดต่อผู้ดูแลระบบ",
+      invalid: "กรุณาตรวจสอบอีเมลและรหัสผ่าน",
+    },
+  };
+
+  const ui = translations[language] || translations.ja;
 
   async function submit(event) {
     event.preventDefault();
@@ -62,7 +73,7 @@ export default function LoginScreen({ message = "" }) {
       padding: "20px",
       background:
         "radial-gradient(circle at top left,rgba(59,130,246,.24),transparent 35%),linear-gradient(135deg,#eff6ff,#f8fafc 52%,#eef2ff)",
-      fontFamily: "Arial,'Yu Gothic',sans-serif",
+      fontFamily: "Arial,'Noto Sans Thai','Yu Gothic',sans-serif",
     }}>
       <form
         onSubmit={submit}
@@ -99,6 +110,7 @@ export default function LoginScreen({ message = "" }) {
         <select
           value={language}
           onChange={(e) => setLanguage(e.target.value)}
+          aria-label="Language"
           style={{
             width: "100%",
             minHeight: "44px",
@@ -112,6 +124,7 @@ export default function LoginScreen({ message = "" }) {
           <option value="ja">🇯🇵 日本語</option>
           <option value="en">🇺🇸 English</option>
           <option value="es">🇪🇸 Español</option>
+          <option value="th">🇹🇭 ภาษาไทย</option>
         </select>
 
         <label style={{ display: "grid", gap: "6px", marginBottom: "14px", fontWeight: 800 }}>
