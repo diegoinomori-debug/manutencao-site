@@ -1772,6 +1772,193 @@ Object.assign(MIYAMA_TRANSLATIONS.th, {
   "製品図面DRチェックシート":"เช็กลิสต์ DR แบบผลิตภัณฑ์", "工程検討書":"เอกสารศึกษากระบวนการ", "工程FMEA":"FMEA กระบวนการ", "設備共通基本仕様書":"ข้อกำหนดพื้นฐานร่วมของเครื่องจักร", "設備個別基本仕様書":"ข้อกำหนดพื้นฐานเฉพาะเครื่องจักร", "設備製作仕様書":"ข้อกำหนดการผลิตเครื่องจักร", "設備図面DRチェックシート":"เช็กลิสต์ DR แบบเครื่องจักร", "工程点検チェックシート":"เช็กลิสต์ตรวจสอบกระบวนการ", "保全ポリシー・設備保全方針書":"นโยบายการบำรุงรักษา", "定期・定量点検表":"แบบตรวจตามเวลา / ปริมาณ", "予防保全リスト":"รายการบำรุงรักษาเชิงป้องกัน", "予備品リスト":"รายการอะไหล่สำรอง", "給油指導票":"คู่มือการหล่อลื่น", "バックアップ電池使用リスト":"รายการแบตเตอรี่สำรอง", "設備引き渡し書":"เอกสารส่งมอบเครื่องจักร"
 });
 
+
+// ===== Thai final UI review patch =====
+Object.assign(MIYAMA_TRANSLATIONS.th, {
+  // Home / dashboard fixed English + Japanese strings
+  "One Team Maintenance Group": "กลุ่มบำรุงรักษา One Team",
+  "設備保全を、もっとスマートに。": "ทำให้งานบำรุงรักษาเครื่องจักรฉลาดและมีประสิทธิภาพยิ่งขึ้น",
+  "設備・部品・トラブル内容を検索してください": "ค้นหาเครื่องจักร อะไหล่ หรือรายละเอียดปัญหา",
+  "MIYAMA AIへ": "ไปที่ MIYAMA AI",
+  "ダッシュボードへ": "ไปที่แดชบอร์ด",
+  "To MIYAMA AI": "ไปที่ MIYAMA AI",
+  "Go to dashboard": "ไปที่แดชบอร์ด",
+  "故障・修理の記録": "บันทึกการขัดข้องและการซ่อม",
+  "保全計画・実績の管理": "จัดการแผนและผลการบำรุงรักษา",
+  "工事の計画・進捗管理": "จัดการแผนและความคืบหน้าของงานปรับปรุง",
+  "在庫・発注の管理": "จัดการสต็อกและการสั่งซื้อ",
+  "停止・故障データ分析": "วิเคราะห์ข้อมูลการหยุดและการขัดข้อง",
+  "生産データの管理": "จัดการข้อมูลการผลิต",
+  "Breakdown/repair records": "บันทึกการขัดข้องและการซ่อม",
+  "Management of maintenance plans and results": "จัดการแผนและผลการบำรุงรักษา",
+  "Construction planning and progress management": "จัดการแผนและความคืบหน้าของงานปรับปรุง",
+  "Inventory/order management": "จัดการสต็อกและการสั่งซื้อ",
+  "Outage/failure data analysis": "วิเคราะห์ข้อมูลการหยุดและการขัดข้อง",
+  "Production data management": "จัดการข้อมูลการผลิต",
+  "お知らせ": "ประกาศ",
+  "Notice": "ประกาศ",
+  "システム": "ระบบ",
+  "system": "ระบบ",
+  "保全": "บำรุงรักษา",
+  "the current": "ปัจจุบัน",
+  "現在": "ปัจจุบัน",
+  "MIYAMA Maintenance テスト運用中": "MIYAMA Maintenance อยู่ระหว่างการทดสอบใช้งาน",
+  "MIYAMA Maintenance test operation in progress": "MIYAMA Maintenance อยู่ระหว่างการทดสอบใช้งาน",
+  "現場テストのフィードバックを反映しながら改善しています。": "กำลังปรับปรุงระบบตามข้อเสนอแนะจากการทดสอบหน้างาน",
+  "We are making improvements based on feedback from field tests.": "กำลังปรับปรุงระบบตามข้อเสนอแนะจากการทดสอบหน้างาน",
+  "最近の修理報告": "รายงานซ่อมล่าสุด",
+  "See all ›": "ดูทั้งหมด ›",
+  "すべて見る ›": "ดูทั้งหมด ›",
+  "日付": "วันที่",
+  "設備名": "เครื่องจักร",
+  "内容": "รายละเอียด",
+  "状態": "สถานะ",
+  "Excel import": "นำเข้า Excel",
+  "Excel取込": "นำเข้า Excel",
+  "下書き": "ฉบับร่าง",
+  "登録済み": "ลงทะเบียนแล้ว",
+
+  // Report theme / sections
+  "選択テーマ": "หัวข้อที่เลือก",
+  "表示テーマを選択": "เลือกหัวข้อที่จะแสดง",
+  "長い報告書を全部出さず、必要なテーマだけ表示できます。": "แสดงเฉพาะหัวข้อที่จำเป็น โดยไม่ต้องเปิดรายงานทั้งหมด",
+  "不具合内容": "รายละเอียดความผิดปกติ",
+  "不具合現象": "อาการผิดปกติ",
+  "不具合箇所": "ตำแหน่งที่ผิดปกติ",
+  "リンク先": "ลิงก์ที่เกี่ยวข้อง",
+  "不具合原因・なぜなぜ分析": "สาเหตุความผิดปกติและการวิเคราะห์ Why-Why",
+  "なぜ1": "ทำไม 1",
+  "なぜ2": "ทำไม 2",
+  "なぜ3": "ทำไม 3",
+  "処置内容": "การแก้ไขที่ดำเนินการ",
+  "再発防止・流出防止・変化点": "ป้องกันการเกิดซ้ำ / ป้องกันการหลุดรอด / จุดเปลี่ยนแปลง",
+  "再発防止区分": "ประเภทการป้องกันการเกิดซ้ำ",
+  "変化点ランク": "ระดับจุดเปลี่ยนแปลง",
+  "FP点検": "ตรวจสอบ FP",
+  "再発防止・残工事": "ป้องกันการเกิดซ้ำ / งานคงค้าง",
+  "流出防止": "ป้องกันการหลุดรอด",
+  "時間・停止時間": "เวลาและเวลาหยุด",
+  "①不具合発生日時": "① วันที่/เวลาที่เกิดความผิดปกติ",
+  "②保全作業開始日時": "② วันที่/เวลาเริ่มงานบำรุงรักษา",
+  "③保全作業完了日時": "③ วันที่/เวลาสิ้นสุดงานบำรุงรักษา",
+  "④生産開始日時": "④ วันที่/เวลาเริ่มการผลิต",
+  "⑤停止除外時間H": "⑤ เวลาที่ไม่นับเป็นเวลาหยุด (ชม.)",
+  "⑥機能低下(%)": "⑥ การลดลงของสมรรถนะ (%)",
+  "⑦停止時間H": "⑦ เวลาหยุด (ชม.)",
+  "QRコード用リンク": "ลิงก์สำหรับ QR Code",
+  "現場でQR化して貼ると、スマホからこの報告書へすぐアクセスできます。": "สร้าง QR Code และติดที่หน้างานเพื่อเปิดรายงานนี้จากสมาร์ตโฟนได้อย่างรวดเร็ว",
+  "リンクコピー": "คัดลอกลิงก์",
+
+  // Maintenance page – full composite strings from screenshots
+  "表示メニュー": "เมนูแสดงผล",
+  "カード表示": "มุมมองการ์ด",
+  "緊急確認": "ตรวจสอบเร่งด่วน",
+  "部品連携": "เชื่อมโยงอะไหล่",
+  "期限超過": "เกินกำหนด",
+  "7日以内": "ภายใน 7 วัน",
+  "30日以内": "ภายใน 30 วัน",
+  "表示件数": "จำนวนที่แสดง",
+  "定期保全検索・並び替え": "ค้นหาและเรียงลำดับการบำรุงรักษาเชิงป้องกัน",
+  "設備名・部位・内容・品番・担当者・保全種類で検索できます。": "ค้นหาได้จากเครื่องจักร ตำแหน่ง รายละเอียด หมายเลขชิ้นส่วน ผู้รับผิดชอบ และประเภทการบำรุงรักษา",
+  "すべての設備": "เครื่องจักรทั้งหมด",
+  "緊急順": "เรียงตามความเร่งด่วน",
+  "ABC / あいうえお順": "เรียงตามตัวอักษร",
+  "設備名順": "เรียงตามชื่อเครื่องจักร",
+  "保全種類順": "เรียงตามประเภทการบำรุงรักษา",
+  "生産数連動の考え方": "หลักการเชื่อมโยงกับจำนวนการผลิต",
+  "保全方式で計算ルールを切り替えます。定期保全は日数、定量保全は生産数で次回実施日を自動計算します。": "ระบบจะเปลี่ยนวิธีคำนวณตามรูปแบบการบำรุงรักษา: แบบตามเวลาคำนวณด้วยจำนวนวัน และแบบตามปริมาณคำนวณจากจำนวนการผลิตเพื่อหาวันดำเนินการครั้งถัดไป",
+  "定期保全：前回実施日 + 保全周期（日） ／ 定量保全：前回実施日 + 保全サイクル ÷ 1日平均生産数": "ตามเวลา: วันที่ทำครั้งก่อน + รอบบำรุงรักษา (วัน) / ตามปริมาณ: วันที่ทำครั้งก่อน + รอบการใช้งาน ÷ ปริมาณการผลิตเฉลี่ยต่อวัน",
+  "保全方式": "รูปแบบการบำรุงรักษา",
+  "保全種類": "ประเภทการบำรุงรักษา",
+  "部品名": "ชื่อชิ้นส่วน",
+  "保全サイクル": "รอบการบำรุงรักษา",
+  "保全周期（日）": "รอบการบำรุงรักษา (วัน)",
+  "1日平均生産数": "ปริมาณการผลิตเฉลี่ยต่อวัน",
+  "前回実施日": "วันที่ดำเนินการครั้งก่อน",
+  "次回実施日": "วันที่ดำเนินการครั้งถัดไป",
+  "残り日数": "จำนวนวันที่เหลือ",
+  "残り回数": "จำนวนครั้งที่เหลือ",
+  "未入力": "ยังไม่ได้กรอก",
+  "生産数DB未登録": "ยังไม่มีข้อมูลในฐานข้อมูลการผลิต",
+  "生産数DBから自動計算": "คำนวณอัตโนมัติจากฐานข้อมูลการผลิต",
+  "何日ごとに実施しますか？": "ควรดำเนินการทุกกี่วัน?",
+  "担当者名を入力": "กรอกชื่อผู้รับผิดชอบ",
+  "交換理由・注意点・現場メモなど（日本語入力対応）": "เหตุผลในการเปลี่ยน ข้อควรระวัง หรือบันทึกหน้างาน",
+  "メモ": "บันทึก",
+  "新規追加": "เพิ่มรายการใหม่",
+  "予備品から追加": "เพิ่มจากอะไหล่",
+  "定期保全Excel取込": "นำเข้า Excel การบำรุงรักษาเชิงป้องกัน",
+  "定期保全を空にする": "ล้างรายการบำรุงรักษาเชิงป้องกัน",
+  "交換完了": "ดำเนินการเสร็จแล้ว",
+  "保存確認": "บันทึก / ยืนยัน",
+  "定期保全から外す": "นำออกจากการบำรุงรักษาเชิงป้องกัน",
+  "残り": "เหลือ",
+
+  // Common English/Spanish fallbacks that Thai was inheriting
+  "Maintenance Mode": "รูปแบบการบำรุงรักษา",
+  "Maintenance Type": "ประเภทการบำรุงรักษา",
+  "Equipment": "เครื่องจักร",
+  "Part Name": "ชื่อชิ้นส่วน",
+  "Maintenance Cycle": "รอบการบำรุงรักษา",
+  "Daily Average Production": "ปริมาณการผลิตเฉลี่ยต่อวัน",
+  "Maintenance Interval (Days)": "รอบการบำรุงรักษา (วัน)",
+  "Last Done Date": "วันที่ดำเนินการครั้งก่อน",
+  "Next Due Date": "วันที่ดำเนินการครั้งถัดไป",
+  "Days Left": "จำนวนวันที่เหลือ",
+  "Not entered": "ยังไม่ได้กรอก",
+  "Production DB not registered": "ยังไม่มีข้อมูลในฐานข้อมูลการผลิต",
+  "Memo": "บันทึก",
+  "Completed": "ดำเนินการเสร็จแล้ว",
+  "Save / Confirm": "บันทึก / ยืนยัน",
+  "Remove from Maintenance": "นำออกจากการบำรุงรักษา",
+  "Time-Based Maintenance (Days)": "บำรุงรักษาตามเวลา (วัน)",
+  "Production-Based Maintenance": "บำรุงรักษาตามจำนวนการผลิต",
+
+  // Spare / analytics labels with ternaries that may otherwise fall to Spanish/Japanese
+  "Criticidad": "ระดับความสำคัญ",
+  "Criticality": "ระดับความสำคัญ",
+  "Cantidad anual planificada": "จำนวนที่วางแผนต่อปี",
+  "Annual Planned Qty": "จำนวนที่วางแผนต่อปี",
+  "Repuesto crítico": "อะไหล่สำคัญ",
+  "Critical Spare": "อะไหล่สำคัญ",
+  "Automático / No": "อัตโนมัติ / ไม่",
+  "Automatic / No": "อัตโนมัติ / ไม่",
+  "Sí - crítico": "ใช่ - สำคัญ",
+  "Yes - Critical": "ใช่ - สำคัญ",
+  "Riesgo de falta": "ความเสี่ยงอะไหล่ขาด",
+  "Shortage Risk": "ความเสี่ยงอะไหล่ขาด",
+  "Presupuesto anual": "งบประมาณรายปี",
+  "Annual Budget": "งบประมาณรายปี",
+  "Mantenimiento de alto costo": "การบำรุงรักษาต้นทุนสูง",
+  "High-Cost Maintenance": "การบำรุงรักษาต้นทุนสูง",
+  "Compra recomendada": "ยอดสั่งซื้อที่แนะนำ",
+  "Recommended Purchase": "ยอดสั่งซื้อที่แนะนำ",
+  "Pieza": "ชิ้นส่วน",
+  "Part": "ชิ้นส่วน",
+  "Cobertura": "ระยะครอบคลุมสต็อก",
+  "Coverage": "ระยะครอบคลุมสต็อก",
+  "Riesgo": "ความเสี่ยง",
+  "Risk": "ความเสี่ยง",
+  "Pedido": "สั่งซื้อ",
+  "Order": "สั่งซื้อ",
+  "Lista de repuestos críticos": "รายการอะไหล่สำคัญ",
+  "Critical Spare List": "รายการอะไหล่สำคัญ",
+  "uso 180d": "การใช้ 180 วัน",
+  "180d use": "การใช้ 180 วัน",
+  "uso en fallas": "ใช้ในเหตุขัดข้อง",
+  "failure uses": "ใช้ในเหตุขัดข้อง",
+  "/año": "/ปี",
+  "/yr": "/ปี",
+
+  // Linked actions / strategy blocks
+  "Acción vinculada": "การดำเนินการที่เชื่อมโยง",
+  "Linked Action": "การดำเนินการที่เชื่อมโยง",
+  "Abrir mantenimiento": "เปิดหน้าบำรุงรักษา",
+  "Open Maintenance": "เปิดหน้าบำรุงรักษา",
+  "Abrir mejora": "เปิดงานปรับปรุง",
+  "Open Improvement": "เปิดงานปรับปรุง"
+});
+
 const MIYAMA_BLOCKED_TRANSLATION_KEYS = new Set(["分", "日", "月", "年", "火", "水", "木", "金", "土"]);
 
 Object.keys(MIYAMA_TRANSLATIONS).forEach((lang) => {
@@ -2109,7 +2296,15 @@ async function applyMiyamaLanguage(language = "ja", signal) {
 
   if (selectedLanguage === "ja") return;
 
-  const remainingNodes = textNodes.filter((node) => containsJapaneseText(node.nodeValue));
+  const remainingNodes = textNodes.filter((node) => {
+    const value = String(node.nodeValue || "").trim();
+    if (!value) return false;
+    if (selectedLanguage === "th") {
+      if (/MIYAMA|https?:\/\/|^[A-Z0-9_./#\-]+$/i.test(value)) return false;
+      return shouldTranslateLongText(value, "th");
+    }
+    return containsJapaneseText(value);
+  });
   const uniqueTexts = [...new Set(
     remainingNodes
       .map((node) => node.nodeValue.trim())
@@ -2118,7 +2313,7 @@ async function applyMiyamaLanguage(language = "ja", signal) {
     // Campos longos do relatório usam os componentes de tradução dedicados.
     // Limitar a tradução automática do DOM evita centenas de chamadas ao abrir a página.
     .filter((value) => value.length <= 140)
-    .slice(0, selectedLanguage === "th" ? 160 : 80);
+    .slice(0, selectedLanguage === "th" ? 260 : 80);
 
   const translatedByOriginal = {};
   const concurrency = 6;
@@ -3580,17 +3775,36 @@ async function translateJapaneseChunk(text, targetLanguage = "en", signal) {
   const original = String(text ?? "");
   if (!original || !shouldTranslateLongText(original, targetLanguage)) return original;
 
-  const response = await fetch("/api/translate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      text: original,
-      targetLanguage: ["en", "es", "th"].includes(targetLanguage) ? targetLanguage : "en",
-    }),
-    signal,
+  const requestBody = JSON.stringify({
+    text: original,
+    targetLanguage: ["en", "es", "th"].includes(targetLanguage) ? targetLanguage : "en",
   });
+
+  let response;
+  try {
+    response = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody,
+      signal,
+    });
+  } catch (localError) {
+    response = null;
+  }
+
+  // Vite local development does not always execute Vercel serverless /api routes.
+  // For Thai display, retry the deployed MIYAMA endpoint so historical English/Japanese
+  // repair text can still be previewed in Thai during local testing.
+  if ((!response || !response.ok) && targetLanguage === "th" && typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
+    response = await fetch("https://manutencao-site-swart.vercel.app/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody,
+      signal,
+    });
+  }
+
+  if (!response) throw new Error("Translation server is unavailable.");
 
   let data = {};
   try {
@@ -7736,12 +7950,12 @@ function renderHome() {
     .slice(0, 3);
 
   const quickMenus = [
-    { key: "report", icon: "📄", title: "修理報告", sub: "故障・修理の記録" },
-    { key: "maintenance", icon: "🔧", title: "定期保全", sub: "保全計画・実績の管理" },
-    { key: "work", icon: "🏗️", title: "工事管理", sub: "工事の計画・進捗管理" },
-    { key: "spare", icon: "📦", title: "予備品管理", sub: "在庫・発注の管理" },
-    { key: "analytics", icon: "📊", title: "保全分析", sub: "停止・故障データ分析" },
-    { key: "dailyProduction", icon: "🗄️", title: "生産数DB", sub: "生産データの管理" },
+    { key: "report", icon: "📄", title: translateMiyamaText("修理報告", appLanguage), sub: translateMiyamaText("故障・修理の記録", appLanguage) },
+    { key: "maintenance", icon: "🔧", title: translateMiyamaText("定期保全", appLanguage), sub: translateMiyamaText("保全計画・実績の管理", appLanguage) },
+    { key: "work", icon: "🏗️", title: translateMiyamaText("工事管理", appLanguage), sub: translateMiyamaText("工事の計画・進捗管理", appLanguage) },
+    { key: "spare", icon: "📦", title: translateMiyamaText("予備品管理", appLanguage), sub: translateMiyamaText("在庫・発注の管理", appLanguage) },
+    { key: "analytics", icon: "📊", title: translateMiyamaText("保全分析", appLanguage), sub: translateMiyamaText("停止・故障データ分析", appLanguage) },
+    { key: "dailyProduction", icon: "🗄️", title: translateMiyamaText("生産数DB", appLanguage), sub: translateMiyamaText("生産データの管理", appLanguage) },
   ];
 
   return (
@@ -7842,7 +8056,11 @@ function renderHome() {
             >
               <span>{normalizeDateOnly(r.createdAt || r.troubleDateTime) || "-"}</span>
               <span>{r.equipment || r.lineName || "設備未設定"}</span>
-              <span>{r.phenomenon || r.troublePoint || "内容未入力"}</span>
+              <span>
+                {appLanguage === "ja"
+                  ? (r.phenomenon || r.troublePoint || "内容未入力")
+                  : <AsyncTranslatedText text={r.phenomenon || r.troublePoint || "内容未入力"} language={appLanguage} />}
+              </span>
               <span><b className="miyamaBadge green">{r.approvalStatus || "登録済み"}</b></span>
             </button>
           ))}
@@ -8163,9 +8381,19 @@ function renderHome() {
     };
 
     const urgencyLabel = (row) => {
-      if (row.daysLeft === "") return "未入力";
-      if (row.daysLeft < 0) return `期限超過 ${Math.abs(row.daysLeft)}日`;
-      if (row.daysLeft === 0) return "本日実施";
+      if (row.daysLeft === "") return translateMiyamaText("未入力", appLanguage);
+      if (row.daysLeft < 0) {
+        if (appLanguage === "th") return `เกินกำหนด ${Math.abs(row.daysLeft)} วัน`;
+        if (appLanguage === "es") return `Vencido ${Math.abs(row.daysLeft)} días`;
+        if (appLanguage === "en") return `Overdue ${Math.abs(row.daysLeft)} days`;
+        return `期限超過 ${Math.abs(row.daysLeft)}日`;
+      }
+      if (row.daysLeft === 0) {
+        return appLanguage === "th" ? "ดำเนินการวันนี้" : appLanguage === "es" ? "Realizar hoy" : appLanguage === "en" ? "Due today" : "本日実施";
+      }
+      if (appLanguage === "th") return `เหลือ ${row.daysLeft} วัน`;
+      if (appLanguage === "es") return `Quedan ${row.daysLeft} días`;
+      if (appLanguage === "en") return `${row.daysLeft} days left`;
       return `残り ${row.daysLeft}日`;
     };
 
@@ -10579,19 +10807,23 @@ function renderHome() {
             toggleSection={toggleSection}
             sectionKey="trouble"
             title={
-              appLanguage === "es"
-                ? "⚠️ Detalles de la falla"
-                : appLanguage === "en"
-                  ? "⚠️ Failure Details"
-                  : "⚠️ 不具合内容"
+              appLanguage === "th"
+                ? "⚠️ รายละเอียดความผิดปกติ"
+                : appLanguage === "es"
+                  ? "⚠️ Detalles de la falla"
+                  : appLanguage === "en"
+                    ? "⚠️ Failure Details"
+                    : "⚠️ 不具合内容"
             }
           >
             <h3>
-              {appLanguage === "es"
-                ? "🚨 Síntoma de la falla"
-                : appLanguage === "en"
-                  ? "🚨 Failure Symptom"
-                  : "🚨 不具合現象"}
+              {appLanguage === "th"
+                ? "🚨 อาการผิดปกติ"
+                : appLanguage === "es"
+                  ? "🚨 Síntoma de la falla"
+                  : appLanguage === "en"
+                    ? "🚨 Failure Symptom"
+                    : "🚨 不具合現象"}
             </h3>
             {appLanguage === "ja" ? (
               <textarea
@@ -10606,11 +10838,13 @@ function renderHome() {
             )}
 
             <h3>
-              {appLanguage === "es"
-                ? "📍 Punto de la falla"
-                : appLanguage === "en"
-                  ? "📍 Failure Point"
-                  : "📍 不具合箇所"}
+              {appLanguage === "th"
+                ? "📍 ตำแหน่งที่ผิดปกติ"
+                : appLanguage === "es"
+                  ? "📍 Punto de la falla"
+                  : appLanguage === "en"
+                    ? "📍 Failure Point"
+                    : "📍 不具合箇所"}
             </h3>
             {appLanguage === "ja" ? (
               <textarea
@@ -10625,11 +10859,13 @@ function renderHome() {
             )}
 
             <h3>
-              {appLanguage === "es"
-                ? "🔗 Enlace"
-                : appLanguage === "en"
-                  ? "🔗 Link"
-                  : "🔗 リンク先"}
+              {appLanguage === "th"
+                ? "🔗 ลิงก์ที่เกี่ยวข้อง"
+                : appLanguage === "es"
+                  ? "🔗 Enlace"
+                  : appLanguage === "en"
+                    ? "🔗 Link"
+                    : "🔗 リンク先"}
             </h3>
             <input
               value={row.linkUrl || ""}

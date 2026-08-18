@@ -1933,3 +1933,28 @@
 .page[data-language="th"] label {
   overflow-wrap: anywhere;
 }
+
+
+/* ===== Thai readability final review ===== */
+.page[data-language="th"] {
+  line-height: 1.55;
+}
+.page[data-language="th"] button,
+.page[data-language="th"] label,
+.page[data-language="th"] h1,
+.page[data-language="th"] h2,
+.page[data-language="th"] h3,
+.page[data-language="th"] p,
+.page[data-language="th"] span,
+.page[data-language="th"] small {
+  line-height: 1.45;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+.page[data-language="th"] .miyamaQuickCard small {
+  min-height: 40px;
+}
+.page[data-language="th"] .miyamaTopMenuButton span {
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+}
