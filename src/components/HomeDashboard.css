@@ -1833,3 +1833,67 @@
     width: 100%;
   }
 }
+
+
+/* =========================================================
+   Top navigation - safe layout for English / Spanish
+   ========================================================= */
+.tabs .miyamaTopMenuButton {
+  flex: 0 0 124px !important;
+  min-width: 124px !important;
+  width: 124px !important;
+  height: 68px !important;
+  padding: 7px 8px !important;
+  overflow: hidden !important;
+}
+
+.tabs .miyamaTopMenuButton span {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  width: 100%;
+  max-width: 108px;
+  min-height: 27px;
+  line-height: 1.15 !important;
+  text-align: center;
+  white-space: normal !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  font-size: 11px !important;
+}
+
+.page[data-language="en"] .tabs .miyamaTopMenuButton,
+.page[data-language="es"] .tabs .miyamaTopMenuButton {
+  flex-basis: 132px !important;
+  min-width: 132px !important;
+  width: 132px !important;
+}
+
+.page[data-language="en"] .tabs .miyamaTopMenuButton span,
+.page[data-language="es"] .tabs .miyamaTopMenuButton span {
+  max-width: 116px;
+  font-size: 10.5px !important;
+}
+
+.miyamaTopMenuViewport {
+  gap: 7px !important;
+}
+
+@media (max-width: 1200px) {
+  .tabs .miyamaTopMenuButton,
+  .page[data-language="en"] .tabs .miyamaTopMenuButton,
+  .page[data-language="es"] .tabs .miyamaTopMenuButton {
+    flex-basis: 118px !important;
+    min-width: 118px !important;
+    width: 118px !important;
+  }
+
+  .tabs .miyamaTopMenuButton span,
+  .page[data-language="en"] .tabs .miyamaTopMenuButton span,
+  .page[data-language="es"] .tabs .miyamaTopMenuButton span {
+    max-width: 104px;
+    font-size: 10px !important;
+  }
+}

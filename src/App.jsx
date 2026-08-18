@@ -14250,19 +14250,64 @@ Requirements:
     return renderHome();
   }
 
+  const topMenuLabels = {
+    ja: {
+      home: "ホーム",
+      miyamaAi: "MIYAMA AI",
+      calendar: "カレンダー",
+      report: "修理報告",
+      maintenance: "定期保全",
+      work: "工事管理",
+      newEquipment: "新規設備",
+      spare: "予備品管理",
+      analytics: "保全分析",
+      dailyProduction: "生産数DB",
+      csvAnalytics: "CSV分析",
+      users: "ユーザー管理",
+    },
+    en: {
+      home: "Home",
+      miyamaAi: "MIYAMA AI",
+      calendar: "Calendar",
+      report: "Repair",
+      maintenance: "Preventive",
+      work: "Work Mgmt",
+      newEquipment: "New Equipment",
+      spare: "Spare Parts",
+      analytics: "Analytics",
+      dailyProduction: "Production DB",
+      csvAnalytics: "CSV Analysis",
+      users: "Users",
+    },
+    es: {
+      home: "Inicio",
+      miyamaAi: "MIYAMA AI",
+      calendar: "Calendario",
+      report: "Reparaciones",
+      maintenance: "Preventivo",
+      work: "Trabajos",
+      newEquipment: "Equipos nuevos",
+      spare: "Repuestos",
+      analytics: "Análisis",
+      dailyProduction: "Producción DB",
+      csvAnalytics: "Análisis CSV",
+      users: "Usuarios",
+    },
+  }[appLanguage] || {};
+
   const menuItems = [
-    { key: "home", label: "ホーム", icon: <Home size={16} /> },
-    { key: "miyamaAi", label: "MIYAMA AI", icon: <Bot size={16} /> },
-    { key: "calendar", label: "カレンダー", icon: <CalendarDays size={16} /> },
-    { key: "report", label: "修理報告", icon: <FileText size={16} /> },
-    { key: "maintenance", label: "定期保全", icon: <Wrench size={16} /> },
-    { key: "work", label: "工事管理", icon: <Hammer size={16} /> },
-    { key: "newEquipment", label: "新規設備管理", icon: <Factory size={16} /> },
-    { key: "spare", label: "予備品管理", icon: <Package size={16} /> },
-    { key: "analytics", label: "保全分析", icon: <BarChart3 size={16} /> },
-    { key: "dailyProduction", label: "生産数DB", icon: <BarChart3 size={16} /> },
-    { key: "csvAnalytics", label: "CSV分析", icon: <FileSpreadsheet size={16} /> },
-    ...(isAdmin ? [{ key: "users", label: "ユーザー管理", icon: <Users size={16} /> }] : []),
+    { key: "home", label: topMenuLabels.home, icon: <Home size={16} /> },
+    { key: "miyamaAi", label: topMenuLabels.miyamaAi, icon: <Bot size={16} /> },
+    { key: "calendar", label: topMenuLabels.calendar, icon: <CalendarDays size={16} /> },
+    { key: "report", label: topMenuLabels.report, icon: <FileText size={16} /> },
+    { key: "maintenance", label: topMenuLabels.maintenance, icon: <Wrench size={16} /> },
+    { key: "work", label: topMenuLabels.work, icon: <Hammer size={16} /> },
+    { key: "newEquipment", label: topMenuLabels.newEquipment, icon: <Factory size={16} /> },
+    { key: "spare", label: topMenuLabels.spare, icon: <Package size={16} /> },
+    { key: "analytics", label: topMenuLabels.analytics, icon: <BarChart3 size={16} /> },
+    { key: "dailyProduction", label: topMenuLabels.dailyProduction, icon: <BarChart3 size={16} /> },
+    { key: "csvAnalytics", label: topMenuLabels.csvAnalytics, icon: <FileSpreadsheet size={16} /> },
+    ...(isAdmin ? [{ key: "users", label: topMenuLabels.users, icon: <Users size={16} /> }] : []),
   ];
 
 return (
@@ -14275,8 +14320,9 @@ return (
           type="button"
           className="miyamaNavArrow"
           onClick={() => topMenuRef.current?.scrollBy({ left: -420, behavior: "smooth" })}
-          aria-label="前のメニュー"
-          title="前のメニュー"
+          data-no-translate="true"
+          aria-label={appLanguage === "es" ? "Menú anterior" : appLanguage === "en" ? "Previous menu" : "前のメニュー"}
+          title={appLanguage === "es" ? "Menú anterior" : appLanguage === "en" ? "Previous menu" : "前のメニュー"}
         >
           ‹
         </button>
@@ -14321,6 +14367,7 @@ return (
             <button
               type="button"
               key={item.key}
+              data-no-translate="true"
               className={`miyamaTopMenuButton ${page === item.key ? "active" : ""}`}
               onClick={() => setPage(item.key)}
             >
@@ -14334,8 +14381,9 @@ return (
           type="button"
           className="miyamaNavArrow"
           onClick={() => topMenuRef.current?.scrollBy({ left: 420, behavior: "smooth" })}
-          aria-label="次のメニュー"
-          title="次のメニュー"
+          data-no-translate="true"
+          aria-label={appLanguage === "es" ? "Menú siguiente" : appLanguage === "en" ? "Next menu" : "次のメニュー"}
+          title={appLanguage === "es" ? "Menú siguiente" : appLanguage === "en" ? "Next menu" : "次のメニュー"}
         >
           ›
         </button>
