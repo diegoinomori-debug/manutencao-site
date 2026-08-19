@@ -3421,6 +3421,293 @@ div[style*="grid-template-columns: repeat(4, 1fr)"] input { min-width: 0 !import
 .miyamaDrilldownList{display:grid;gap:12px}.miyamaDrilldownCard{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:15px;box-shadow:0 6px 20px rgba(15,23,42,.05)}.miyamaDrilldownCardTop{display:flex;justify-content:space-between;gap:12px;align-items:center;padding-bottom:9px;border-bottom:1px solid #f1f5f9}.miyamaDrilldownCardTop b{font-size:16px;color:#0f172a}.miyamaDrilldownCardTop span{font-size:12px;color:#64748b}.miyamaDrilldownMeta{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.miyamaDrilldownMeta span{font-size:12px;font-weight:800;color:#334155;background:#f1f5f9;border-radius:999px;padding:5px 8px}.miyamaDrilldownDl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0}.miyamaDrilldownDl div{padding:9px 10px;border-radius:10px;background:#f8fafc}.miyamaDrilldownDl dt{font-size:11px;font-weight:900;color:#64748b;margin-bottom:4px}.miyamaDrilldownDl dd{margin:0;white-space:pre-wrap;color:#0f172a;line-height:1.45}.miyamaOpenReportButton{margin-top:12px}.miyamaDrilldownEmpty{padding:30px;text-align:center;color:#64748b;background:#fff;border:1px dashed #cbd5e1;border-radius:16px}
 @media(max-width:720px){.miyamaPageGuide{font-size:13px}.miyamaSimpleHowTo{align-items:flex-start;flex-direction:column}.miyamaDrilldownPanel{width:100vw;padding:0 12px 20px}.miyamaDrilldownHeader{margin:0 -12px 14px;padding:15px}.miyamaDrilldownDl{grid-template-columns:1fr}.miyamaDrilldownCardTop{align-items:flex-start;flex-direction:column}}
 
+
+
+/* ===== MIYAMA 2026 MODERN INDUSTRIAL UI ===== */
+:root {
+  --m-modern-navy:#08111f;
+  --m-modern-navy2:#0f1d33;
+  --m-modern-blue:#2563eb;
+  --m-modern-cyan:#06b6d4;
+  --m-modern-purple:#7c3aed;
+  --m-modern-surface:#ffffff;
+  --m-modern-bg:#eef3f9;
+  --m-modern-line:#d9e2ef;
+  --m-modern-text:#0b1324;
+  --m-modern-muted:#66758d;
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(37,99,235,.10), transparent 28%),
+    radial-gradient(circle at 90% 8%, rgba(6,182,212,.07), transparent 25%),
+    linear-gradient(180deg,#f7faff 0%,#eef3f9 42%,#f8fafc 100%) !important;
+}
+.page { padding-top:12px !important; }
+
+/* Top navigation: dark industrial control bar */
+.tabs.miyamaTopNav,
+.miyamaTopNav {
+  background:rgba(8,17,31,.96) !important;
+  border:1px solid rgba(148,163,184,.14) !important;
+  box-shadow:0 18px 45px rgba(8,17,31,.20) !important;
+  border-radius:20px !important;
+  padding:8px 10px !important;
+  margin-bottom:18px !important;
+  backdrop-filter:blur(18px) saturate(145%);
+}
+.miyamaTopNav button,
+.miyamaTopNav select {
+  color:#dce8f8 !important;
+  background:transparent !important;
+  border-color:transparent !important;
+  border-radius:12px !important;
+  transition:.18s ease !important;
+}
+.miyamaTopNav button:hover,
+.miyamaTopNav button.active {
+  background:linear-gradient(135deg,rgba(37,99,235,.95),rgba(6,182,212,.82)) !important;
+  color:#fff !important;
+  box-shadow:0 8px 22px rgba(37,99,235,.28) !important;
+  transform:translateY(-1px);
+}
+.miyamaTopNav select option { color:#0f172a !important; background:#fff !important; }
+
+/* Home hero: futuristic factory / blueprint feeling */
+.miyamaHomeHero {
+  position:relative !important;
+  overflow:hidden !important;
+  min-height:320px !important;
+  display:grid !important;
+  grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr) !important;
+  align-items:center !important;
+  gap:36px !important;
+  padding:clamp(28px,4vw,58px) !important;
+  border-radius:30px !important;
+  color:#fff !important;
+  background:
+    radial-gradient(circle at 77% 27%,rgba(6,182,212,.28),transparent 20%),
+    radial-gradient(circle at 70% 85%,rgba(124,58,237,.23),transparent 28%),
+    linear-gradient(125deg,#07101e 0%,#0e1d35 46%,#102a4c 100%) !important;
+  border:1px solid rgba(148,163,184,.18) !important;
+  box-shadow:0 28px 70px rgba(8,17,31,.28) !important;
+}
+.miyamaHomeHero::before {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background-image:
+    linear-gradient(rgba(56,189,248,.055) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(56,189,248,.055) 1px,transparent 1px);
+  background-size:42px 42px;
+  mask-image:linear-gradient(90deg,transparent 4%,#000 45%,#000 100%);
+}
+.miyamaHomeHero::after {
+  content:"⚙  ◇  ⚡  ◉";
+  position:absolute;
+  right:5%;
+  top:17%;
+  width:37%;
+  height:64%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:clamp(42px,6vw,88px);
+  letter-spacing:24px;
+  color:rgba(103,232,249,.25);
+  border:1px solid rgba(103,232,249,.17);
+  border-radius:28px;
+  background:linear-gradient(145deg,rgba(15,23,42,.12),rgba(14,165,233,.09));
+  box-shadow:inset 0 0 50px rgba(6,182,212,.06);
+  transform:perspective(900px) rotateY(-7deg) rotateX(2deg);
+}
+.miyamaHomeHero > * { position:relative; z-index:2; }
+.miyamaHomeHeroText h1 {
+  margin:0 0 8px !important;
+  font-size:clamp(38px,5.2vw,72px) !important;
+  line-height:.98 !important;
+  letter-spacing:-2.2px !important;
+  color:#fff !important;
+  text-shadow:0 0 34px rgba(34,211,238,.13);
+}
+.miyamaHomeHeroText h2 {
+  color:#67e8f9 !important;
+  font-size:clamp(16px,1.8vw,23px) !important;
+  letter-spacing:.12em !important;
+  text-transform:uppercase;
+  margin:12px 0 !important;
+}
+.miyamaHomeHeroText p { color:#b9c9dc !important; font-size:17px !important; }
+.miyamaHomeHeroActions { align-self:end !important; }
+.miyamaHomeSearch {
+  background:rgba(255,255,255,.09) !important;
+  border:1px solid rgba(103,232,249,.24) !important;
+  border-radius:18px !important;
+  box-shadow:0 12px 30px rgba(0,0,0,.18) !important;
+  backdrop-filter:blur(12px);
+}
+.miyamaHomeSearch input {
+  color:#fff !important;
+  background:transparent !important;
+  border:0 !important;
+  box-shadow:none !important;
+}
+.miyamaHomeSearch input::placeholder { color:#93a7c0 !important; }
+.miyamaHomeButtons button {
+  border:0 !important;
+  border-radius:14px !important;
+  min-height:48px !important;
+  font-weight:800 !important;
+  background:linear-gradient(135deg,#2563eb,#06b6d4) !important;
+  color:#fff !important;
+  box-shadow:0 12px 28px rgba(6,182,212,.17) !important;
+}
+.miyamaHomeButtons button:last-child {
+  background:rgba(255,255,255,.08) !important;
+  border:1px solid rgba(255,255,255,.18) !important;
+}
+
+/* Quick modules: clean icon cards like a modern control center */
+.miyamaQuickGrid { gap:14px !important; margin-top:18px !important; }
+.miyamaQuickCard {
+  min-height:150px !important;
+  position:relative !important;
+  overflow:hidden !important;
+  text-align:left !important;
+  padding:22px !important;
+  border-radius:22px !important;
+  background:rgba(255,255,255,.92) !important;
+  border:1px solid rgba(148,163,184,.22) !important;
+  box-shadow:0 12px 34px rgba(15,23,42,.07) !important;
+  transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease !important;
+}
+.miyamaQuickCard::after {
+  content:"";
+  position:absolute;
+  right:-26px; top:-32px;
+  width:105px; height:105px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(37,99,235,.12),transparent 68%);
+}
+.miyamaQuickCard:hover {
+  transform:translateY(-5px) !important;
+  border-color:rgba(37,99,235,.35) !important;
+  box-shadow:0 22px 48px rgba(15,23,42,.12) !important;
+}
+.miyamaQuickIcon {
+  width:48px !important;
+  height:48px !important;
+  display:grid !important;
+  place-items:center !important;
+  border-radius:14px !important;
+  background:linear-gradient(145deg,#eef6ff,#e6fbff) !important;
+  border:1px solid #d9eaf8 !important;
+  font-size:24px !important;
+}
+.miyamaQuickCard strong { font-size:17px !important; color:#0b1324 !important; margin-top:14px !important; }
+.miyamaQuickCard small { color:#718096 !important; line-height:1.5 !important; }
+.miyamaQuickArrow { color:#2563eb !important; font-size:25px !important; }
+
+/* Global content cards */
+.tableWrap,.miyamaHomePanel,.miyamaElitePanel,.machineBreakdownCard,.productionKpi,.card,.calendarEditCard {
+  border-radius:22px !important;
+  border:1px solid rgba(148,163,184,.20) !important;
+  box-shadow:0 10px 30px rgba(15,23,42,.065) !important;
+  background:rgba(255,255,255,.94) !important;
+}
+.tableWrap:hover,.miyamaElitePanel:hover,.machineBreakdownCard:hover {
+  border-color:rgba(37,99,235,.22) !important;
+}
+.tableWrap h1,.tableWrap h2,.tableWrap h3,
+.miyamaElitePanel h3 { color:#0b1324 !important; letter-spacing:-.02em; }
+.tableWrap > p,.miyamaElitePanel p { color:#718096 !important; }
+
+/* KPI tiles become dashboard instrumentation */
+.productionKpiGrid,.miyamaEliteKpiGrid { gap:12px !important; }
+.productionKpi,.miyamaEliteKpi {
+  position:relative !important;
+  overflow:hidden !important;
+  padding:19px !important;
+  transition:transform .18s ease,box-shadow .18s ease !important;
+}
+.productionKpi:hover,.miyamaEliteKpi:hover { transform:translateY(-3px); box-shadow:0 18px 34px rgba(15,23,42,.10) !important; }
+.productionKpi::before,.miyamaEliteKpi::before {
+  content:"";
+  position:absolute;
+  left:0;top:0;bottom:0;width:4px;
+  background:linear-gradient(#2563eb,#06b6d4);
+}
+.productionKpi strong,.miyamaEliteKpi strong { color:#0b1324 !important; letter-spacing:-.035em; }
+
+/* Modern controls */
+input,select,textarea {
+  background:#f8fbff !important;
+  border:1px solid #d7e1ee !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9) !important;
+  transition:border-color .16s ease, box-shadow .16s ease, background .16s ease !important;
+}
+input:focus,select:focus,textarea:focus {
+  outline:none !important;
+  border-color:#60a5fa !important;
+  background:#fff !important;
+  box-shadow:0 0 0 4px rgba(37,99,235,.10) !important;
+}
+.primaryButton {
+  border:0 !important;
+  background:linear-gradient(135deg,#2563eb 0%,#0ea5e9 58%,#06b6d4 100%) !important;
+  box-shadow:0 9px 20px rgba(37,99,235,.18) !important;
+  font-weight:800 !important;
+  transition:.18s ease !important;
+}
+.primaryButton:hover { transform:translateY(-2px); box-shadow:0 14px 28px rgba(37,99,235,.25) !important; }
+.deleteButton { box-shadow:none !important; }
+
+/* Analysis rows: feel clickable / interactive */
+.miyamaEliteCauseRow,.miyamaEliteMachineRow,.productionDetailBarRow,.machineMiniRow {
+  border-radius:14px !important;
+  transition:background .16s ease,transform .16s ease !important;
+}
+.miyamaEliteCauseRow:hover,.miyamaEliteMachineRow:hover,.productionDetailBarRow:hover,.machineMiniRow:hover {
+  background:#f2f7ff !important;
+  transform:translateX(2px);
+}
+.miyamaEliteBarTrack,.productionBarBg { background:#e8eef6 !important; }
+.miyamaEliteBarFill,.productionBarFill { border-radius:999px !important; }
+
+/* Modals */
+.modalBackdrop { backdrop-filter:blur(8px) !important; background:rgba(4,10,20,.52) !important; }
+.modalCard {
+  border:1px solid rgba(255,255,255,.5) !important;
+  box-shadow:0 35px 90px rgba(2,8,23,.28) !important;
+  background:rgba(255,255,255,.98) !important;
+}
+
+/* Tables */
+table { border-collapse:separate !important; border-spacing:0 !important; }
+th { background:#f3f7fc !important; color:#53647a !important; font-size:12px !important; text-transform:none; }
+td { border-bottom:1px solid #e8edf4 !important; }
+tbody tr:hover td { background:#f8fbff !important; }
+
+/* Mobile keeps the modern feeling without visual overload */
+@media (max-width:900px) {
+  .tabs.miyamaTopNav,.miyamaTopNav { border-radius:16px !important; margin-left:0 !important; margin-right:0 !important; }
+  .miyamaHomeHero {
+    grid-template-columns:1fr !important;
+    min-height:auto !important;
+    padding:28px 22px !important;
+    border-radius:22px !important;
+  }
+  .miyamaHomeHero::after { opacity:.16; width:70%; right:-20%; top:24%; }
+  .miyamaHomeHeroText h1 { font-size:40px !important; }
+  .miyamaQuickGrid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  .miyamaQuickCard { min-height:135px !important; padding:16px !important; }
+}
+@media (max-width:520px) {
+  .miyamaQuickGrid { grid-template-columns:1fr !important; }
+  .miyamaHomeHeroText h1 { font-size:34px !important; letter-spacing:-1.4px !important; }
+  .miyamaHomeHero::after { display:none; }
+}
 `;
 
 
