@@ -3410,6 +3410,17 @@ div[style*="grid-template-columns: repeat(4, 1fr)"] input { min-width: 0 !import
 .productionDbTable th { background:#f8fafc; color:#334155; font-size:13px; }
 .productionDbExample { border:1px solid #dbe3ef; background:#f8fafc; border-radius:16px; padding:14px; line-height:1.75; color:#334155; }
 
+
+/* ===== V30 SIMPLE & CLICKABLE UX ===== */
+.miyamaPageGuide{display:flex;align-items:flex-start;gap:12px;margin:0 0 16px;padding:14px 16px;background:#f8fbff;border:1px solid #dbeafe;border-radius:16px;color:#334155}.miyamaPageGuideIcon{font-size:22px;line-height:1.2}.miyamaPageGuide b{color:#0f172a}.miyamaPageGuide p{margin:3px 0 0;line-height:1.55;color:#64748b}
+.miyamaSimpleHowTo{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 4px;padding:10px 12px;border-radius:12px;background:#eff6ff;color:#1e3a8a;font-size:13px}.miyamaSimpleHowTo span{background:#fff;border:1px solid #dbeafe;border-radius:999px;padding:5px 9px}
+.miyamaSecondaryButton{border:1px solid #cbd5e1!important;background:#fff!important;color:#334155!important;border-radius:12px!important;padding:10px 14px!important;font-weight:800!important;cursor:pointer!important}
+.miyamaClickableAnalysisRow{width:100%;border:0;text-align:left;font:inherit;color:inherit;cursor:pointer;background:transparent;transition:transform .15s ease,box-shadow .15s ease,background .15s ease}.miyamaClickableAnalysisRow:hover{background:#f8fbff;box-shadow:0 8px 22px rgba(15,23,42,.08);transform:translateY(-1px)}.miyamaClickableAnalysisRow:focus-visible{outline:3px solid rgba(37,99,235,.25);outline-offset:2px}button.miyamaEliteCauseRow,button.miyamaEliteMachineRow{font:inherit;color:inherit;text-align:left}
+.miyamaClickableMiniRow{width:100%;border:0;background:transparent;text-align:left;font:inherit;color:inherit;cursor:pointer;border-radius:10px}.miyamaClickableMiniRow:hover{background:#f8fbff}
+.miyamaDrilldownBackdrop{position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.48);backdrop-filter:blur(3px);display:flex;justify-content:flex-end}.miyamaDrilldownPanel{width:min(820px,92vw);height:100vh;background:#f8fafc;box-shadow:-25px 0 70px rgba(15,23,42,.22);overflow:auto;padding:0 20px 28px}.miyamaDrilldownHeader{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin:0 -20px 18px;padding:20px;background:rgba(255,255,255,.97);border-bottom:1px solid #e2e8f0;backdrop-filter:blur(12px)}.miyamaDrilldownHeader small{font-weight:900;letter-spacing:.09em;color:#2563eb}.miyamaDrilldownHeader h2{margin:4px 0 4px;color:#0f172a}.miyamaDrilldownHeader p{margin:0;color:#64748b}.miyamaDrilldownClose{width:42px;height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#334155;font-size:28px;line-height:1;cursor:pointer}
+.miyamaDrilldownList{display:grid;gap:12px}.miyamaDrilldownCard{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:15px;box-shadow:0 6px 20px rgba(15,23,42,.05)}.miyamaDrilldownCardTop{display:flex;justify-content:space-between;gap:12px;align-items:center;padding-bottom:9px;border-bottom:1px solid #f1f5f9}.miyamaDrilldownCardTop b{font-size:16px;color:#0f172a}.miyamaDrilldownCardTop span{font-size:12px;color:#64748b}.miyamaDrilldownMeta{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.miyamaDrilldownMeta span{font-size:12px;font-weight:800;color:#334155;background:#f1f5f9;border-radius:999px;padding:5px 8px}.miyamaDrilldownDl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0}.miyamaDrilldownDl div{padding:9px 10px;border-radius:10px;background:#f8fafc}.miyamaDrilldownDl dt{font-size:11px;font-weight:900;color:#64748b;margin-bottom:4px}.miyamaDrilldownDl dd{margin:0;white-space:pre-wrap;color:#0f172a;line-height:1.45}.miyamaOpenReportButton{margin-top:12px}.miyamaDrilldownEmpty{padding:30px;text-align:center;color:#64748b;background:#fff;border:1px dashed #cbd5e1;border-radius:16px}
+@media(max-width:720px){.miyamaPageGuide{font-size:13px}.miyamaSimpleHowTo{align-items:flex-start;flex-direction:column}.miyamaDrilldownPanel{width:100vw;padding:0 12px 20px}.miyamaDrilldownHeader{margin:0 -12px 14px;padding:15px}.miyamaDrilldownDl{grid-template-columns:1fr}.miyamaDrilldownCardTop{align-items:flex-start;flex-direction:column}}
+
 `;
 
 
@@ -4559,6 +4570,9 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [autoReportHistoryMessage, setAutoReportHistoryMessage] = useState("");
   const [analyticsPeriod, setAnalyticsPeriod] = useState("all");
   const [analyticsBaseDate, setAnalyticsBaseDate] = useState(todayText());
+  // V30 UX: one consistent details panel for analytics screens.
+  // Uses data already loaded in memory, so opening details creates ZERO extra Firestore reads.
+  const [analysisDrilldown, setAnalysisDrilldown] = useState(null);
   const [reportViewMode, setReportViewMode] = useState("summary");
   const [maintenanceViewMode, setMaintenanceViewMode] = useState("cards");
   const [spareViewMode, setSpareViewMode] = useState("cards");
@@ -12063,8 +12077,9 @@ function renderHome() {
     const groupBy = (getter) => Object.values(filtered.reduce((acc, row) => {
       const key = getter(row) || "未入力";
       const calc = calculateReport(row);
-      if (!acc[key]) acc[key] = { key, count: 0, stopHours: 0, repairHours: 0, cost: 0, latest: "", samples: [] };
+      if (!acc[key]) acc[key] = { key, count: 0, stopHours: 0, repairHours: 0, cost: 0, latest: "", samples: [], rows: [] };
       acc[key].count += 1;
+      acc[key].rows.push(row);
       acc[key].stopHours += toNumber(row.stopTimeHours ?? calc.stopTimeHours, 0);
       acc[key].repairHours += toNumber(row.laborHours ?? calc.laborHours, 0);
       acc[key].cost += toNumber(row.totalCost ?? calc.totalCost, 0);
@@ -12124,8 +12139,9 @@ function renderHome() {
     const eliteCauseMap = {};
     filtered.forEach((row) => {
       const key = getFailureCauseCategoryCompatible(row);
-      if (!eliteCauseMap[key]) eliteCauseMap[key] = { key, count: 0, stopHours: 0, cost: 0 };
+      if (!eliteCauseMap[key]) eliteCauseMap[key] = { key, count: 0, stopHours: 0, cost: 0, rows: [] };
       eliteCauseMap[key].count += 1;
+      eliteCauseMap[key].rows.push(row);
       eliteCauseMap[key].stopHours += toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0);
       eliteCauseMap[key].cost += toNumber(row.totalCost ?? calculateReport(row).totalCost, 0);
     });
@@ -12212,13 +12228,22 @@ function renderHome() {
       return dictionary[cause]?.[appLanguage] || cause;
     };
 
-    const Row = ({ item, index, max, mode = "hours" }) => (
-      <div className="productionDetailBarRow">
+    const openReportDrilldown = (title, rows = [], note = "") => {
+      setAnalysisDrilldown({ type: "maintenance", title, note, rows: Array.isArray(rows) ? rows : [] });
+    };
+
+    const Row = ({ item, index, max, mode = "hours", titlePrefix = "" }) => (
+      <button
+        type="button"
+        className="productionDetailBarRow miyamaClickableAnalysisRow"
+        onClick={() => openReportDrilldown(`${titlePrefix}${item.key}`, item.rows || [], `${item.count}件 / ${mode === "cost" ? formatMoney(item.cost) : formatHours(item.stopHours)}`)}
+        title={appLanguage === "en" ? "Click to see details" : appLanguage === "es" ? "Haga clic para ver detalles" : appLanguage === "th" ? "คลิกเพื่อดูรายละเอียด" : "クリックして詳細を見る"}
+      >
         <div className={`productionRankNo ${index < 3 ? "top" : ""}`}>{index + 1}</div>
-        <div className="productionRankName"><b>{item.key}</b><small>件数 {item.count}件 / 最新 {item.latest || "-"}</small></div>
+        <div className="productionRankName"><b>{item.key}</b><small>件数 {item.count}件 / 最新 {item.latest || "-"} ・ 詳細 ›</small></div>
         <div className="productionBarBg detail"><div className="productionBarFill red" style={{ width: `${Math.min(100, ((mode === "cost" ? item.cost : item.stopHours) / max) * 100)}%` }} /></div>
         <div className="productionRankValue">{mode === "cost" ? formatMoney(item.cost) : formatHours(item.stopHours)}<span>{mode === "cost" ? "保全費用" : "停止時間"}</span></div>
-      </div>
+      </button>
     );
 
     return (
@@ -12345,17 +12370,16 @@ function renderHome() {
             <div className="miyamaEliteCauseList">
               {eliteCauseRank.length === 0 && <p className="miyamaEliteEmpty">-</p>}
               {eliteCauseRank.map((item, index) => (
-                <div className="miyamaEliteCauseRow" key={item.key}>
+                <button type="button" className="miyamaEliteCauseRow miyamaClickableAnalysisRow" key={item.key}
+                  onClick={() => openReportDrilldown(`${appLanguage === "en" ? "Cause: " : appLanguage === "es" ? "Causa: " : appLanguage === "th" ? "สาเหตุ: " : "原因："}${eliteCauseLabel(item.key)}`, item.rows || [], `${item.count}${appLanguage === "ja" ? "件" : ""} / ${formatHours(item.stopHours)}`)}>
                   <span className="miyamaEliteRankNo">{index + 1}</span>
                   <div>
                     <b>{eliteCauseLabel(item.key)}</b>
-                    <small>{item.count}{appLanguage === "ja" ? "件" : appLanguage === "en" ? " cases" : " casos"}</small>
+                    <small>{item.count}{appLanguage === "ja" ? "件" : appLanguage === "en" ? " cases" : appLanguage === "es" ? " casos" : " รายการ"} ・ {appLanguage === "ja" ? "詳細を見る" : appLanguage === "en" ? "View details" : appLanguage === "es" ? "Ver detalles" : "ดูรายละเอียด"} ›</small>
                   </div>
-                  <div className="miyamaEliteBarTrack">
-                    <div className="miyamaEliteBarFill danger" style={{ width: `${Math.min(100, (item.stopHours / eliteCauseMax) * 100)}%` }} />
-                  </div>
+                  <div className="miyamaEliteBarTrack"><div className="miyamaEliteBarFill danger" style={{ width: `${Math.min(100, (item.stopHours / eliteCauseMax) * 100)}%` }} /></div>
                   <strong>{formatHours(item.stopHours)}</strong>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -12385,17 +12409,13 @@ function renderHome() {
           </div>
 
           {eliteMachineRiskRank.map((machine, index) => (
-            <div className="miyamaEliteMachineRow" key={machine.key}>
+            <button type="button" className="miyamaEliteMachineRow miyamaClickableAnalysisRow" key={machine.key}
+              onClick={() => openReportDrilldown(`${appLanguage === "en" ? "Equipment: " : appLanguage === "es" ? "Equipo: " : appLanguage === "th" ? "เครื่องจักร: " : "設備："}${machine.key}`, filtered.filter((row) => getReportMachine(row) === machine.key), `${machine.count}${appLanguage === "ja" ? "件" : ""} / ${formatHours(machine.stopHours)}`)}>
               <span className={`miyamaEliteRankNo ${index < 3 ? "top" : ""}`}>{index + 1}</span>
-              <div>
-                <b>{machine.key}</b>
-                <small>{machine.count}{appLanguage === "ja" ? "件" : appLanguage === "en" ? " reports" : " informes"}</small>
-              </div>
+              <div><b>{machine.key}</b><small>{machine.count}{appLanguage === "ja" ? "件" : appLanguage === "en" ? " reports" : appLanguage === "es" ? " informes" : " รายการ"} ・ 詳細 ›</small></div>
               <strong>{formatHours(machine.stopHours)}</strong>
-              <span>{machine.recurrence}</span>
-              <span>{machine.highCriticality}</span>
-              <strong>{machine.riskScore.toFixed(0)}</strong>
-            </div>
+              <span>{machine.recurrence}</span><span>{machine.highCriticality}</span><strong>{machine.riskScore.toFixed(0)}</strong>
+            </button>
           ))}
         </section>
 
@@ -12410,6 +12430,7 @@ function renderHome() {
         <div className="tableWrap productionHero">
           <h1>📈 保全分析センター</h1>
           <p>この画面は <b>保全修理報告書だけ</b> を使って、停止時間・MTTR・費用・設備ランキングを計算します。CSVアラームはここでは使いません。</p>
+          <div className="miyamaSimpleHowTo"><b>👀 見方は3ステップ：</b><span>① 赤い棒を見る</span><span>② 気になる項目をクリック</span><span>③ 設備・場所・現象・原因・処置まで確認</span></div>
           <div className="productionTrendToolbar" style={{ marginTop: "16px" }}>
             {periodOptions.map((option) => (
               <button
@@ -12428,6 +12449,7 @@ function renderHome() {
             <label>🏭 設備名<input value={productionMachineName} onChange={(e) => setProductionMachineName(e.target.value)} placeholder="必要な場合だけ入力" /></label>
             <label>🏗 ライン<input value={productionLineName} onChange={(e) => setProductionLineName(e.target.value)} placeholder="必要な場合だけ入力" /></label>
             <button className="primaryButton" onClick={loadReports}>🔄 再読込</button>
+            <button type="button" className="miyamaSecondaryButton" onClick={() => { setProductionSearch(""); setProductionMachineName(""); setProductionLineName(""); setAnalyticsPeriod("all"); }}>✕ 絞り込み解除</button>
           </div>
         </div>
 
@@ -12444,23 +12466,23 @@ function renderHome() {
           <h2>🏭 設備別 停止時間ランキング</h2>
           <p>どの設備が一番長く止まっているかを、保全修理報告書の停止時間から集計します。</p>
           {machineRank.length === 0 && <p>保全修理報告書データがまだありません。</p>}
-          {machineRank.slice(0, 10).map((item, index) => <Row key={item.key} item={item} index={index} max={maxMachineStop} />)}
+          {machineRank.slice(0, 10).map((item, index) => <Row key={item.key} item={item} index={index} max={maxMachineStop} titlePrefix="設備：" />)}
         </div>
 
         <div className="tableWrap">
           <h2>⚠️ 保全原因ランキング</h2>
           <p>不具合現象・不具合箇所・なぜ1から、停止時間が大きい原因を整理します。</p>
-          {reasonRank.slice(0, 10).map((item, index) => <Row key={item.key} item={item} index={index} max={maxReasonStop} />)}
+          {reasonRank.slice(0, 10).map((item, index) => <Row key={item.key} item={item} index={index} max={maxReasonStop} titlePrefix="原因：" />)}
         </div>
 
         <div className="machineBreakdownGrid">
           <div className="machineBreakdownCard">
             <h3>🔧 交換・故障部品 TOP</h3>
-            {partRank.slice(0, 8).map((item) => <div className="machineMiniRow" key={item.key}><div><b>{item.key}</b><br /><small>停止 {formatHours(item.stopHours)} / 件数 {item.count}件</small></div><strong>{item.count}件</strong></div>)}
+            {partRank.slice(0, 8).map((item) => <button type="button" className="machineMiniRow miyamaClickableMiniRow" key={item.key} onClick={() => openReportDrilldown(`部品：${item.key}`, item.rows || [], `停止 ${formatHours(item.stopHours)} / ${item.count}件`)}><div><b>{item.key}</b><br /><small>停止 {formatHours(item.stopHours)} / 件数 {item.count}件 ・ 詳細 ›</small></div><strong>{item.count}件</strong></button>)}
           </div>
           <div className="machineBreakdownCard">
             <h3>📅 月別 停止時間</h3>
-            {monthlyRank.slice(0, 8).map((item) => <div className="machineMiniRow" key={item.key}><div><b>{item.key}</b><br /><small>費用 {formatMoney(item.cost)} / 件数 {item.count}件</small></div><strong>{formatHours(item.stopHours)}</strong></div>)}
+            {monthlyRank.slice(0, 8).map((item) => <button type="button" className="machineMiniRow miyamaClickableMiniRow" key={item.key} onClick={() => openReportDrilldown(`月：${item.key}`, item.rows || [], `費用 ${formatMoney(item.cost)} / ${item.count}件`)}><div><b>{item.key}</b><br /><small>費用 {formatMoney(item.cost)} / 件数 {item.count}件 ・ 詳細 ›</small></div><strong>{formatHours(item.stopHours)}</strong></button>)}
           </div>
         </div>
 
@@ -12527,8 +12549,9 @@ function renderHome() {
 
     const by = (getter) => Object.values(enriched.reduce((acc, row) => {
       const key = getter(row) || "未入力";
-      if (!acc[key]) acc[key] = { key, count: 0, latest: "", machines: {}, samples: [], solution: row.solution || "" };
+      if (!acc[key]) acc[key] = { key, count: 0, latest: "", machines: {}, samples: [], solution: row.solution || "", rows: [] };
       acc[key].count += 1;
+      acc[key].rows.push(row);
       if (row.date > acc[key].latest) acc[key].latest = row.date;
       acc[key].machines[row.machine] = (acc[key].machines[row.machine] || 0) + 1;
       if (acc[key].samples.length < 3) acc[key].samples.push(row.message);
@@ -12544,13 +12567,17 @@ function renderHome() {
     const maxReason = Math.max(1, ...reasonRank.map((x) => x.count));
     const topRate = total > 0 && alarmRank[0] ? Math.round((alarmRank[0].count / total) * 100) : 0;
 
-    const CsvRow = ({ item, index, max, color = "orange" }) => (
-      <div className="productionDetailBarRow">
+    const openCsvDrilldown = (title, rows = [], note = "") => {
+      setAnalysisDrilldown({ type: "csv", title, note, rows: Array.isArray(rows) ? rows : [] });
+    };
+
+    const CsvRow = ({ item, index, max, color = "orange", titlePrefix = "" }) => (
+      <button type="button" className="productionDetailBarRow miyamaClickableAnalysisRow" onClick={() => openCsvDrilldown(`${titlePrefix}${item.key}`, item.rows || [], `${item.count}回 / 主設備 ${item.mainMachine}`)}>
         <div className={`productionRankNo ${index < 3 ? "top" : ""}`}>{index + 1}</div>
-        <div className="productionRankName"><b>{item.key}</b><small>主設備 {item.mainMachine} / 最新 {item.latest || "-"}</small></div>
+        <div className="productionRankName"><b>{item.key}</b><small>主設備 {item.mainMachine} / 最新 {item.latest || "-"} ・ 詳細 ›</small></div>
         <div className="productionBarBg detail"><div className={`productionBarFill ${color}`} style={{ width: `${Math.min(100, (item.count / max) * 100)}%` }} /></div>
         <div className="productionRankValue">{Number(item.count || 0).toLocaleString()}<span>発生回数</span></div>
-      </div>
+      </button>
     );
 
     return (
@@ -12560,6 +12587,7 @@ function renderHome() {
             <div>
               <h1>📉 CSV分析センター</h1>
               <p>この画面は <b>CSVアラームだけ</b> を使って、機械が止まる原因・アラーム回数・発生傾向を分析します。保全修理報告書の停止時間はここでは使いません。</p>
+              <div className="miyamaSimpleHowTo"><b>👀 見方は3ステップ：</b><span>① 多いアラームを見る</span><span>② 行をクリック</span><span>③ 発生日・設備・アラーム・対策を確認</span></div>
             </div>
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               <label className="primaryButton" style={{ cursor: "pointer" }}>
@@ -12602,13 +12630,13 @@ function renderHome() {
           <h2>🚨 アラーム別 TOP10</h2>
           <p>CSVに出ているアラームメッセージをそのまま集計します。機械が止まる直接の入口を見る画面です。</p>
           {alarmRank.length === 0 && <p>CSVデータがまだありません。右上のCSV取込からアップロードしてください。</p>}
-          {alarmRank.slice(0, 10).map((item, index) => <CsvRow key={item.key} item={item} index={index} max={maxAlarm} color="red" />)}
+          {alarmRank.slice(0, 10).map((item, index) => <CsvRow key={item.key} item={item} index={index} max={maxAlarm} color="red" titlePrefix="アラーム：" />)}
         </div>
 
         <div className="tableWrap">
           <h2>⚠️ 停止原因分類 TOP10</h2>
           <p>アラーム文言から、センサー・詰まり・搬送・位置ズレなどに分類します。</p>
-          {reasonRank.slice(0, 10).map((item, index) => <CsvRow key={item.key} item={item} index={index} max={maxReason} color="orange" />)}
+          {reasonRank.slice(0, 10).map((item, index) => <CsvRow key={item.key} item={item} index={index} max={maxReason} color="orange" titlePrefix="原因：" />)}
         </div>
 
         <div className="machineBreakdownGrid">
@@ -15103,6 +15131,50 @@ Requirements:
     );
   }
 
+  function renderPageGuide() {
+    const guides = {
+      home: { icon: "🏠", ja: "よく使う機能から始めます。迷ったら検索欄に設備名・部品名・不具合を書いてください。", en: "Start from the common actions. If unsure, search by equipment, part, or failure.", es: "Empiece por las funciones principales. Si tiene dudas, busque por equipo, pieza o falla.", th: "เริ่มจากเมนูที่ใช้บ่อย หากไม่แน่ใจให้ค้นหาด้วยชื่อเครื่องจักร ชิ้นส่วน หรืออาการเสีย" },
+      report: { icon: "📝", ja: "修理内容を記録します。概要 → 不具合 → 原因 → 処置 → 再発防止の順で確認すると簡単です。", en: "Record repairs in order: summary → failure → cause → action → recurrence prevention.", es: "Registre la reparación en orden: resumen → falla → causa → acción → prevención.", th: "บันทึกงานซ่อมตามลำดับ: ภาพรวม → อาการเสีย → สาเหตุ → การแก้ไข → ป้องกันการเกิดซ้ำ" },
+      maintenance: { icon: "🛠️", ja: "期限が近いものから確認します。設備・部品で検索し、実施したら完了登録します。", en: "Check the nearest due items first. Search by equipment/part and mark completed after work.", es: "Revise primero lo próximo a vencer. Busque por equipo/pieza y marque completado.", th: "ตรวจรายการที่ใกล้ถึงกำหนดก่อน ค้นหาตามเครื่องจักร/ชิ้นส่วน และบันทึกเมื่อเสร็จ" },
+      spare: { icon: "📦", ja: "在庫不足を優先して確認します。部品名・型式・設備で検索できます。", en: "Prioritize shortages. Search by part name, model, or equipment.", es: "Priorice faltantes. Busque por pieza, modelo o equipo.", th: "ตรวจอะไหล่ที่ขาดก่อน ค้นหาด้วยชื่อ รุ่น หรือเครื่องจักร" },
+      calendar: { icon: "📅", ja: "日付を選ぶと予定を確認・追加できます。月表示は概要、下の一覧で詳細を見ます。", en: "Select a date to view/add schedules. The month is an overview; details are below.", es: "Seleccione una fecha para ver/agregar planes. El mes es un resumen; los detalles están abajo.", th: "เลือกวันที่เพื่อดูหรือเพิ่มแผน ปฏิทินเดือนเป็นภาพรวม รายละเอียดอยู่ด้านล่าง" },
+      work: { icon: "🏗️", ja: "未完了・遅れ・高リスクの工事から確認します。進捗を更新すると全員が同じ状況を見られます。", en: "Check incomplete, delayed, and high-risk work first. Keep progress updated.", es: "Revise primero trabajos incompletos, retrasados y de alto riesgo. Actualice el progreso.", th: "ตรวจงานที่ยังไม่เสร็จ ล่าช้า หรือเสี่ยงสูงก่อน และอัปเดตความคืบหน้า" },
+      analytics: { icon: "📊", ja: "赤い棒・ランキングはクリックできます。カテゴリ → 設備 → 実際の修理報告まで掘り下げて確認します。", en: "Red bars and rankings are clickable. Drill down from category → equipment → actual report.", es: "Las barras rojas y rankings se pueden abrir. Vea categoría → equipo → informe real.", th: "แถบสีแดงและอันดับคลิกได้ ดูรายละเอียดจากหมวด → เครื่องจักร → รายงานจริง" },
+      csvAnalytics: { icon: "📉", ja: "アラーム行をクリックすると、どの設備・いつ・何が起きたかを一覧で確認できます。", en: "Click an alarm row to see which equipment, when, and what happened.", es: "Haga clic en una alarma para ver equipo, fecha y detalle.", th: "คลิกแถว Alarm เพื่อดูว่าเกิดกับเครื่องใด เมื่อไร และเกิดอะไรขึ้น" },
+      dailyProduction: { icon: "🗄️", ja: "生産数を日付・設備ごとに登録します。定量保全の次回日計算に使います。", en: "Register production by date/equipment. It feeds production-based maintenance due dates.", es: "Registre producción por fecha/equipo. Se usa para mantenimiento por producción.", th: "บันทึกยอดผลิตตามวันที่และเครื่องจักร เพื่อคำนวณกำหนดบำรุงตามจำนวนผลิต" },
+      users: { icon: "👥", ja: "アカウント・権限・有効状態を管理します。新規作成はFirebase Authと自動連携します。", en: "Manage accounts, roles, and active status. New accounts link to Firebase Auth automatically.", es: "Gestione cuentas, roles y estado. Las nuevas cuentas se vinculan con Firebase Auth.", th: "จัดการบัญชี สิทธิ์ และสถานะ บัญชีใหม่เชื่อม Firebase Auth อัตโนมัติ" },
+      newEquipment: { icon: "🏭", ja: "新設備の準備状況をチェックリストで確認します。未完了項目だけ追えば進捗が分かります。", en: "Track new-equipment readiness by checklist. Focus on incomplete items.", es: "Controle la preparación del equipo nuevo con la lista. Enfoque lo pendiente.", th: "ติดตามความพร้อมเครื่องจักรใหม่ด้วยเช็กลิสต์ เน้นรายการที่ยังไม่เสร็จ" },
+    };
+    const guide = guides[page];
+    if (!guide) return null;
+    const lang = MIYAMA_LANGUAGES[appLanguage] ? appLanguage : "ja";
+    return <div className="miyamaPageGuide" role="note"><span className="miyamaPageGuideIcon">{guide.icon}</span><div><b>{lang === "ja" ? "この画面でできること" : lang === "en" ? "What you can do here" : lang === "es" ? "Qué puede hacer aquí" : "สิ่งที่ทำได้ในหน้านี้"}</b><p>{guide[lang] || guide.ja}</p></div></div>;
+  }
+
+  function renderAnalysisDrilldown() {
+    if (!analysisDrilldown) return null;
+    const rows = Array.isArray(analysisDrilldown.rows) ? analysisDrilldown.rows : [];
+    const isCsv = analysisDrilldown.type === "csv";
+    const stopTotal = !isCsv ? rows.reduce((sum, row) => sum + toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0), 0) : 0;
+    const close = () => setAnalysisDrilldown(null);
+    const openReport = (row) => {
+      close(); setPage("report"); setReportSearch(String(row?.id || row?.equipment || row?.phenomenon || ""));
+      if (row?.id) window.setTimeout(() => document.getElementById(`maintenance-report-${row.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
+    };
+    return (
+      <div className="miyamaDrilldownBackdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
+        <section className="miyamaDrilldownPanel" role="dialog" aria-modal="true" aria-label={analysisDrilldown.title}>
+          <header className="miyamaDrilldownHeader"><div><small>{isCsv ? "CSV DETAIL" : "MAINTENANCE DETAIL"}</small><h2>{analysisDrilldown.title}</h2><p>{analysisDrilldown.note || `${rows.length}件`} {(!isCsv && rows.length > 0) ? ` / 停止 ${stopTotal.toFixed(1)}H` : ""}</p></div><button type="button" className="miyamaDrilldownClose" onClick={close} aria-label="Close">×</button></header>
+          {rows.length === 0 ? <div className="miyamaDrilldownEmpty">詳細データがありません。</div> : isCsv ? (
+            <div className="miyamaDrilldownList">{rows.map((row, index) => <article className="miyamaDrilldownCard" key={`${row.id || row.alarmNo || index}-${index}`}><div className="miyamaDrilldownCardTop"><b>{row.machine || row.equipment || "設備未入力"}</b><span>{row.date || getCsvLogDate(row) || "-"}</span></div><div className="miyamaDrilldownMeta"><span>🏗 {row.lineName || row.line || "-"}</span><span>🚨 No. {row.alarmNo || "-"}</span></div><dl className="miyamaDrilldownDl"><div><dt>アラーム</dt><dd>{row.message || row.alarmMessage || "-"}</dd></div><div><dt>原因</dt><dd>{row.reason || "-"}</dd></div><div><dt>推奨対策</dt><dd>{row.solution || "-"}</dd></div></dl></article>)}</div>
+          ) : (
+            <div className="miyamaDrilldownList">{rows.slice().sort((a,b)=>toNumber(b.stopTimeHours ?? calculateReport(b).stopTimeHours,0)-toNumber(a.stopTimeHours ?? calculateReport(a).stopTimeHours,0)).map((row,index)=>{ const calc=calculateReport(row); const stop=toNumber(row.stopTimeHours ?? calc.stopTimeHours,0); const cost=toNumber(row.totalCost ?? calc.totalCost,0); return <article className="miyamaDrilldownCard" key={row.id || index}><div className="miyamaDrilldownCardTop"><b>{getEquipmentNameFromRecord(row) || row.equipment || "設備未入力"}</b><span>{normalizeDateOnly(row.createdAt || row.troubleDateTime || row.reportCreatedDate || row.workStartDateTime) || "-"}</span></div><div className="miyamaDrilldownMeta"><span>🏗 {row.lineName || "-"}</span><span>⏰ {stop.toFixed(1)}H</span><span>💴 ¥{Math.round(cost).toLocaleString()}</span></div><dl className="miyamaDrilldownDl"><div><dt>不具合箇所</dt><dd>{row.troublePoint || "-"}</dd></div><div><dt>不具合現象</dt><dd>{row.phenomenon || "-"}</dd></div><div><dt>原因</dt><dd>{row.failureCauseCategory || row.why1 || row.why2 || "-"}</dd></div><div><dt>処置</dt><dd>{row.action || "-"}</dd></div><div><dt>再発防止</dt><dd>{row.recurrencePrevention || "-"}</dd></div></dl><button type="button" className="primaryButton miyamaOpenReportButton" onClick={()=>openReport(row)}>📄 元の修理報告を開く</button></article>; })}</div>
+          )}
+        </section>
+      </div>
+    );
+  }
+
   function renderCurrentPage() {
     if (page === "home") return renderHome();
     if (page === "ai") return renderMiyamaAi();
@@ -15267,7 +15339,9 @@ return (
 
       {page !== "home" && page !== "miyamaAi" && renderGlobalSearchBox()}
 
+      {renderPageGuide()}
       {renderCurrentPage()}
+      {renderAnalysisDrilldown()}
 
     </div>
   </div>
