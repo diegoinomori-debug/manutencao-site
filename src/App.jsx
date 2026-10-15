@@ -1,3 +1,4 @@
+import { calculateReport } from "./utils/reportCalculations";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 // V14: 日本語IME対応、設備選択、日付入力補正、次回実施日・残り日数の即時計算を安定化。
 import * as XLSX from "xlsx";
@@ -48,8 +49,22 @@ import {
   updateDoc,
   getDoc,
   setDoc,
+  writeBatch,
+  runTransaction,
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+
+async function createUniqueImport(collectionName, data, duplicateKey) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(duplicateKey));
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  const reference = doc(db, collectionName, `import_${hash}`);
+  return runTransaction(db, async transaction => {
+    const existing = await transaction.get(reference);
+    if (existing.exists()) return false;
+    transaction.set(reference, { ...data, duplicateKey });
+    return true;
+  });
+}
 
 function toLocalDateText(date = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
@@ -499,43 +514,6 @@ function hoursBetween(startValue, endValue) {
   return Math.max(0, (end - start) / 3600000);
 }
 
-function calculateReport(report = {}) {
-  const stopExclusionHours = Math.max(0, toNumber(report.stopExclusionHours ?? report.stopExclusionTime, 0));
-  const functionDownRateRaw = Math.max(0, toNumber(report.functionDownRate, 100));
-  const functionDownRate = functionDownRateRaw <= 1 ? functionDownRateRaw : functionDownRateRaw / 100;
-
-  // 停止時間は「不具合発生」から「生産開始」までを基本にします。
-  // Excel側で 1899/12/30 が入った場合は、作業開始・作業完了で補正します。
-  const startForStop = pickDateTime(report.troubleDateTime, report.workStartDateTime);
-  const endForStop = pickDateTime(report.productionStartDateTime, report.workEndDateTime);
-  const stopTimeHours = Math.max(0, (hoursBetween(startForStop, endForStop) - stopExclusionHours) * functionDownRate);
-
-  const workerCount = Math.max(1, toNumber(report.workerCount, 1));
-  const laborRate = Math.max(0, toNumber(report.laborRate, 3000));
-  const laborBaseHours = Math.max(0, hoursBetween(report.workStartDateTime, report.workEndDateTime) - stopExclusionHours);
-  const laborHours = laborBaseHours * workerCount;
-  const laborCost = Math.round(laborHours * laborRate);
-
-  const partAmount1 = toNumber(report.partQty1, 0) * toNumber(report.partUnitPrice1, 0);
-  const partAmount2 = toNumber(report.partQty2, 0) * toNumber(report.partUnitPrice2, 0);
-  const partAmount3 = toNumber(report.partQty3, 0) * toNumber(report.partUnitPrice3, 0);
-  const partsCost = Math.round(partAmount1 + partAmount2 + partAmount3 + toNumber(report.partsCostManual, 0));
-  const totalCost = Math.round(laborCost + partsCost);
-
-  return {
-    stopExclusionHours,
-    functionDownRate: functionDownRateRaw,
-    stopTimeHours: Number(stopTimeHours.toFixed(2)),
-    laborHours: Number(laborHours.toFixed(2)),
-    laborCost,
-    partAmount1,
-    partAmount2,
-    partAmount3,
-    partsCost,
-    totalCost,
-  };
-}
-
 
 function calculateSmartMaintenance(part = {}) {
   const lastDate = normalizeDateOnly(part.lastDate);
@@ -760,6 +738,12 @@ function clampPercent(value) {
 
 function formatYen(value) {
   return `${Math.round(Number(value || 0)).toLocaleString()}円`;
+}
+
+function escapeReportHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[ch]);
 }
 
 function makeCsvSafe(value) {
@@ -4141,29 +4125,15 @@ async function translateJapaneseChunk(text, targetLanguage = "en", signal) {
     targetLanguage: ["en", "es", "th"].includes(targetLanguage) ? targetLanguage : "en",
   });
 
-  let response;
-  try {
-    response = await fetch("/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody,
-      signal,
-    });
-  } catch (localError) {
-    response = null;
-  }
-
-  // Vite local development does not always execute Vercel serverless /api routes.
-  // For Thai display, retry the deployed MIYAMA endpoint so historical English/Japanese
-  // repair text can still be previewed in Thai during local testing.
-  if ((!response || !response.ok) && targetLanguage === "th" && typeof window !== "undefined" && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
-    response = await fetch("https://manutencao-site-swart.vercel.app/api/translate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody,
-      signal,
-    });
-  }
+  const user = auth.currentUser;
+  if (!user) throw new Error("Sign in to translate maintenance data.");
+  const token = await user.getIdToken();
+  const response = await fetch("/api/translate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: requestBody,
+    signal,
+  });
 
   if (!response) throw new Error("Translation server is unavailable.");
 
@@ -4741,6 +4711,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   const [parts, setParts] = useState([]);
+  const maintenanceSaveQueue = useRef(new Map());
+  const maintenanceSavedRows = useRef(new Map());
+  const reportSaveInFlight = useRef(false);
+  const dailyProductionRowsRef = useRef(null);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [reports, setReports] = useState([]);
   const [similarProblems, setSimilarProblems] = useState([]);
@@ -4834,6 +4808,9 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [paidAiError, setPaidAiError] = useState("");
   const [productionLogs, setProductionLogs] = useState([]);
   const [dailyProductions, setDailyProductions] = useState([]);
+  useEffect(() => {
+    if (dailyProductionRowsRef.current !== null) dailyProductionRowsRef.current = dailyProductions;
+  }, [dailyProductions]);
   const [dailyProductionDraft, setDailyProductionDraft] = useState({ date: "", equipment: "", quantity: "", note: "" });
   const [dailyProductionSearch, setDailyProductionSearch] = useState("");
   const [productionMachineName, setProductionMachineName] = useState("");
@@ -4954,7 +4931,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   // Evita milhares de leituras desnecessárias no Firestore:
   // carrega a base diária somente quando a tela de produção é aberta.
   useEffect(() => {
-    if (page === "dailyProduction") {
+    if (["dailyProduction", "maintenance"].includes(page)) {
       loadDailyProductions();
     }
   }, [page]);
@@ -5132,7 +5109,9 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   async function loadParts() {
     const snap = await getDocs(collection(db, "parts"));
-    setParts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    maintenanceSavedRows.current = new Map(rows.map(row => [row.id, row]));
+    setParts(rows);
   }
 
   async function loadCalendar() {
@@ -5290,6 +5269,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function deleteNewEquipmentProject(projectId) {
+    if (!isAdmin) { alert("削除は管理者のみ実行できます。 / Only administrators can delete records."); return; }
     if (!projectId) return;
     const ok = window.confirm(
       appLanguage === "es"
@@ -5322,12 +5302,12 @@ function MaintenanceApp({ currentUser, userProfile }) {
   async function loadDailyProductions() {
     try {
       const snap = await getDocs(collection(db, "dailyProductions"));
+      dailyProductionRowsRef.current = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       rows.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
       setDailyProductions(rows);
     } catch (err) {
       console.error("dailyProductions load error:", err);
-      setDailyProductions([]);
     }
   }
 
@@ -5364,6 +5344,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function deleteDailyProduction(id) {
+    if (!isAdmin) { alert("削除は管理者のみ実行できます。 / Only administrators can delete records."); return; }
     if (!confirm("この生産数データを削除しますか？")) return;
     await deleteDoc(doc(db, "dailyProductions", id));
     await loadDailyProductions();
@@ -5371,6 +5352,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
 
   async function deleteDailyProductionBySelectedDate() {
+    if (!isAdmin) { alert("削除は管理者のみ実行できます。 / Only administrators can delete records."); return; }
     const targetDate = normalizeDateOnly(dailyProductionDraft.date);
     if (!targetDate) {
       alert("削除する日付を選択してください。");
@@ -5394,6 +5376,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function clearAllDailyProductions() {
+    if (!isAdmin) { alert("削除は管理者のみ実行できます。 / Only administrators can delete records."); return; }
     const ok = window.confirm(
       "⚠️ 生産数DBをすべて初期化します。\n\n平均生産数・保全サイクルによる交換予測の元データが削除されます。\n保全報告書・予備品・カレンダー・計画工事は削除されません。\n\n本当に削除しますか？"
     );
@@ -5411,6 +5394,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function clearAllProductionLogs() {
+    if (!isAdmin) { alert("削除は管理者のみ実行できます。 / Only administrators can delete records."); return; }
     const ok = window.confirm(
       "CSV取込データ（productionLogs）をすべて削除します。\n\n保全報告書・予備品・カレンダー・計画工事は削除されません。\n\n本当に削除しますか？"
     );
@@ -5433,100 +5417,55 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function updateField(collectionName, id, field, value) {
-    const setterMap = {
-      parts: setParts,
-      calendar: setCalendarEvents,
-      maintenanceReports: setReports,
-      plannedWorks: setPlannedWorks,
-      dailyProductions: setDailyProductions,
-    };
-
-    const setter = setterMap[collectionName];
-
-    if (setter) {
-      setter((current) =>
-        current.map((item) =>
-          item.id === id ? { ...item, [field]: value } : item
-        )
-      );
-    }
-
     await updateDoc(doc(db, collectionName, id), { [field]: value });
+    const setter = { parts: setParts, calendar: setCalendarEvents,
+      maintenanceReports: setReports, plannedWorks: setPlannedWorks,
+      dailyProductions: setDailyProductions }[collectionName];
+    if (collectionName === "parts") {
+      const latest = maintenanceSavedRows.current.get(id);
+      if (latest) maintenanceSavedRows.current.set(id, { ...latest, [field]: value });
+    }
+    if (setter) setter(current => current.map(item =>
+      item.id === id ? { ...item, [field]: value } : item));
   }
 
   async function updateMaintenanceSchedule(row, changes = {}) {
-    // Use the newest state value, not only the row captured by the render.
-    // This prevents a quick date/cycle edit from calculating with stale data.
-    let patchToSave = null;
-
-    setParts((current) => {
-      const latest = current.find((item) => item.id === row.id) || row;
+    const previous = maintenanceSaveQueue.current.get(row.id) || Promise.resolve();
+    const operation = previous.catch(() => {}).then(async () => {
+      if (dailyProductionRowsRef.current === null) {
+        const snapshot = await getDocs(collection(db, "dailyProductions"));
+        dailyProductionRowsRef.current = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setDailyProductions(dailyProductionRowsRef.current);
+      }
+      const latest = maintenanceSavedRows.current.get(row.id)
+        || parts.find(item => item.id === row.id) || row;
       const updated = { ...latest, ...changes };
       updated.lastDate = normalizeMaintenanceDateInput(updated.lastDate);
       updated.maintenanceMode = normalizeMaintenanceMode(updated.maintenanceMode, updated);
-
-      const smart = calculateSmartMaintenanceByDailyProduction(updated, dailyProductions);
-      patchToSave = {
-        ...changes,
-        lastDate: updated.lastDate,
-        maintenanceMode: updated.maintenanceMode,
-        nextDate: smart.nextDate || "",
-        dateNextDate: smart.dateNextDate || "",
-        productionNextDate: smart.productionNextDate || "",
-        daysLeft: smart.daysLeft,
-        status: smart.status,
-      };
-
-      return current.map((item) =>
-        item.id === row.id ? { ...item, ...patchToSave } : item
-      );
+      const smart = calculateSmartMaintenanceByDailyProduction(updated, dailyProductionRowsRef.current || dailyProductions);
+      const patch = { ...changes, lastDate: updated.lastDate,
+        maintenanceMode: updated.maintenanceMode, nextDate: smart.nextDate || "",
+        dateNextDate: smart.dateNextDate || "", productionNextDate: smart.productionNextDate || "",
+        daysLeft: smart.daysLeft, status: smart.status };
+      await updateDoc(doc(db, "parts", row.id), patch);
+      maintenanceSavedRows.current.set(row.id, { ...latest, ...patch });
+      setParts(current => current.map(item => item.id === row.id ? { ...item, ...patch } : item));
     });
-
-    // React state updates are synchronous for the updater callback, but keep a safe fallback.
-    if (!patchToSave) {
-      const updated = { ...row, ...changes };
-      updated.lastDate = normalizeMaintenanceDateInput(updated.lastDate);
-      updated.maintenanceMode = normalizeMaintenanceMode(updated.maintenanceMode, updated);
-      const smart = calculateSmartMaintenanceByDailyProduction(updated, dailyProductions);
-      patchToSave = {
-        ...changes,
-        lastDate: updated.lastDate,
-        maintenanceMode: updated.maintenanceMode,
-        nextDate: smart.nextDate || "",
-        dateNextDate: smart.dateNextDate || "",
-        productionNextDate: smart.productionNextDate || "",
-        daysLeft: smart.daysLeft,
-        status: smart.status,
-      };
+    maintenanceSaveQueue.current.set(row.id, operation);
+    try { await operation; }
+    finally {
+      if (maintenanceSaveQueue.current.get(row.id) === operation)
+        maintenanceSaveQueue.current.delete(row.id);
     }
-
-    await updateDoc(doc(db, "parts", row.id), patchToSave);
   }
 
   async function saveMaintenanceSchedule(row) {
-    const latest = parts.find((item) => item.id === row.id) || row;
-    const normalized = {
-      ...latest,
-      lastDate: normalizeMaintenanceDateInput(latest.lastDate),
-      maintenanceMode: normalizeMaintenanceMode(latest.maintenanceMode, latest),
-    };
-    const smart = calculateSmartMaintenanceByDailyProduction(normalized, dailyProductions);
-    const patch = {
-      lastDate: normalized.lastDate,
-      maintenanceMode: normalized.maintenanceMode,
-      nextDate: smart.nextDate || "",
-      dateNextDate: smart.dateNextDate || "",
-      productionNextDate: smart.productionNextDate || "",
-      daysLeft: smart.daysLeft,
-      status: smart.status,
-    };
-
-    setParts((current) => current.map((item) => item.id === row.id ? { ...item, ...patch } : item));
-    await updateDoc(doc(db, "parts", row.id), patch);
-    alert(smart.nextDate ? `保存しました。次回実施日：${smart.nextDate}` : "保存しました。前回実施日と保全周期を確認してください。");
+    await updateMaintenanceSchedule(row);
+    alert("保存しました。");
   }
 
   async function removeItem(collectionName, id) {
+    if (!isAdmin) { alert("削除は管理者のみ実行できます。 / Only administrators can delete records."); return; }
     await deleteDoc(doc(db, collectionName, id));
     if (collectionName === "parts") loadParts();
     if (collectionName === "calendar") loadCalendar();
@@ -5701,6 +5640,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
       return;
     }
 
+    if (reportSaveInFlight.current) return;
+    reportSaveInFlight.current = true;
+    let reportCommitted = false;
+    try {
+    const batch = writeBatch(db);
     const createdNow = new Date().toISOString();
     const reportToSave = {
       ...sanitizeReportDates(newReport),
@@ -5724,9 +5668,13 @@ function MaintenanceApp({ currentUser, userProfile }) {
       eliteDiagnosisAt: newReport.eliteDiagnosisAt || createdNow,
     };
 
-    const reportRef = await addDoc(collection(db, "maintenanceReports"), reportToSave);
+    if (new TextEncoder().encode(JSON.stringify(reportToSave)).length > 800000) {
+      throw new Error("Report images are too large; reduce their size before saving.");
+    }
+    const reportRef = doc(collection(db, "maintenanceReports"));
+    batch.set(reportRef, reportToSave);
 
-    await addDoc(collection(db, "calendar"), {
+    batch.set(doc(collection(db, "calendar")), {
       date: reportToSave.createdAt || todayText(),
       time: "",
       title: `保全修理報告書：${reportToSave.equipment || "設備名なし"}`,
@@ -5809,7 +5757,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
         createdBy: currentUserName,
       };
 
-      const maintenanceRef = await addDoc(collection(db, "parts"), maintenanceDoc);
+      const maintenanceRef = doc(collection(db, "parts"));
+      batch.set(maintenanceRef, maintenanceDoc);
       linkedMaintenanceId = maintenanceRef.id;
       strategyActionType = "PM";
 
@@ -5856,11 +5805,12 @@ function MaintenanceApp({ currentUser, userProfile }) {
         createdBy: currentUserName,
       };
 
-      const workRef = await addDoc(collection(db, "plannedWorks"), work);
+      const workRef = doc(collection(db, "plannedWorks"));
+      batch.set(workRef, work);
       linkedPlannedWorkId = workRef.id;
       strategyActionType = "CM";
 
-      await addDoc(collection(db, "calendar"), {
+      batch.set(doc(collection(db, "calendar")), {
         date: work.date || todayText(),
         time: "",
         title: `改良保全：${work.title}`,
@@ -5882,7 +5832,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     }
 
     if (strategyActionType) {
-      await updateDoc(doc(db, "maintenanceReports", reportRef.id), {
+      batch.update(reportRef, {
         strategyActionCreated: true,
         strategyActionType,
         linkedMaintenanceId,
@@ -5891,6 +5841,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
       });
     }
 
+    await batch.commit();
+    reportCommitted = true;
     setNewReport(null);
     await Promise.all([loadReports(), loadCalendar(), loadParts(), loadPlannedWorks()]);
 
@@ -5902,6 +5854,15 @@ function MaintenanceApp({ currentUser, userProfile }) {
           : "保存しました。";
 
     alert(`${savedText}${actionMessage}`);
+    } catch (error) {
+      console.error("report save failed", error);
+      alert(reportCommitted
+        ? "保存は完了しました。表示の更新に失敗しました。ページを再読み込みしてください。"
+        : error.message?.startsWith("Report images")
+          ? "画像の合計サイズが大きすぎます。画像を縮小してから保存してください。"
+          : "保存に失敗しました。入力内容を保持しています。接続と権限を確認してください。");
+    } finally { reportSaveInFlight.current = false; }
+
   }
 
   function startNewCalendarEvent(date = selectedDate) {
@@ -5976,9 +5937,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
       return;
     }
 
-    const docRef = await addDoc(collection(db, "plannedWorks"), newPlannedWork);
+    const batch = writeBatch(db);
+    const docRef = doc(collection(db, "plannedWorks"));
+    batch.set(docRef, newPlannedWork);
 
-    await addDoc(collection(db, "calendar"), {
+    batch.set(doc(collection(db, "calendar")), {
       date: newPlannedWork.date || todayText(),
       time: "",
       title: `計画工事：${newPlannedWork.title}`,
@@ -5990,6 +5953,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       image: newPlannedWork.image || "",
     });
 
+    await batch.commit();
     setNewPlannedWork(null);
     await Promise.all([loadPlannedWorks(), loadCalendar()]);
     alert("計画工事を保存しました。カレンダーにも追加されました。");
@@ -5999,6 +5963,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const file = event.target.files[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/") || file.size > 250 * 1024) {
+      alert("画像は250KB以下に縮小して選択してください。 / Select an image of 250 KB or less.");
+      event.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onloadend = () => updateField(collectionName, rowId, "image", reader.result);
     reader.readAsDataURL(file);
@@ -6008,6 +5977,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const file = event.target.files[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/") || file.size > 250 * 1024) {
+      alert("画像は250KB以下に縮小して選択してください。 / Select an image of 250 KB or less.");
+      event.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onloadend = () => {
       setter((current) => ({ ...current, image: reader.result }));
@@ -6019,6 +5993,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const file = event.target.files[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/") || file.size > 250 * 1024) {
+      alert("画像は250KB以下に縮小して選択してください。 / Select an image of 250 KB or less.");
+      event.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onloadend = () => {
       setNewReport((current) => ({ ...current, [field]: reader.result }));
@@ -7132,7 +7111,7 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
 
   function printReport(row) {
     const calc = calculateReport(row);
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>保全作業報告書</title><style>body{font-family:Arial,'Yu Gothic',sans-serif;padding:28px;color:#0f172a}h1{border-bottom:3px solid #2563eb;padding-bottom:12px}.grid{display:grid;grid-template-columns:160px 1fr;border:1px solid #cbd5e1}.grid div{padding:10px;border-bottom:1px solid #e2e8f0}.label{background:#f8fafc;font-weight:bold}.box{white-space:pre-wrap;border:1px solid #cbd5e1;padding:14px;margin:10px 0;border-radius:10px}</style></head><body><h1>MIYAMA 保全作業報告書</h1><div class="grid"><div class="label">作成日</div><div>${row.createdAt || ''}</div><div class="label">設備名</div><div>${row.equipment || ''}</div><div class="label">ライン名</div><div>${row.lineName || ''}</div><div class="label">作業者</div><div>${row.worker || ''}</div><div class="label">停止時間</div><div>${calc.stopTimeHours}H</div><div class="label">合計費用</div><div>${formatYen(calc.totalCost)}</div><div class="label">承認状態</div><div>${row.approvalStatus || ''}</div></div><h2>不具合現象</h2><div class="box">${row.phenomenon || ''}</div><h2>なぜなぜ分析</h2><div class="box">なぜ1：${row.why1 || ''}\n\nなぜ2：${row.why2 || ''}\n\nなぜ3：${row.why3 || ''}</div><h2>処置内容</h2><div class="box">${row.action || ''}</div><h2>再発防止</h2><div class="box">${row.recurrencePrevention || ''}</div></body></html>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>保全作業報告書</title><style>body{font-family:Arial,'Yu Gothic',sans-serif;padding:28px;color:#0f172a}h1{border-bottom:3px solid #2563eb;padding-bottom:12px}.grid{display:grid;grid-template-columns:160px 1fr;border:1px solid #cbd5e1}.grid div{padding:10px;border-bottom:1px solid #e2e8f0}.label{background:#f8fafc;font-weight:bold}.box{white-space:pre-wrap;border:1px solid #cbd5e1;padding:14px;margin:10px 0;border-radius:10px}</style></head><body><h1>MIYAMA 保全作業報告書</h1><div class="grid"><div class="label">作成日</div><div>${escapeReportHtml(row.createdAt || '')}</div><div class="label">設備名</div><div>${escapeReportHtml(row.equipment || '')}</div><div class="label">ライン名</div><div>${escapeReportHtml(row.lineName || '')}</div><div class="label">作業者</div><div>${escapeReportHtml(row.worker || '')}</div><div class="label">停止時間</div><div>${escapeReportHtml(calc.stopTimeHours)}H</div><div class="label">合計費用</div><div>${escapeReportHtml(formatYen(calc.totalCost))}</div><div class="label">承認状態</div><div>${escapeReportHtml(row.approvalStatus || '')}</div></div><h2>不具合現象</h2><div class="box">${escapeReportHtml(row.phenomenon || '')}</div><h2>なぜなぜ分析</h2><div class="box">なぜ1：${escapeReportHtml(row.why1 || '')}\n\nなぜ2：${escapeReportHtml(row.why2 || '')}\n\nなぜ3：${escapeReportHtml(row.why3 || '')}</div><h2>処置内容</h2><div class="box">${escapeReportHtml(row.action || '')}</div><h2>再発防止</h2><div class="box">${escapeReportHtml(row.recurrencePrevention || '')}</div></body></html>`;
     const win = window.open("", "_blank");
     if (!win) return alert("ポップアップを許可してください。");
     win.document.write(html);
@@ -7267,8 +7246,10 @@ const buildReportFromExcelRow = (row = [], fileName = "", workbook = null) => {
     reportType: excelText(sheet.reportType, row?.[0]) || "保全作業報告書",
     worker: excelText(sheet.worker, row?.[1]),
     createdBy: excelText(sheet.createdBy, row?.[1]),
-    approvedBy: excelText(sheet.approvedBy),
-    inspectedBy: excelText(sheet.inspectedBy),
+    importedApprovedBy: excelText(sheet.approvedBy),
+    importedInspectedBy: excelText(sheet.inspectedBy),
+    approvedBy: "",
+    inspectedBy: "",
     maintenanceType: excelText(sheet.maintenanceType, row?.[2]) || "CM",
     troubleDateTime: pickDateTime(sheet.troubleDateTime || rowTrouble, sheet.workStartDateTime || rowStart),
     workStartDateTime: pickDateTime(sheet.workStartDateTime || rowStart),
@@ -7365,13 +7346,21 @@ const handleBulkReportExcelUpload = async (e) => {
 
       const report = buildReportFromExcelRow(row, file.name, workbook);
       report.note = `Excel一括取込ファイル：${file.name}`;
+      report.importedCreatedBy = report.createdBy || "";
+      report.createdBy = currentUserName;
+      report.createdByUid = currentUser.uid;
+      report.createdByEmail = currentUser.email || "";
+      report.createdAtAudit = new Date().toISOString();
 
       const duplicateKey = makeMaintenanceReportDuplicateKey(report);
       if (existingReportKeys.has(duplicateKey)) {
         duplicated += 1;
         continue;
       }
-      await addDoc(collection(db, "maintenanceReports"), { ...report, duplicateKey });
+      if (!await createUniqueImport("maintenanceReports", report, duplicateKey)) {
+        duplicated += 1;
+        continue;
+      }
       existingReportKeys.add(duplicateKey);
       success += 1;
     } catch (error) {
@@ -8887,7 +8876,10 @@ function renderHome() {
                 duplicated += 1;
                 continue;
               }
-              await addDoc(collection(db, "parts"), { ...item, duplicateKey });
+              if (!await createUniqueImport("parts", item, duplicateKey)) {
+        duplicated += 1;
+        continue;
+      }
               existingPartKeys.add(duplicateKey);
               success += 1;
             }
@@ -8903,7 +8895,10 @@ function renderHome() {
                 duplicated += 1;
                 continue;
               }
-              await addDoc(collection(db, "parts"), { ...item, duplicateKey });
+              if (!await createUniqueImport("parts", item, duplicateKey)) {
+        duplicated += 1;
+        continue;
+      }
               existingPartKeys.add(duplicateKey);
               success += 1;
             }
@@ -8921,27 +8916,8 @@ function renderHome() {
   };
 
   async function completeMaintenanceRow(row) {
-    const todayValue = todayText();
-    const mode = normalizeMaintenanceMode(row.maintenanceMode, row);
-    let nextDate = "";
-
-    if (mode === "定期保全") {
-      nextDate = row.cycle ? addDays(todayValue, row.cycle) : "";
-    } else {
-      const average = toNumber(row.dailyAverageProduction, 0);
-      const cycleCount = toNumber(row.cycleProductionCount, 0);
-      nextDate = average > 0 && cycleCount > 0 ? addDays(todayValue, Math.ceil(cycleCount / average)) : "";
-    }
-
-    await updateDoc(doc(db, "parts", row.id), {
-      maintenanceMode: mode,
-      lastDate: todayValue,
-      nextDate,
-      result: "OK",
-    });
-
-    await loadParts();
-    alert(mode === "定期保全" ? "実施完了にしました。前回実施日を今日に更新し、保全周期（日）で次回実施日を計算しました。" : "実施完了にしました。前回実施日を今日に更新し、生産数で次回実施日を計算しました。");
+    await updateMaintenanceSchedule(row, { lastDate: todayText(), result: "OK" });
+    alert("実施完了にしました。前回実施日と次回実施日を更新しました。");
   }
 
   function renderMaintenance() {
@@ -11097,9 +11073,13 @@ function renderHome() {
         inspectionRequestedByUid: currentUser.uid,
         inspectionRequestedAt: new Date().toISOString(),
         inspectedBy: "",
+        inspectedByUid: "",
+        inspectedByEmail: "",
         inspectedDate: "",
         inspectedAt: "",
         approvedBy: "",
+        approvedByUid: "",
+        approvedByEmail: "",
         approvedDate: "",
         approvedAt: "",
       };
@@ -12351,7 +12331,7 @@ function renderHome() {
     });
 
     const totalReports = filtered.length;
-    const totalStopHours = filtered.reduce((sum, row) => sum + toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0), 0);
+    const totalStopHours = filtered.reduce((sum, row) => sum + toNumber(calculateReport(row).stopTimeHours, 0), 0);
     const totalRepairHours = filtered.reduce((sum, row) => sum + toNumber(row.laborHours ?? calculateReport(row).laborHours, 0), 0);
     const totalCost = filtered.reduce((sum, row) => sum + toNumber(row.totalCost ?? calculateReport(row).totalCost, 0), 0);
     const mttr = totalReports > 0 ? totalStopHours / totalReports : 0;
@@ -12367,7 +12347,7 @@ function renderHome() {
       if (!acc[key]) acc[key] = { key, count: 0, stopHours: 0, repairHours: 0, cost: 0, latest: "", samples: [], rows: [] };
       acc[key].count += 1;
       acc[key].rows.push(row);
-      acc[key].stopHours += toNumber(row.stopTimeHours ?? calc.stopTimeHours, 0);
+      acc[key].stopHours += toNumber(calc.stopTimeHours, 0);
       acc[key].repairHours += toNumber(row.laborHours ?? calc.laborHours, 0);
       acc[key].cost += toNumber(row.totalCost ?? calc.totalCost, 0);
       const d = getReportDate(row);
@@ -12396,7 +12376,7 @@ function renderHome() {
       return {
         strategy,
         count: rows.length,
-        stopHours: rows.reduce((sum, row) => sum + toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0), 0),
+        stopHours: rows.reduce((sum, row) => sum + toNumber(calculateReport(row).stopTimeHours, 0), 0),
         cost: rows.reduce((sum, row) => sum + toNumber(row.totalCost ?? calculateReport(row).totalCost, 0), 0),
       };
     });
@@ -12429,7 +12409,7 @@ function renderHome() {
       if (!eliteCauseMap[key]) eliteCauseMap[key] = { key, count: 0, stopHours: 0, cost: 0, rows: [] };
       eliteCauseMap[key].count += 1;
       eliteCauseMap[key].rows.push(row);
-      eliteCauseMap[key].stopHours += toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0);
+      eliteCauseMap[key].stopHours += toNumber(calculateReport(row).stopTimeHours, 0);
       eliteCauseMap[key].cost += toNumber(row.totalCost ?? calculateReport(row).totalCost, 0);
     });
     const eliteCauseRank = Object.values(eliteCauseMap)
@@ -13084,7 +13064,10 @@ function renderHome() {
           duplicated += 1;
           continue;
         }
-        await addDoc(collection(db, "productionLogs"), { ...row, duplicateKey });
+        if (!await createUniqueImport("productionLogs", row, duplicateKey)) {
+        duplicated += 1;
+        continue;
+      }
         existingKeys.add(duplicateKey);
         imported += 1;
       }
@@ -13197,8 +13180,10 @@ function renderHome() {
       risk: "同一アラーム再発・停止時間増加",
       note: "生産状況ページから自動作成",
     };
-    const docRef = await addDoc(collection(db, "plannedWorks"), work);
-    await addDoc(collection(db, "calendar"), {
+    const batch = writeBatch(db);
+    const docRef = doc(collection(db, "plannedWorks"));
+    batch.set(docRef, work);
+    batch.set(doc(collection(db, "calendar")), {
       date: work.date,
       time: "",
       title: `計画工事：${work.title}`,
@@ -13209,6 +13194,7 @@ function renderHome() {
       plannedWorkId: docRef.id,
       image: "",
     });
+    await batch.commit();
     await Promise.all([loadPlannedWorks(), loadCalendar()]);
     setPage("work");
     alert("計画工事へ展開しました。カレンダーにも登録しました。");
@@ -14136,7 +14122,7 @@ function renderHome() {
 
 
   function renderMiyamaAi() {
-    const totalStop = reports.reduce((sum, r) => sum + toNumber(r.stopTimeHours, 0), 0);
+    const totalStop = reports.reduce((sum, r) => sum + toNumber(calculateReport(r).stopTimeHours, 0), 0);
     const totalRepair = reports.reduce((sum, r) => sum + toNumber(r.laborHours, 0), 0);
     const totalCost = reports.reduce((sum, r) => sum + toNumber(r.totalCost, 0), 0);
     const noStock = spareRows.filter((p) => Number(p.stockQty || 0) <= 0).length;
@@ -14150,7 +14136,7 @@ function renderHome() {
         const key = r.equipment || r.lineName || "設備名なし";
         if (!map[key]) map[key] = { count: 0, stop: 0, cost: 0 };
         map[key].count += 1;
-        map[key].stop += toNumber(r.stopTimeHours, 0);
+        map[key].stop += toNumber(calculateReport(r).stopTimeHours, 0);
         map[key].cost += toNumber(r.totalCost, 0);
       });
       return Object.entries(map).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.count - a.count || b.stop - a.stop).slice(0, 5);
@@ -15442,7 +15428,7 @@ Requirements:
     if (!analysisDrilldown) return null;
     const rows = Array.isArray(analysisDrilldown.rows) ? analysisDrilldown.rows : [];
     const isCsv = analysisDrilldown.type === "csv";
-    const stopTotal = !isCsv ? rows.reduce((sum, row) => sum + toNumber(row.stopTimeHours ?? calculateReport(row).stopTimeHours, 0), 0) : 0;
+    const stopTotal = !isCsv ? rows.reduce((sum, row) => sum + toNumber(calculateReport(row).stopTimeHours, 0), 0) : 0;
     const close = () => setAnalysisDrilldown(null);
     const openReport = (row) => {
       close(); setPage("report"); setReportSearch(String(row?.id || row?.equipment || row?.phenomenon || ""));
@@ -15455,7 +15441,7 @@ Requirements:
           {rows.length === 0 ? <div className="miyamaDrilldownEmpty">詳細データがありません。</div> : isCsv ? (
             <div className="miyamaDrilldownList">{rows.map((row, index) => <article className="miyamaDrilldownCard" key={`${row.id || row.alarmNo || index}-${index}`}><div className="miyamaDrilldownCardTop"><b>{row.machine || row.equipment || "設備未入力"}</b><span>{row.date || getCsvLogDate(row) || "-"}</span></div><div className="miyamaDrilldownMeta"><span>🏗 {row.lineName || row.line || "-"}</span><span>🚨 No. {row.alarmNo || "-"}</span></div><dl className="miyamaDrilldownDl"><div><dt>アラーム</dt><dd>{row.message || row.alarmMessage || "-"}</dd></div><div><dt>原因</dt><dd>{row.reason || "-"}</dd></div><div><dt>推奨対策</dt><dd>{row.solution || "-"}</dd></div></dl></article>)}</div>
           ) : (
-            <div className="miyamaDrilldownList">{rows.slice().sort((a,b)=>toNumber(b.stopTimeHours ?? calculateReport(b).stopTimeHours,0)-toNumber(a.stopTimeHours ?? calculateReport(a).stopTimeHours,0)).map((row,index)=>{ const calc=calculateReport(row); const stop=toNumber(row.stopTimeHours ?? calc.stopTimeHours,0); const cost=toNumber(row.totalCost ?? calc.totalCost,0); return <article className="miyamaDrilldownCard" key={row.id || index}><div className="miyamaDrilldownCardTop"><b>{getEquipmentNameFromRecord(row) || row.equipment || "設備未入力"}</b><span>{normalizeDateOnly(row.createdAt || row.troubleDateTime || row.reportCreatedDate || row.workStartDateTime) || "-"}</span></div><div className="miyamaDrilldownMeta"><span>🏗 {row.lineName || "-"}</span><span>⏰ {stop.toFixed(1)}H</span><span>💴 ¥{Math.round(cost).toLocaleString()}</span></div><dl className="miyamaDrilldownDl"><div><dt>不具合箇所</dt><dd>{row.troublePoint || "-"}</dd></div><div><dt>不具合現象</dt><dd>{row.phenomenon || "-"}</dd></div><div><dt>原因</dt><dd>{row.failureCauseCategory || row.why1 || row.why2 || "-"}</dd></div><div><dt>処置</dt><dd>{row.action || "-"}</dd></div><div><dt>再発防止</dt><dd>{row.recurrencePrevention || "-"}</dd></div></dl><button type="button" className="primaryButton miyamaOpenReportButton" onClick={()=>openReport(row)}>📄 元の修理報告を開く</button></article>; })}</div>
+            <div className="miyamaDrilldownList">{rows.slice().sort((a,b)=>toNumber(b.stopTimeHours ?? calculateReport(b).stopTimeHours,0)-toNumber(a.stopTimeHours ?? calculateReport(a).stopTimeHours,0)).map((row,index)=>{ const calc=calculateReport(row); const stop=toNumber(calc.stopTimeHours,0); const cost=toNumber(row.totalCost ?? calc.totalCost,0); return <article className="miyamaDrilldownCard" key={row.id || index}><div className="miyamaDrilldownCardTop"><b>{getEquipmentNameFromRecord(row) || row.equipment || "設備未入力"}</b><span>{normalizeDateOnly(row.createdAt || row.troubleDateTime || row.reportCreatedDate || row.workStartDateTime) || "-"}</span></div><div className="miyamaDrilldownMeta"><span>🏗 {row.lineName || "-"}</span><span>⏰ {stop.toFixed(1)}H</span><span>💴 ¥{Math.round(cost).toLocaleString()}</span></div><dl className="miyamaDrilldownDl"><div><dt>不具合箇所</dt><dd>{row.troublePoint || "-"}</dd></div><div><dt>不具合現象</dt><dd>{row.phenomenon || "-"}</dd></div><div><dt>原因</dt><dd>{row.failureCauseCategory || row.why1 || row.why2 || "-"}</dd></div><div><dt>処置</dt><dd>{row.action || "-"}</dd></div><div><dt>再発防止</dt><dd>{row.recurrencePrevention || "-"}</dd></div></dl><button type="button" className="primaryButton miyamaOpenReportButton" onClick={()=>openReport(row)}>📄 元の修理報告を開く</button></article>; })}</div>
           )}
         </section>
       </div>

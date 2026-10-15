@@ -1,3 +1,5 @@
+import { auth } from "../firebase";
+
 export async function askMiyamaAI({
   message,
   language = "auto",
@@ -6,10 +8,14 @@ export async function askMiyamaAI({
   history = [],
   signal,
 }) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Sign in to use MIYAMA AI.");
+  const token = await user.getIdToken();
   const response = await fetch("/api/chat", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       message,

@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { calculateReport } from "../utils/reportCalculations";
 
 const LABELS = {
   ja: {
@@ -76,24 +77,7 @@ function toNumber(value) {
 }
 
 function calculateDowntime(report = {}) {
-  const direct = toNumber(report.stopTimeHours);
-  if (direct > 0) return direct;
-
-  const startValue = report.troubleDateTime || report.workStartDateTime;
-  const endValue = report.productionStartDateTime || report.workEndDateTime;
-  const start = startValue ? new Date(startValue) : null;
-  const end = endValue ? new Date(endValue) : null;
-
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return 0;
-  }
-
-  const excluded = Math.max(
-    0,
-    toNumber(report.stopExclusionHours ?? report.stopExclusionTime)
-  );
-
-  return Math.max(0, (end - start) / 3600000 - excluded);
+  return calculateReport(report).stopTimeHours;
 }
 
 function mostFrequent(values = []) {
