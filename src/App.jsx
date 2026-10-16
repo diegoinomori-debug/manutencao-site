@@ -7831,17 +7831,17 @@ Rules:
           </div>
         </Section>
 
-        <Section openSections={openSections} toggleSection={toggleSection} sectionKey="time" title="⏱️ 時間・停止時間（自動計算）">
+        <Section openSections={openSections} toggleSection={toggleSection} sectionKey="time" title={appLanguage === "en" ? "⏱️ Time / Downtime (calculated)" : "⏱️ 時間・停止時間（自動計算）"}>
           <div className="reportGrid">
-            <label>🚨 ①不具合発生日時<input type="datetime-local" value={dateTimeInputValue(newReport.troubleDateTime)} onChange={(e) => setReport("troubleDateTime", e.target.value)} /></label>
-            <label>🛠️ ②保全作業開始日時<input type="datetime-local" value={dateTimeInputValue(newReport.workStartDateTime)} onChange={(e) => setReport("workStartDateTime", e.target.value)} /></label>
-            <label>✅ ③保全作業完了日時<input type="datetime-local" value={dateTimeInputValue(newReport.workEndDateTime)} onChange={(e) => setReport("workEndDateTime", e.target.value)} /></label>
-            <label>▶️ ④生産開始日時<input type="datetime-local" value={dateTimeInputValue(newReport.productionStartDateTime)} onChange={(e) => setReport("productionStartDateTime", e.target.value)} /></label>
-            <label>⏸️ ⑤停止除外時間H<input type="number" step="0.1" value={newReport.stopExclusionHours ?? 0} onChange={(e) => setReport("stopExclusionHours", e.target.value)} /></label>
-            <label>📉 ⑥機能低下(%)<input type="number" step="1" value={newReport.functionDownRate ?? 100} onChange={(e) => setReport("functionDownRate", e.target.value)} /></label>
-            <label>⏱️ ⑦停止時間H<input className="readOnlyCalc" readOnly value={calc.stopTimeHours} /></label>
+            <label>{appLanguage === "en" ? "🚨 ① Failure Occurred At" : "🚨 ①不具合発生日時"}<input type="datetime-local" value={dateTimeInputValue(newReport.troubleDateTime)} onChange={(e) => setReport("troubleDateTime", e.target.value)} /></label>
+            <label>{appLanguage === "en" ? "🛠️ ② Maintenance Started At" : "🛠️ ②保全作業開始日時"}<input type="datetime-local" value={dateTimeInputValue(newReport.workStartDateTime)} onChange={(e) => setReport("workStartDateTime", e.target.value)} /></label>
+            <label>{appLanguage === "en" ? "✅ ③ Maintenance Completed At" : "✅ ③保全作業完了日時"}<input type="datetime-local" value={dateTimeInputValue(newReport.workEndDateTime)} onChange={(e) => setReport("workEndDateTime", e.target.value)} /></label>
+            <label>{appLanguage === "en" ? "▶️ ④ Production Resumed At" : "▶️ ④生産開始日時"}<input type="datetime-local" value={dateTimeInputValue(newReport.productionStartDateTime)} onChange={(e) => setReport("productionStartDateTime", e.target.value)} /></label>
+            <label>{appLanguage === "en" ? "⏸️ ⑤ Excluded Downtime (h)" : "⏸️ ⑤停止除外時間H"}<input type="number" step="0.1" value={newReport.stopExclusionHours ?? 0} onChange={(e) => setReport("stopExclusionHours", e.target.value)} /></label>
+            <label>{appLanguage === "en" ? "📉 ⑥ Functional Loss (%)" : "📉 ⑥機能低下(%)"}<input type="number" step="1" value={newReport.functionDownRate ?? 100} onChange={(e) => setReport("functionDownRate", e.target.value)} /></label>
+            <label>{appLanguage === "en" ? "⏱️ ⑦ Downtime (h)" : "⏱️ ⑦停止時間H"}<input className="readOnlyCalc" readOnly value={calc.stopTimeHours} /></label>
           </div>
-          <p style={{ color: "#64748b" }}>※⑦停止時間＝（④生産開始日時 - ①不具合発生日時 - ⑤停止除外時間）×⑥機能低下率</p>
+          <p style={{ color: "#64748b" }}>{appLanguage === "en" ? "⑦ Downtime = (④ Production Resumed At - ① Failure Occurred At - ⑤ Excluded Downtime) × ⑥ Functional Loss Rate" : "※⑦停止時間＝（④生産開始日時 - ①不具合発生日時 - ⑤停止除外時間）×⑥機能低下率"}</p>
         </Section>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="trouble" title="📝 不具合内容">
@@ -11439,15 +11439,15 @@ function renderHome() {
         )}
 
         {show("time") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="time" title="⏱️ 時間・停止時間">
+          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="time" title={appLanguage === "en" ? "⏱️ Time / Downtime" : "⏱️ 時間・停止時間"}>
             <div className="reportGrid">
-              <label>🚨 ①不具合発生日時<input type="datetime-local" value={dateTimeInputValue(row.troubleDateTime)} onChange={(e) => setRow("troubleDateTime", e.target.value)} /></label>
-              <label>🛠️ ②保全作業開始日時<input type="datetime-local" value={dateTimeInputValue(row.workStartDateTime)} onChange={(e) => setRow("workStartDateTime", e.target.value)} /></label>
-              <label>✅ ③保全作業完了日時<input type="datetime-local" value={dateTimeInputValue(row.workEndDateTime)} onChange={(e) => setRow("workEndDateTime", e.target.value)} /></label>
-              <label>▶️ ④生産開始日時<input type="datetime-local" value={dateTimeInputValue(row.productionStartDateTime)} onChange={(e) => setRow("productionStartDateTime", e.target.value)} /></label>
-              <label>⏸️ ⑤停止除外時間H<input type="number" min="0" step="0.1" value={Math.max(0, toNumber(row.stopExclusionHours, 0))} onChange={(e) => setRow("stopExclusionHours", e.target.value)} /></label>
-              <label>📉 ⑥機能低下(%)<input type="number" min="0" step="1" value={Math.max(0, toNumber(row.functionDownRate, 100))} onChange={(e) => setRow("functionDownRate", e.target.value)} /></label>
-              <label>⏱️ ⑦停止時間H<input className="readOnlyCalc" readOnly value={calc.stopTimeHours} /></label>
+              <label>{appLanguage === "en" ? "🚨 ① Failure Occurred At" : "🚨 ①不具合発生日時"}<input type="datetime-local" value={dateTimeInputValue(row.troubleDateTime)} onChange={(e) => setRow("troubleDateTime", e.target.value)} /></label>
+              <label>{appLanguage === "en" ? "🛠️ ② Maintenance Started At" : "🛠️ ②保全作業開始日時"}<input type="datetime-local" value={dateTimeInputValue(row.workStartDateTime)} onChange={(e) => setRow("workStartDateTime", e.target.value)} /></label>
+              <label>{appLanguage === "en" ? "✅ ③ Maintenance Completed At" : "✅ ③保全作業完了日時"}<input type="datetime-local" value={dateTimeInputValue(row.workEndDateTime)} onChange={(e) => setRow("workEndDateTime", e.target.value)} /></label>
+              <label>{appLanguage === "en" ? "▶️ ④ Production Resumed At" : "▶️ ④生産開始日時"}<input type="datetime-local" value={dateTimeInputValue(row.productionStartDateTime)} onChange={(e) => setRow("productionStartDateTime", e.target.value)} /></label>
+              <label>{appLanguage === "en" ? "⏸️ ⑤ Excluded Downtime (h)" : "⏸️ ⑤停止除外時間H"}<input type="number" min="0" step="0.1" value={Math.max(0, toNumber(row.stopExclusionHours, 0))} onChange={(e) => setRow("stopExclusionHours", e.target.value)} /></label>
+              <label>{appLanguage === "en" ? "📉 ⑥ Functional Loss (%)" : "📉 ⑥機能低下(%)"}<input type="number" min="0" step="1" value={Math.max(0, toNumber(row.functionDownRate, 100))} onChange={(e) => setRow("functionDownRate", e.target.value)} /></label>
+              <label>{appLanguage === "en" ? "⏱️ ⑦ Downtime (h)" : "⏱️ ⑦停止時間H"}<input className="readOnlyCalc" readOnly value={calc.stopTimeHours} /></label>
             </div>
           </Section>
         )}
