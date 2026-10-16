@@ -3891,14 +3891,14 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
       .then((translated) => {
         if (cancelled) return;
         const next = String(translated || original);
-        const failedThai = language === "th" && shouldTranslateLongText(original, "th") && !containsThaiText(next);
+        const failedThai = shouldTranslateLongText(original, language) && (next.trim() === original.trim() || (language === "th" && !containsThaiText(next)));
         setTranslationFailed(failedThai);
         setDisplayValue(next);
       })
       .catch((error) => {
         if (!cancelled && error?.name !== "AbortError") {
           console.warn("Input display translation failed:", error);
-          setTranslationFailed(language === "th");
+          setTranslationFailed(true);
           setDisplayValue(original);
         }
       });
@@ -3926,13 +3926,13 @@ function TranslatedReadOnlyInput({ value = "", language = "ja", placeholder = ""
               : undefined
       }
     />
-      {translationFailed && language === "th" && (
+      {translationFailed && language !== "ja" && (
         <button
           type="button"
           className="miyamaTranslationRetryButton miyamaTranslationRetrySmall"
           onClick={() => setRetryToken((value) => value + 1)}
         >
-          🔄 แปลอีกครั้ง
+          {language === "en" ? "Translation unavailable — retry" : language === "es" ? "Traducción no disponible — reintentar" : "🔄 แปลอีกครั้ง"}
         </button>
       )}
     </div>
@@ -3964,14 +3964,14 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
       .then((translated) => {
         if (cancelled) return;
         const next = String(translated || original);
-        const failedThai = language === "th" && shouldTranslateLongText(original, "th") && !containsThaiText(next);
+        const failedThai = shouldTranslateLongText(original, language) && (next.trim() === original.trim() || (language === "th" && !containsThaiText(next)));
         setTranslationFailed(failedThai);
         setDisplayValue(next);
       })
       .catch((error) => {
         if (!cancelled && error?.name !== "AbortError") {
           console.warn("Textarea display translation failed:", error);
-          setTranslationFailed(language === "th");
+          setTranslationFailed(true);
           setDisplayValue(original);
         }
       });
@@ -3999,13 +3999,13 @@ function TranslatedReadOnlyTextarea({ value = "", language = "ja", placeholder =
                 : undefined
         }
       />
-      {translationFailed && language === "th" && (
+      {translationFailed && language !== "ja" && (
         <button
           type="button"
           className="miyamaTranslationRetryButton"
           onClick={() => setRetryToken((value) => value + 1)}
         >
-          🔄 แปลเนื้อหาอีกครั้ง
+          {language === "en" ? "Translation unavailable — retry" : language === "es" ? "Traducción no disponible — reintentar" : "🔄 แปลเนื้อหาอีกครั้ง"}
         </button>
       )}
     </div>
@@ -4157,7 +4157,7 @@ async function translateJapaneseLongText(value, signal, targetLanguage = "en") {
 
   const cacheKey = makeLongTranslationKey(`${targetLanguage}|${original}`);
   const cache = readLongTranslationCache();
-  if (cache[cacheKey]) return cache[cacheKey];
+  if (cache[cacheKey] && String(cache[cacheKey]).trim() !== original.trim()) return cache[cacheKey];
 
   const chunks = splitTranslationText(original);
   const translatedChunks = [];
@@ -4176,7 +4176,7 @@ async function translateJapaneseLongText(value, signal, targetLanguage = "en") {
     shouldTranslateLongText(normalizedOriginal, "th") &&
     (!normalizedTranslated || normalizedTranslated === normalizedOriginal || !containsThaiText(normalizedTranslated));
 
-  if (!looksUntranslatedThai) {
+  if (!looksUntranslatedThai && normalizedTranslated && normalizedTranslated !== normalizedOriginal) {
     cache[cacheKey] = translated;
     writeLongTranslationCache(cache);
   }
@@ -11429,11 +11429,11 @@ function renderHome() {
           <Section openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="🏭 基本情報・設備情報">
             <div className="reportGrid">
               <label>📅 作成日<input type="date" value={dateOnlyInputValue(row.createdAt)} onChange={(e) => setRow("createdAt", e.target.value)} /></label>
-              <label>🗂️ 保全分類<input value={row.maintenanceType || ""} onChange={(e) => setRow("maintenanceType", e.target.value)} /></label>
-              <label>👥 グループ名<input value={row.groupName || ""} onChange={(e) => setRow("groupName", e.target.value)} /></label>
-              <label>🏭 ライン名<input value={row.lineName || ""} onChange={(e) => setRow("lineName", e.target.value)} /></label>
-              <label>⚙️ 設備名<input value={row.equipment || ""} onChange={(e) => setRow("equipment", e.target.value)} /></label>
-              <label>👤 作業者<input value={row.worker || ""} onChange={(e) => setRow("worker", e.target.value)} /></label>
+              <label>🗂️ 保全分類{appLanguage === "ja" ? (<input value={row.maintenanceType || ""} onChange={(e) => setRow("maintenanceType", e.target.value)} />) : (<TranslatedReadOnlyInput value={row.maintenanceType || ""} language={appLanguage} />)}</label>
+              <label>👥 グループ名{appLanguage === "ja" ? (<input value={row.groupName || ""} onChange={(e) => setRow("groupName", e.target.value)} />) : (<TranslatedReadOnlyInput value={row.groupName || ""} language={appLanguage} />)}</label>
+              <label>🏭 ライン名{appLanguage === "ja" ? (<input value={row.lineName || ""} onChange={(e) => setRow("lineName", e.target.value)} />) : (<TranslatedReadOnlyInput value={row.lineName || ""} language={appLanguage} />)}</label>
+              <label>⚙️ 設備名{appLanguage === "ja" ? (<input value={row.equipment || ""} onChange={(e) => setRow("equipment", e.target.value)} />) : (<TranslatedReadOnlyInput value={row.equipment || ""} language={appLanguage} />)}</label>
+              <label>👤 作業者{appLanguage === "ja" ? (<input value={row.worker || ""} onChange={(e) => setRow("worker", e.target.value)} />) : (<TranslatedReadOnlyInput value={row.worker || ""} language={appLanguage} />)}</label>
             </div>
           </Section>
         )}
