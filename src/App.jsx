@@ -4317,6 +4317,22 @@ const NEW_EQUIPMENT_CHECKLIST = [
   { id: "equipmentHandover", jp: "設備引き渡し書", en: "Equipment Handover Document", es: "Documento de entrega del equipo", group: "引渡し準備" },
 ];
 
+// Membership follows persisted approval status, never an unsaved draft.
+function filterApprovedMaintenanceReports(rows, query = "", from = "", to = "") {
+  const normalize = (value) => String(value ?? "").normalize("NFKC").toLocaleLowerCase();
+  const words = normalize(query).trim().split(/\s+/).filter(Boolean);
+  return rows.filter((row) => {
+    if (row.approvalStatus !== "承認済み") return false;
+    const date = normalizeDateOnly(row.createdAt);
+    if ((from && (!date || date < from)) || (to && (!date || date > to))) return false;
+    const text = normalize([row.id, row.equipment, row.lineName, row.worker,
+      row.phenomenon, row.troublePoint, row.why1, row.why2, row.why3, row.action,
+      row.note, row.approvedBy, row.importedApprovedBy, row.createdAt].join(" "));
+    return words.every((word) => text.includes(word));
+  }).sort((a, b) => String(b.approvedAt || b.approvedDate || b.createdAt || "")
+    .localeCompare(String(a.approvedAt || a.approvedDate || a.createdAt || "")));
+}
+
 function MaintenanceApp({ currentUser, userProfile }) {
   const currentUserName =
     String(
@@ -4780,6 +4796,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [globalPage, setGlobalPage] = useState(1);
   const [reportSearch, setReportSearch] = useState("");
   const [reportPage, setReportPage] = useState(1);
+  const [approvedReportSearch, setApprovedReportSearch] = useState("");
+  const [approvedReportFrom, setApprovedReportFrom] = useState("");
+  const [approvedReportTo, setApprovedReportTo] = useState("");
+  const [approvedReportPage, setApprovedReportPage] = useState(1);
+  const [approvedReportId, setApprovedReportId] = useState(null);
   const REPORTS_PER_PAGE = 8;
   const [spareSearch, setSpareSearch] = useState("");
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
@@ -6193,7 +6214,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
           id: `report-${report.id}`,
           sourceId: report.id,
           sourceType: "maintenanceReports",
-          page: "report",
+          page: report.approvalStatus === "承認済み" ? "approvedReports" : "report",
           date,
           time: "",
           title: `保全報告：${report.equipment || report.lineName || "設備名なし"}`,
@@ -6285,7 +6306,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   const filteredReports = useMemo(() => {
     const keyword = reportSearch.toLowerCase().trim();
-    const sorted = [...reports].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const sorted = reports.filter((row) => row.approvalStatus !== "承認済み").sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     if (!keyword) return sorted;
 
     const keywords = keyword.split(/\s+/);
@@ -6327,7 +6348,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const allItems = [
       ...reports.map((r) => ({
         category: "📝 保全報告書",
-        page: "report",
+        reportId: r.id,
+        page: r.approvalStatus === "承認済み" ? "approvedReports" : "report",
         title: r.equipment || "設備名なし",
         date: r.createdAt || "-",
         text: `${r.lineName || ""} ${r.phenomenon || ""} ${r.troublePoint || ""} ${r.why1 || ""} ${r.why2 || ""} ${r.why3 || ""} ${r.action || ""} ${r.note || ""}`,
@@ -6385,7 +6407,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const allItems = [
       ...reports.map((r) => ({
         category: "📝 保全報告書",
-        page: "report",
+        reportId: r.id,
+        page: r.approvalStatus === "承認済み" ? "approvedReports" : "report",
         title: r.equipment || "設備名なし",
         date: r.createdAt || "-",
         text: `${r.lineName || ""} ${r.phenomenon || ""} ${r.troublePoint || ""} ${r.why1 || ""} ${r.why2 || ""} ${r.why3 || ""} ${r.action || ""} ${r.note || ""}`,
@@ -6890,7 +6913,7 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
                   key={translationKey}
                   className="calendarEditCard"
                   style={{ cursor: "pointer" }}
-                  onClick={() => setPage(item.page)}
+                  onClick={() => item.page === "approvedReports" && item.reportId ? openApprovedReport(item.reportId) : setPage(item.page)}
                 >
                   <b>{translateMiyamaText(item.category, appLanguage)} / {item.date}</b>
                   <h3>{displayTitle}</h3>
@@ -7709,6 +7732,7 @@ Rules:
       setHistoryAiQuestion("");
       setHistoryAiAnswer("");
       setHistoryAiError("");
+      if (reports.find((row) => row.id === problem.id)?.approvalStatus === "承認済み") { openApprovedReport(problem.id); return; }
       setReportSearch(problem.id);
       setPage("report");
 
@@ -11016,7 +11040,7 @@ function renderHome() {
     );
   }
 
-  function ReportViewCard({ row: sourceRow, index = 0 }) {
+  function ReportViewCard({ row: sourceRow, index = 0, fullReport = false }) {
     // 報告書は「入力中＝下書き」「保存ボタンでFirebase反映」に変更しました。
     // これで日本語入力中に文字が消える・戻る不具合を防止します。
     const row = reportDrafts[sourceRow.id] || sourceRow;
@@ -11264,7 +11288,7 @@ function renderHome() {
       { key: "other", label: "写真", icon: "📷" },
       { key: "all", label: "全部", icon: "📚" },
     ];
-    const show = (key) => reportViewMode === "all" || reportViewMode === key;
+    const show = (key) => fullReport || reportViewMode === "all" || reportViewMode === key;
 
     return (
       <div
@@ -11367,7 +11391,7 @@ function renderHome() {
             </div>
             <strong style={{ color: reportAccent }}>No.{index + 1}</strong>
           </div>
-          <SubTabBar items={reportTabs} value={reportViewMode} onChange={setReportViewMode} />
+          {!fullReport && <SubTabBar items={reportTabs} value={reportViewMode} onChange={setReportViewMode} />}
         </div>
 
         {reportViewMode === "summary" && (
@@ -11794,6 +11818,74 @@ function renderHome() {
     );
   }
 
+  function openApprovedReport(id) {
+    setApprovedReportId(id);
+    setOpenSections((current) => ({ ...current, basic: true, time: true, trouble: true,
+      why: true, prevention: true, cost: true, approval: true, other: true }));
+    setPage("approvedReports");
+  }
+
+  function renderApprovedReports() {
+    const en = appLanguage === "en";
+    const label = (ja, english) => en ? english : ja;
+    const invalidDates = !!(approvedReportFrom && approvedReportTo && approvedReportFrom > approvedReportTo);
+    const rows = invalidDates ? [] : filterApprovedMaintenanceReports(reports, approvedReportSearch, approvedReportFrom, approvedReportTo);
+    const pages = Math.max(1, Math.ceil(rows.length / REPORTS_PER_PAGE));
+    const current = Math.min(approvedReportPage, pages);
+    const visible = rows.slice((current - 1) * REPORTS_PER_PAGE, current * REPORTS_PER_PAGE);
+    const selected = reports.find((row) => row.id === approvedReportId && row.approvalStatus === "承認済み");
+    return <>
+      <div className="header"><div>
+        <h2>✅ {label("保全報告書承認済み", "Approved Maintenance Reports")}</h2>
+        <p>{label("承認済みの報告書を検索できます。行を選択すると報告書全体が開きます。", "Search approved reports. Select a report to open the complete document.")}</p>
+      </div></div>
+      {selected ? <>
+        <button type="button" className="primaryButton" onClick={() => setApprovedReportId(null)}>
+          ← {label("検索結果に戻る", "Back to search results")}
+        </button>
+        {ReportViewCard({ row: selected, fullReport: true })}
+      </> : <>
+        {approvedReportId && <p role="status">{label("この報告書は承認済みではありません。報告書タブで確認してください。", "This report is no longer approved. Check the Reports tab.")}</p>}
+        <div className="tableWrap">
+          <div className="reportGrid">
+            <label>{label("検索", "Search")}
+              <input type="search" value={approvedReportSearch}
+                placeholder={label("設備・ライン・作業者・不具合・承認者", "Equipment, line, worker, failure, approver")}
+                onChange={(e) => { setApprovedReportSearch(e.target.value); setApprovedReportPage(1); }} />
+            </label>
+            <label>{label("作成日（開始）", "Created date — from")}
+              <input type="date" value={approvedReportFrom} onChange={(e) => { setApprovedReportFrom(e.target.value); setApprovedReportPage(1); }} />
+            </label>
+            <label>{label("作成日（終了）", "Created date — to")}
+              <input type="date" value={approvedReportTo} onChange={(e) => { setApprovedReportTo(e.target.value); setApprovedReportPage(1); }} />
+            </label>
+          </div>
+          <button type="button" className="primaryButton" onClick={() => { setApprovedReportSearch(""); setApprovedReportFrom(""); setApprovedReportTo(""); setApprovedReportPage(1); setApprovedReportId(null); }}>
+            {label("条件をクリア", "Clear filters")}
+          </button>
+          {invalidDates && <p role="alert">{label("終了日は開始日以降を指定してください。", "The end date must be on or after the start date.")}</p>}
+          <p role="status">{label("検索結果", "Results")}: {rows.length}</p>
+          {rows.length === 0 && !invalidDates && <p>{label("該当する承認済み報告書はありません。", "No approved reports match these filters.")}</p>}
+          <div style={{ overflowX: "auto" }}><table style={{ width: "100%" }}>
+            <thead><tr>{[label("作成日", "Created date"), label("ライン", "Line"), label("設備", "Equipment"), label("不具合概要", "Failure summary"), label("承認者", "Approver"), label("詳細", "Details")].map((text) => <th key={text}>{text}</th>)}</tr></thead>
+            <tbody>{visible.map((row) => <tr key={row.id} onClick={() => openApprovedReport(row.id)} style={{ cursor: "pointer" }}>
+              <td>{normalizeDateOnly(row.createdAt) || "—"}</td>
+              <td>{row.lineName || "—"}</td><td>{row.equipment || "—"}</td>
+              <td style={{ maxWidth: "320px", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{String(row.phenomenon || "—").slice(0, 140)}{String(row.phenomenon || "").length > 140 ? "…" : ""}</td>
+              <td>{row.approvedBy || row.importedApprovedBy || "—"}</td>
+              <td><button type="button" className="primaryButton" onClick={(e) => { e.stopPropagation(); openApprovedReport(row.id); }}>{label("開く", "Open")}</button></td>
+            </tr>)}</tbody>
+          </table></div>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center", marginTop: "16px" }}>
+            <button type="button" className="primaryButton" disabled={current <= 1} onClick={() => setApprovedReportPage(current - 1)}>← {label("前へ", "Previous")}</button>
+            <span>{current} / {pages}</span>
+            <button type="button" className="primaryButton" disabled={current >= pages} onClick={() => setApprovedReportPage(current + 1)}>{label("次へ", "Next")} →</button>
+          </div>
+        </div>
+      </>}
+    </>;
+  }
+
   function renderReports() {
     return (
       <>
@@ -11862,7 +11954,7 @@ function renderHome() {
                 }}
               >
                 <strong>
-                  表示：{startIndex + 1}〜
+                  表示：{filteredReports.length ? startIndex + 1 : 0}〜
                   {Math.min(startIndex + REPORTS_PER_PAGE, filteredReports.length)}
                   / {filteredReports.length}件
                 </strong>
@@ -12257,7 +12349,7 @@ function renderHome() {
           const displayText = appLanguage === "en" && translated?.text ? translated.text : item.text;
 
           return (
-            <div key={translationKey} className="calendarEditCard" style={{ cursor: "pointer" }} onClick={() => setPage(item.page)}>
+            <div key={translationKey} className="calendarEditCard" style={{ cursor: "pointer" }} onClick={() => item.page === "approvedReports" && item.reportId ? openApprovedReport(item.reportId) : setPage(item.page)}>
               <b>{item.category} / {item.date}</b>
               <h3>{displayTitle}</h3>
               <p style={{ whiteSpace: "pre-wrap" }}>{displayText || "-"}</p>
@@ -15431,7 +15523,7 @@ Requirements:
     const stopTotal = !isCsv ? rows.reduce((sum, row) => sum + toNumber(calculateReport(row).stopTimeHours, 0), 0) : 0;
     const close = () => setAnalysisDrilldown(null);
     const openReport = (row) => {
-      close(); setPage("report"); setReportSearch(String(row?.id || row?.equipment || row?.phenomenon || ""));
+      close(); if (row?.approvalStatus === "承認済み") { openApprovedReport(row.id); return; } setPage("report"); setReportSearch(String(row?.id || row?.equipment || row?.phenomenon || ""));
       if (row?.id) window.setTimeout(() => document.getElementById(`maintenance-report-${row.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
     };
     return (
@@ -15452,6 +15544,7 @@ Requirements:
     if (page === "home") return renderHome();
     if (page === "ai") return renderMiyamaAi();
     if (page === "report") return renderReports();
+    if (page === "approvedReports") return renderApprovedReports();
     if (page === "maintenance") return renderMaintenance();
     if (page === "dailyProduction") return renderDailyProductionManagement();
     if (page === "spare") return renderSpareParts();
@@ -15521,6 +15614,7 @@ Requirements:
     { key: "miyamaAi", label: topMenuLabels.miyamaAi, icon: <Bot size={16} /> },
     { key: "calendar", label: topMenuLabels.calendar, icon: <CalendarDays size={16} /> },
     { key: "report", label: topMenuLabels.report, icon: <FileText size={16} /> },
+    { key: "approvedReports", label: appLanguage === "en" ? "Approved Maintenance Reports" : "保全報告書承認済み", icon: <FileText size={16} /> },
     { key: "maintenance", label: topMenuLabels.maintenance, icon: <Wrench size={16} /> },
     { key: "work", label: topMenuLabels.work, icon: <Hammer size={16} /> },
     { key: "newEquipment", label: topMenuLabels.newEquipment, icon: <Factory size={16} /> },
