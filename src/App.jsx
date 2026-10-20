@@ -4333,6 +4333,27 @@ function filterApprovedMaintenanceReports(rows, query = "", from = "", to = "") 
     .localeCompare(String(a.approvedAt || a.approvedDate || a.createdAt || "")));
 }
 
+// One active delivery forecast per part; events are derived from saved part data.
+function buildPartDeliveryEvents(parts, language = "ja", today = todayText()) {
+  const en = language === "en";
+  return parts.filter((part) => part.deliveryStatus !== "received")
+    .map((part) => ({ part, date: normalizeDateOnly(part.expectedDeliveryDate) }))
+    .filter(({ date }) => /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .map(({ part, date }) => ({
+      id: `delivery-${part.id}`, sourceId: part.id, sourceType: "partDelivery", page: "spare",
+      partSearch: part.partNo || part.partName || "", date, time: "",
+      title: `${en ? "Parts delivery" : "部品入荷予定"}：${part.partName || part.partNo || "—"}`,
+      detail: [
+        `${en ? "Part number" : "型式・品番"}: ${part.partNo || part.serialNo || "—"}`,
+        `${en ? "Equipment" : "設備"}: ${part.equipment || "—"}`,
+        `${en ? "Supplier" : "購入先"}: ${part.supplier || "—"}`,
+        date < today ? (en ? "Overdue — receipt unconfirmed" : "入荷予定日超過・未入荷") : (en ? "Awaiting receipt" : "入荷待ち"),
+      ].join(" / "),
+      owner: part.owner || "", importance: date < today ? "重要" : "通常",
+      category: en ? "Parts delivery" : "部品入荷", image: part.image || "", deletable: false,
+    }));
+}
+
 // Shared predicates keep home counters and destination lists consistent.
 function dashboardQueueRows(rows, queue) {
   return rows.filter((row) => {
@@ -6319,11 +6340,12 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
     return [
       ...manualEvents,
+      ...buildPartDeliveryEvents(parts, appLanguage),
       ...reportEvents,
       ...maintenanceEvents,
       ...plannedWorkEvents,
     ].sort((a, b) => `${a.date || ""}${a.time || ""}`.localeCompare(`${b.date || ""}${b.time || ""}`));
-  }, [calendarEvents, reports, maintenanceRows, plannedWorks]);
+  }, [calendarEvents, reports, maintenanceRows, plannedWorks, parts, appLanguage]);
 
   const filteredReports = useMemo(() => {
     const keyword = reportSearch.toLowerCase().trim();
@@ -10683,6 +10705,21 @@ function renderHome() {
                 <label>📦 在庫数<input type="number" value={row.stockQty || 0} onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)} /></label>
                 <label>⚠️ 最低在庫<input type="number" value={row.minStock || 1} onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)} /></label>
                 <label>🚚 納期<input value={row.leadTime || ""} onChange={(e) => updateField("parts", row.id, "leadTime", e.target.value)} /></label>
+                <label>📅 {appLanguage === "en" ? "Expected delivery date" : "入荷予定日"}
+                  <input type="date" value={dateOnlyInputValue(row.expectedDeliveryDate)}
+                    onChange={(e) => updateField("parts", row.id, "expectedDeliveryDate", e.target.value)} />
+                </label>
+                <label>🚚 {appLanguage === "en" ? "Receipt status" : "入荷状況"}
+                  <select value={row.deliveryStatus === "received" ? "received" : "pending"}
+                    onChange={(e) => updateField("parts", row.id, "deliveryStatus", e.target.value)}>
+                    <option value="pending">{appLanguage === "en" ? "Awaiting receipt" : "入荷待ち"}</option>
+                    <option value="received">{appLanguage === "en" ? "Received" : "入荷済み"}</option>
+                  </select>
+                </label>
+                <p style={{ color: "#475569", alignSelf: "center" }}>{appLanguage === "en"
+                  ? "One delivery forecast per part. Set a date to show it in Calendar. Received deliveries are hidden; stock quantities are updated separately."
+                  : "部品ごとに入荷予定を1件管理します。予定日を入力するとカレンダーに表示され、入荷済みにすると非表示になります。在庫数は別途更新してください。"}</p>
+
 
                 <label>
                   🚦 {appLanguage === "es" ? "Criticidad" : appLanguage === "en" ? "Criticality" : "部品重要度"}
@@ -11088,7 +11125,12 @@ function renderHome() {
 
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "12px" }}>
                   {event.page && event.page !== "calendar" && (
-                    <button className="primaryButton" onClick={() => setPage(event.page)}>
+                    <button className="primaryButton" onClick={() => {
+                      if (event.sourceType === "partDelivery") {
+                        setDashboardQueue(""); setSpareSearch(event.partSearch || "");
+                      }
+                      setPage(event.page);
+                    }}>
                       {calendarText.openRelated}
                     </button>
                   )}
