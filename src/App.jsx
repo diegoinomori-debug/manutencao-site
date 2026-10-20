@@ -4210,6 +4210,89 @@ function extractJsonObject(text = "") {
   }
 }
 
+async function reportStockRequest(body) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Sign in again.");
+  const token = await user.getIdToken();
+  const response = await fetch("/api/report-stock", { method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  return data;
+}
+
+function ReportStockWithdrawal({ reportId, parts, language, locked, writable, dirty, onStockChange }) {
+  const en = language === "en";
+  const [opened, setOpened] = useState(false);
+  const [partId, setPartId] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [query, setQuery] = useState("");
+  const [entries, setEntries] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const pending = useRef(null);
+  const inFlight = useRef(false);
+  const selected = parts.find(part => part.id === partId);
+  const options = parts.filter(part => `${part.partName || ""} ${part.partNo || ""} ${part.equipment || ""}`.toLowerCase().includes(query.toLowerCase()));
+  const history = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true; setBusy(true); setMessage("");
+    try { const data = await reportStockRequest({ action: "history", reportId }); setEntries(data.entries || []); setOpened(true); }
+    catch (error) { setMessage((en ? "Could not load withdrawals: " : "出庫履歴の読込エラー：") + error.message); }
+    finally { inFlight.current = false; setBusy(false); }
+  };
+  const withdraw = async () => {
+    if (inFlight.current || !writable || locked || dirty) return;
+    const count = Number(quantity);
+    if (!selected || !Number.isSafeInteger(count) || count < 1) { setMessage(en ? "Select a part and a positive whole quantity." : "部品と1以上の整数数量を指定してください。"); return; }
+    if (!window.confirm(en ? `Withdraw ${count} × ${selected.partName || selected.partNo}? This reduces stock.` : `${selected.partName || selected.partNo} を ${count} 個出庫します。在庫数を減らします。よろしいですか？`)) return;
+    // Reuse the same operation after a network error, including after a page reload.
+    const key = `miyamaWithdrawal:${reportId}`;
+    const payloadKey = `${partId}|${count}`;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) || "null");
+      if (saved?.payloadKey === payloadKey) pending.current = saved;
+    } catch { /* Storage may be unavailable. The in-memory token still prevents repeat retries. */ }
+    if (pending.current?.payloadKey !== payloadKey) pending.current = { payloadKey, operationId: crypto.randomUUID() };
+    try { sessionStorage.setItem(key, JSON.stringify(pending.current)); } catch { /* Optional recovery storage. */ }
+    inFlight.current = true; setBusy(true); setMessage("");
+    try {
+      const data = await reportStockRequest({ action: "withdraw", reportId, partId, quantity: count, operationId: pending.current.operationId });
+      onStockChange(data.partId, data.stockQty);
+      setEntries(current => [data.entry, ...current.filter(entry => entry.id !== data.entry.id)].slice(0,100));
+      setQuantity("1"); setPartId(""); pending.current = null;
+      try { sessionStorage.removeItem(key); } catch { /* Optional recovery storage. */ }
+      setMessage(en ? "Withdrawal recorded. Saving the report will not deduct it again." : "出庫を記録しました。報告書を保存しても再度減算されません。");
+    } catch (error) { setMessage((en ? "Withdrawal failed. Retry with the same part and quantity: " : "出庫エラー。同じ部品・数量で再試行してください：") + error.message); }
+    finally { inFlight.current = false; setBusy(false); }
+  };
+  return <section className="tableWrap" style={{ marginTop: "16px", border: "2px solid #0891b2" }}>
+    <h3>📦 {en ? "Parts used / stock withdrawals" : "使用部品・在庫出庫"}</h3>
+    <button type="button" className="primaryButton" disabled={busy} onClick={history}>{en ? "Load / refresh withdrawals" : "出庫履歴・登録を開く / 更新"}</button>
+    {message && <p role="status">{message}</p>}
+    {opened && <>
+      {writable && !locked && <>
+        <p>{en ? "Confirm each withdrawal once. This does not change the report's part costs." : "使用した部品の出庫を1回ずつ確定します。報告書の部品費用は自動変更されません。"}</p>
+        {dirty && <p role="status">{en ? "Save report changes before withdrawing." : "出庫前に報告書の変更を保存してください。"}</p>}
+        <div className="reportGrid">
+          <label>{en ? "Find part" : "部品検索"}<input value={query} disabled={busy} onChange={e => setQuery(e.target.value)} /></label>
+          <label>{en ? "Part" : "部品"}<select value={partId} disabled={busy} onChange={e => setPartId(e.target.value)}>
+            <option value="">{en ? "Select" : "選択してください"}</option>
+            {selected && !options.some(part => part.id === partId) && <option value={selected.id}>{selected.partName || selected.partNo}</option>}
+            {options.map(part => <option key={part.id} value={part.id}>{part.partName || part.partNo || part.id} / {part.partNo || "—"} / {en ? "Stock" : "在庫"}: {part.stockQty ?? 0}</option>)}
+          </select></label>
+          <label>{en ? "Quantity" : "出庫数"}<input type="number" min="1" max="1000000" step="1" value={quantity} disabled={busy} onChange={e=>setQuantity(e.target.value)} /></label>
+        </div>
+        <button type="button" className="primaryButton" disabled={busy || dirty || !partId} onClick={withdraw}>{en ? "Confirm stock withdrawal" : "出庫を確定"}</button>
+      </>}
+      {locked && <p>{en ? "Approved report: withdrawals are locked." : "承認済み報告書のため出庫できません。"}</p>}
+      <h4>{en ? "Latest 100 withdrawals" : "出庫履歴（最新100件）"}</h4>
+      {!entries.length && <p>{en ? "No recorded withdrawals." : "出庫履歴はありません。"}</p>}
+      {entries.map(entry => <p key={entry.id}>{entry.createdAt?.replace("T", " ").slice(0,16)} UTC / {entry.partName || entry.partNo} / {en ? "Qty" : "出庫数"}: {entry.quantity} / {entry.before} → {entry.after} / {entry.actorName}</p>)}
+    </>}
+  </section>;
+}
+
 export default function App() {
   const [authUser, setAuthUser] = useState(null);
   const [authProfile, setAuthProfile] = useState(null);
@@ -11565,6 +11648,11 @@ function renderHome() {
             </div>
           </div>
         )}
+
+        <ReportStockWithdrawal key={sourceRow.id} reportId={sourceRow.id} parts={parts} language={appLanguage}
+          locked={sourceRow.approvalStatus === "承認済み"} dirty={isDirty}
+          writable={userProfile?.readOnly !== true && ["operator", "inspector", "approver", "admin"].includes(currentRole)}
+          onStockChange={(id, stockQty) => { if (stockQty !== null) setParts(current => current.map(part => part.id === id ? { ...part, stockQty } : part)); }} />
 
         {show("basic") && (
           <Section openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="🏭 基本情報・設備情報">
