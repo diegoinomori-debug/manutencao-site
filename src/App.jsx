@@ -4333,6 +4333,19 @@ function filterApprovedMaintenanceReports(rows, query = "", from = "", to = "") 
     .localeCompare(String(a.approvedAt || a.approvedDate || a.createdAt || "")));
 }
 
+// Shared predicates keep home counters and destination lists consistent.
+function dashboardQueueRows(rows, queue) {
+  return rows.filter((row) => {
+    if (queue === "inspection") return row.approvalStatus === "点検待ち";
+    if (queue === "approval") return row.approvalStatus === "承認待ち";
+    if (queue === "overdue") return row.status === "交換超過";
+    if (queue === "upcoming") return row.status === "交換間近";
+    if (queue === "stock") return Number.isFinite(row.stockQty) && Number.isFinite(row.minStock) &&
+      (row.stockQty <= 0 || row.stockQty <= row.minStock);
+    return true;
+  });
+}
+
 function MaintenanceApp({ currentUser, userProfile }) {
   const currentUserName =
     String(
@@ -4795,6 +4808,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const GLOBAL_RESULTS_PER_PAGE = 20;
   const [globalPage, setGlobalPage] = useState(1);
   const [reportSearch, setReportSearch] = useState("");
+  const [dashboardQueue, setDashboardQueue] = useState("");
   const [reportPage, setReportPage] = useState(1);
   const [approvedReportSearch, setApprovedReportSearch] = useState("");
   const [approvedReportFrom, setApprovedReportFrom] = useState("");
@@ -4952,7 +4966,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   // Evita milhares de leituras desnecessárias no Firestore:
   // carrega a base diária somente quando a tela de produção é aberta.
   useEffect(() => {
-    if (["dailyProduction", "maintenance"].includes(page)) {
+    if (["home", "dailyProduction", "maintenance"].includes(page)) {
       loadDailyProductions();
     }
   }, [page]);
@@ -4966,8 +4980,14 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }, [page]);
 
   useEffect(() => {
+    const target = ["inspection", "approval"].includes(dashboardQueue) ? "report" :
+      ["overdue", "upcoming"].includes(dashboardQueue) ? "maintenance" : dashboardQueue === "stock" ? "spare" : "";
+    if (target && page !== target) setDashboardQueue("");
+  }, [page, dashboardQueue]);
+
+  useEffect(() => {
     setReportPage(1);
-  }, [reportSearch, reportViewMode]);
+  }, [reportSearch, reportViewMode, dashboardQueue]);
 
   // Tradução otimizada: executa somente ao trocar idioma/página ou quando a quantidade
   // principal de dados muda. Antes ela era executada várias vezes a cada tecla digitada
@@ -6106,7 +6126,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const keyword = maintenanceSearch.toLowerCase().trim();
     const keywords = keyword ? keyword.split(/\s+/) : [];
 
-    const filtered = maintenanceRows.filter((row) => {
+    const filtered = dashboardQueueRows(maintenanceRows, ["overdue", "upcoming"].includes(dashboardQueue) ? dashboardQueue : "").filter((row) => {
       const typeOk = maintenanceTypeFilter === "全て" || row.maintenanceType === maintenanceTypeFilter;
       const rowEquipment = cleanEquipmentName(row.equipment || row.lineName || row.equipment2Name || "");
       const equipmentOk = maintenanceEquipmentFilter === "全て" || rowEquipment === maintenanceEquipmentFilter;
@@ -6142,7 +6162,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       if (b.daysLeft === "") return -1;
       return Number(a.daysLeft) - Number(b.daysLeft);
     });
-  }, [maintenanceRows, maintenanceSearch, maintenanceTypeFilter, maintenanceEquipmentFilter, maintenanceSort]);
+  }, [maintenanceRows, maintenanceSearch, maintenanceTypeFilter, maintenanceEquipmentFilter, maintenanceSort, dashboardQueue]);
 
   const spareRows = useMemo(() => {
     return parts.map((part) => {
@@ -6182,14 +6202,15 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   const filteredSpareRows = useMemo(() => {
     const keyword = spareSearch.toLowerCase().trim();
-    if (!keyword) return spareRows;
+    const queued = dashboardQueueRows(spareRows, dashboardQueue === "stock" ? "stock" : "");
+    if (!keyword) return queued;
     const keywords = keyword.split(/\s+/);
-    return spareRows.filter((row) => containsAll(row.searchText, keywords));
-  }, [spareRows, spareSearch]);
+    return queued.filter((row) => containsAll(row.searchText, keywords));
+  }, [spareRows, spareSearch, dashboardQueue]);
 
   const overCount = maintenanceRows.filter((r) => r.status === "交換超過").length;
   const nearCount = maintenanceRows.filter((r) => r.status === "交換間近").length;
-  const lowStockCount = spareRows.filter((r) => r.stockStatus.includes("なし") || r.stockStatus.includes("不足")).length;
+  const lowStockCount = dashboardQueueRows(spareRows, "stock").length;
   const monthReportCount = reports.filter((report) =>
     (report.createdAt || "").startsWith(new Date().toISOString().slice(0, 7))
   ).length;
@@ -6306,7 +6327,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   const filteredReports = useMemo(() => {
     const keyword = reportSearch.toLowerCase().trim();
-    const sorted = reports.filter((row) => row.approvalStatus !== "承認済み").sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const sorted = dashboardQueueRows(reports, ["inspection", "approval"].includes(dashboardQueue) ? dashboardQueue : "").filter((row) => row.approvalStatus !== "承認済み").sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     if (!keyword) return sorted;
 
     const keywords = keyword.split(/\s+/);
@@ -6337,7 +6358,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
         keywords
       )
     );
-  }, [reports, reportSearch]);
+  }, [reports, reportSearch, dashboardQueue]);
 
   const globalResults = useMemo(() => {
     const keyword = globalSearch.toLowerCase().trim();
@@ -8549,10 +8570,49 @@ Rules:
   }
 
 
+  function dashboardQueueLabel(queue) {
+    const labels = {
+      inspection: ["点検待ちの報告書", "Reports awaiting inspection"],
+      approval: ["承認待ちの報告書", "Reports awaiting approval"],
+      overdue: ["期限超過の定期保全", "Overdue maintenance"],
+      upcoming: ["期限間近の定期保全", "Upcoming maintenance"],
+      stock: ["在庫不足・在庫なし", "Low / zero stock"],
+    };
+    return labels[queue]?.[appLanguage === "en" ? 1 : 0] || "";
+  }
+
+  function openDashboardQueue(queue) {
+    setDashboardQueue(queue);
+    if (["inspection", "approval"].includes(queue)) {
+      setReportSearch(""); setReportPage(1); setReportViewMode("summary"); setPage("report");
+    } else if (["overdue", "upcoming"].includes(queue)) {
+      setMaintenanceSearch(""); setMaintenanceTypeFilter("全て"); setMaintenanceEquipmentFilter("全て");
+      setMaintenanceSort("urgent"); setPage("maintenance");
+    } else { setSpareSearch(""); setPage("spare"); }
+  }
+
+  function renderDashboardQueueBanner() {
+    if (!dashboardQueue || !["report", "maintenance", "spare"].includes(page)) return null;
+    return <div className="tableWrap" style={{ display: "flex", gap: "12px", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", border: "2px solid #2563eb" }}>
+      <strong>📌 {dashboardQueueLabel(dashboardQueue)}</strong>
+      <button type="button" className="primaryButton" onClick={() => setDashboardQueue("")}>
+        {appLanguage === "en" ? "Clear pending filter / show all" : "絞り込み解除・すべて表示"}
+      </button>
+    </div>;
+  }
+
 function renderHome() {
   const recentReports = [...reports]
     .sort((a, b) => String(b.createdAt || b.troubleDateTime || "").localeCompare(String(a.createdAt || a.troubleDateTime || "")))
     .slice(0, 3);
+
+  const pendingCards = [
+    { queue: "inspection", icon: "🔎", count: dashboardQueueRows(reports, "inspection").length, color: "#1d4ed8" },
+    { queue: "approval", icon: "✅", count: dashboardQueueRows(reports, "approval").length, color: "#7c3aed" },
+    { queue: "overdue", icon: "🚨", count: dashboardQueueRows(maintenanceRows, "overdue").length, color: "#b91c1c" },
+    { queue: "upcoming", icon: "🔧", count: dashboardQueueRows(maintenanceRows, "upcoming").length, color: "#92400e" },
+    { queue: "stock", icon: "📦", count: dashboardQueueRows(spareRows, "stock").length, color: "#b45309" },
+  ];
 
   const quickMenus = [
     { key: "report", icon: "📄", title: translateMiyamaText("修理報告", appLanguage), sub: translateMiyamaText("故障・修理の記録", appLanguage) },
@@ -8601,6 +8661,21 @@ function renderHome() {
       </section>
 
       {globalSearch && renderGlobalSearchBox()}
+
+      <section className="miyamaHomePanel" aria-label={appLanguage === "en" ? "Pending actions" : "対応が必要な項目"} style={{ margin: "20px 0" }}>
+        <div className="miyamaPanelTitle"><h3>📌 {appLanguage === "en" ? "Pending actions" : "対応が必要な項目"}</h3></div>
+        <p>{appLanguage === "en" ? "Select a card to see the items that need attention." : "カードを押すと、対応が必要な項目だけを表示します。"}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))", gap: "12px" }}>
+          {pendingCards.map((card) => <button key={card.queue} type="button" className="miyamaQuickCard"
+            style={{ textAlign: "left", borderTop: `4px solid ${card.color}` }} onClick={() => openDashboardQueue(card.queue)}>
+            <span aria-hidden="true" style={{ fontSize: "24px" }}>{card.icon}</span>
+            <strong>{dashboardQueueLabel(card.queue)}</strong>
+            <span style={{ fontSize: "32px", fontWeight: 900, color: card.color }}>{card.count}</span>
+            <small>{appLanguage === "en" ? "View items →" : "一覧を確認 →"}</small>
+          </button>)}
+        </div>
+      </section>
+
 
       <section className="miyamaQuickGrid">
         {quickMenus.map((item) => (
@@ -15707,6 +15782,7 @@ return (
       {page !== "home" && page !== "miyamaAi" && renderGlobalSearchBox()}
 
       {renderPageGuide()}
+      {renderDashboardQueueBanner()}
       {renderCurrentPage()}
       {renderAnalysisDrilldown()}
 
