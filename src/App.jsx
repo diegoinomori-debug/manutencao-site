@@ -5267,25 +5267,38 @@ function MaintenanceApp({ currentUser, userProfile }) {
     reports,
   ]);
 
+  const automaticReadCache = useRef(new Map());
+
+  function loadOnDemand(key, loader) {
+    const cached = automaticReadCache.current.get(key);
+    if (cached?.pending) return cached.pending;
+    if (cached?.at && Date.now() - cached.at < 120000) return;
+    const pending = Promise.resolve().then(loader).then((result) => {
+      if (result === false) automaticReadCache.current.delete(key);
+      else automaticReadCache.current.set(key, { at: Date.now() });
+    }).catch((error) => {
+      automaticReadCache.current.delete(key);
+      console.error(`Could not load ${key}:`, error);
+    });
+    automaticReadCache.current.set(key, { pending });
+    return pending;
+  }
+
+  const hasGlobalSearch = Boolean(globalSearch.trim());
+
   useEffect(() => {
-    loadAll();
+    loadOnDemand("parts", loadParts);
+    loadOnDemand("reports", loadReports);
   }, []);
 
-  // Evita milhares de leituras desnecessárias no Firestore:
-  // carrega a base diária somente quando a tela de produção é aberta.
   useEffect(() => {
-    if (["home", "dailyProduction", "maintenance"].includes(page)) {
-      loadDailyProductions();
-    }
-  }, [page]);
-
-  // productionLogs pode ser uma coleção muito grande.
-  // Por isso, só é carregada quando uma tela que realmente usa esses dados é aberta.
-  useEffect(() => {
-    if (page === "csvAnalytics" || page === "production") {
-      loadProductionLogs();
-    }
-  }, [page]);
+    if (hasGlobalSearch || ["calendar", "ai", "miyamaAi"].includes(page)) loadOnDemand("calendar", loadCalendar);
+    if (hasGlobalSearch || ["work", "calendar", "ai", "miyamaAi", "analytics"].includes(page)) loadOnDemand("works", loadPlannedWorks);
+    if (page === "newEquipment") loadOnDemand("equipment", loadNewEquipmentProjects);
+    if (["home", "dailyProduction", "maintenance", "calendar", "ai", "miyamaAi"].includes(page))
+      loadOnDemand("dailyProduction", loadDailyProductions);
+    if (page === "csvAnalytics" || page === "production") loadOnDemand("productionLogs", loadProductionLogs);
+  }, [page, hasGlobalSearch]);
 
   useEffect(() => {
     const target = ["inspection", "approval"].includes(dashboardQueue) ? "report" :
@@ -5430,32 +5443,6 @@ function MaintenanceApp({ currentUser, userProfile }) {
     }
   }
 
-  async function loadAll() {
-    // Carrega apenas os dados essenciais na abertura do sistema.
-    // As coleções grandes (productionLogs e dailyProductions) são carregadas
-    // somente quando o usuário realmente abre as respectivas páginas.
-    const results = await Promise.allSettled([
-      loadParts(),
-      loadCalendar(),
-      loadReports(),
-      loadPlannedWorks(),
-      loadNewEquipmentProjects(),
-    ]);
-
-    results.forEach((result, index) => {
-      if (result.status === "rejected") {
-        const names = [
-          "parts",
-          "calendar",
-          "maintenanceReports",
-          "plannedWorks",
-          "newEquipmentProjects",
-        ];
-        console.error(`Failed to load ${names[index]}:`, result.reason);
-      }
-    });
-  }
-
   async function loadParts() {
     const snap = await getDocs(collection(db, "parts"));
     const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -5481,6 +5468,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     } catch (err) {
       console.error("plannedWorks load error:", err);
       setPlannedWorks([]);
+      return false;
     }
   }
 
@@ -5502,6 +5490,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
             ? "Projects could not be loaded. If 'permission-denied' appears, Firestore Rules must be updated."
             : "新規設備プロジェクトを読み込めませんでした。permission-deniedの場合はFirestore Rulesの調整が必要です。"
       );
+      return false;
     } finally {
       setNewEquipmentLoading(false);
     }
@@ -5645,6 +5634,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     } catch (err) {
       console.error("productionLogs load error:", err);
       setProductionLogs([]);
+      return false;
     }
   }
 
@@ -5657,6 +5647,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       setDailyProductions(rows);
     } catch (err) {
       console.error("dailyProductions load error:", err);
+      return false;
     }
   }
 
@@ -6216,7 +6207,12 @@ function MaintenanceApp({ currentUser, userProfile }) {
     await batch.commit();
     reportCommitted = true;
     setNewReport(null);
-    await Promise.all([loadReports(), loadCalendar(), loadParts(), loadPlannedWorks()]);
+    await Promise.all([
+      loadReports(),
+      automaticReadCache.current.has("calendar") ? loadCalendar() : Promise.resolve(),
+      linkedMaintenanceId ? loadParts() : Promise.resolve(),
+      linkedPlannedWorkId && automaticReadCache.current.has("works") ? loadPlannedWorks() : Promise.resolve(),
+    ]);
 
     const savedText =
       appLanguage === "es"
