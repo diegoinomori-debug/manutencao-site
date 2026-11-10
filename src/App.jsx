@@ -3695,7 +3695,15 @@ tbody tr:hover td { background:#f8fbff !important; }
 `;
 
 
-function Section({ sectionKey, title, children, openSections, toggleSection }) {
+function Section({ sectionKey, title, children, openSections, toggleSection, compactGroup }) {
+  if (compactGroup) {
+    return (
+      <details name={compactGroup} className="calendarEditCard" style={{ marginTop: 8, padding: "8px 12px" }}>
+        <summary style={{ cursor: "pointer", fontWeight: 700, padding: "5px 0" }}>{title}</summary>
+        <div style={{ marginTop: 10 }}>{children}</div>
+      </details>
+    );
+  }
   const open = openSections?.[sectionKey] ?? true;
   return (
     <div className="calendarEditCard" style={{ marginTop: "14px" }}>
@@ -11490,6 +11498,8 @@ function renderHome() {
     ];
     const show = (key) => fullReport || reportViewMode === "all" || reportViewMode === key;
 
+    const compactGroup = fullReport || reportViewMode === "all" ? `report-sections-${sourceRow.id}` : undefined;
+
     return (
       <div
         id={`maintenance-report-${sourceRow.id}`}
@@ -11649,13 +11659,25 @@ function renderHome() {
           </div>
         )}
 
-        <ReportStockWithdrawal key={sourceRow.id} reportId={sourceRow.id} parts={parts} language={appLanguage}
+        {compactGroup && <p style={{ margin: "8px 0", color: "#475569" }}>{appLanguage === "en"
+          ? "Select a section to open it. The previous section closes automatically."
+          : "見出しを押すと開きます。別の項目を開くと、前の項目は閉じます。"}</p>}
+        {compactGroup ? (
+          <Section compactGroup={compactGroup} title={appLanguage === "en" ? "📦 Parts used / stock withdrawals" : "📦 使用部品・在庫出庫"}>
+            <ReportStockWithdrawal key={sourceRow.id} reportId={sourceRow.id} parts={parts} language={appLanguage}
           locked={sourceRow.approvalStatus === "承認済み"} dirty={isDirty}
           writable={userProfile?.readOnly !== true && ["operator", "inspector", "approver", "admin"].includes(currentRole)}
           onStockChange={(id, stockQty) => { if (stockQty !== null) setParts(current => current.map(part => part.id === id ? { ...part, stockQty } : part)); }} />
+          </Section>
+        ) : (
+          <ReportStockWithdrawal key={sourceRow.id} reportId={sourceRow.id} parts={parts} language={appLanguage}
+          locked={sourceRow.approvalStatus === "承認済み"} dirty={isDirty}
+          writable={userProfile?.readOnly !== true && ["operator", "inspector", "approver", "admin"].includes(currentRole)}
+          onStockChange={(id, stockQty) => { if (stockQty !== null) setParts(current => current.map(part => part.id === id ? { ...part, stockQty } : part)); }} />
+        )}
 
         {show("basic") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="🏭 基本情報・設備情報">
+          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="🏭 基本情報・設備情報">
             <div className="reportGrid">
               <label>📅 作成日<input type="date" value={dateOnlyInputValue(row.createdAt)} onChange={(e) => setRow("createdAt", e.target.value)} /></label>
               <label>🗂️ 保全分類{appLanguage === "ja" ? (<input value={row.maintenanceType || ""} onChange={(e) => setRow("maintenanceType", e.target.value)} />) : (<TranslatedReadOnlyInput value={row.maintenanceType || ""} language={appLanguage} />)}</label>
@@ -11668,7 +11690,7 @@ function renderHome() {
         )}
 
         {show("time") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="time" title={appLanguage === "en" ? "⏱️ Time / Downtime" : "⏱️ 時間・停止時間"}>
+          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="time" title={appLanguage === "en" ? "⏱️ Time / Downtime" : "⏱️ 時間・停止時間"}>
             <div className="reportGrid">
               <label>{appLanguage === "en" ? "🚨 ① Failure Occurred At" : "🚨 ①不具合発生日時"}<input type="datetime-local" value={dateTimeInputValue(row.troubleDateTime)} onChange={(e) => setRow("troubleDateTime", e.target.value)} /></label>
               <label>{appLanguage === "en" ? "🛠️ ② Maintenance Started At" : "🛠️ ②保全作業開始日時"}<input type="datetime-local" value={dateTimeInputValue(row.workStartDateTime)} onChange={(e) => setRow("workStartDateTime", e.target.value)} /></label>
@@ -11683,6 +11705,7 @@ function renderHome() {
 
         {show("trouble") && (
           <Section
+            compactGroup={compactGroup}
             openSections={openSections}
             toggleSection={toggleSection}
             sectionKey="trouble"
@@ -11756,6 +11779,7 @@ function renderHome() {
 
         {show("why") && (
           <Section
+            compactGroup={compactGroup}
             openSections={openSections}
             toggleSection={toggleSection}
             sectionKey="why"
@@ -11809,7 +11833,7 @@ function renderHome() {
         )}
 
         {show("prevention") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
+          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
             <div className="reportGrid">
               <label>🛡️ 再発防止区分<input value={row.recurrenceCategory || ""} onChange={(e) => setRow("recurrenceCategory", e.target.value)} /></label>
               <label>🔄 変化点ランク<input value={row.changeRank || ""} onChange={(e) => setRow("changeRank", e.target.value)} /></label>
@@ -11855,7 +11879,7 @@ function renderHome() {
         )}
 
         {show("cost") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="cost" title="💴 参考費用">
+          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="cost" title="💴 参考費用">
             <div className="reportGrid">
               <label>👤 作業者数<input type="number" min="1" value={Math.max(1, toNumber(row.workerCount, 1))} onChange={(e) => setRow("workerCount", Math.max(1, toNumber(e.target.value, 1)))} /></label>
               <label>💴 時間単価<input type="number" value={row.laborRate || 3000} onChange={(e) => setRow("laborRate", e.target.value)} /></label>
@@ -11877,7 +11901,7 @@ function renderHome() {
         )}
 
         {show("approval") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="approval" title="✅ 確認・承認">
+          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="approval" title="✅ 確認・承認">
             <div className="approvalFlow">
               <div className="approvalStep"><div className="approvalStepIcon">👤</div><span>STEP 1</span><strong>作成</strong><small>{row.createdBy || row.worker || "未入力"}</small></div>
               <div className="approvalStep"><div className="approvalStepIcon">🔎</div><span>STEP 2</span><strong>点検</strong><small>{row.inspectedBy || "未入力"}</small></div>
@@ -12009,7 +12033,7 @@ function renderHome() {
         )}
 
         {show("other") && (
-          <Section openSections={openSections} toggleSection={toggleSection} sectionKey="other" title="📷 写真・備考">
+          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="other" title="📷 写真・備考">
             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "maintenanceReports", row.id)} />
             {row.image && <img src={row.image} alt="" className="calendarPhoto" />}
             <h3>📝 備考</h3>{appLanguage === "ja" ? (
