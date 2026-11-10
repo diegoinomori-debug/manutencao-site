@@ -2841,6 +2841,26 @@ div[style*="grid-template-columns: 320px 1fr"] select { max-width:100%; }
 }
 
 .reportCardShell::before { content:""; position:absolute; inset:0 auto 0 0; width:9px; background:var(--report-accent,#2563eb); }
+
+/* Keep labels readable while sizing fields to their values. */
+.miyamaReportForm .reportGrid.miyamaPreventionGrid {
+  grid-template-columns: minmax(0, 220px) max-content minmax(0, 160px) !important;
+  align-items: start; gap: 8px 14px !important;
+}
+.miyamaReportForm .miyamaPreventionGrid label { display: grid; align-content: start; gap: 4px; }
+.miyamaReportForm .miyamaRankField > span { white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+.miyamaReportForm .miyamaPreventionGrid input, .miyamaReportForm .miyamaPreventionGrid select {
+  min-height: 30px !important; padding: 4px 7px !important; margin: 0 !important;
+}
+.miyamaReportForm .miyamaPreventionGrid .miyamaRankInput { width: 48px !important; }
+.miyamaReportForm .miyamaPreventionNotes h3 { margin: 8px 0 4px; }
+.miyamaReportForm .miyamaPreventionNotes textarea { min-height: 52px !important; padding: 5px 8px !important; }
+@media (max-width: 560px) {
+  .miyamaReportForm .reportGrid.miyamaPreventionGrid {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+  }
+  .miyamaReportForm .miyamaPreventionGrid label:last-child { grid-column: 1 / -1; max-width: 160px; }
+}
 .reportCardShell > * { position:relative; }
 .reportHeaderPanel { border-radius:20px; background:linear-gradient(135deg, rgba(37,99,235,.10), rgba(255,255,255,.96)); border:1px solid #dbe3ef; padding:16px; margin-bottom:14px; }
 .reportSummaryGrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:14px; }
@@ -8706,7 +8726,7 @@ Rules:
                 <option value="必要 未実施">必要 未実施</option>
               </select>
             </label>
-            <label>🔄 変化点ランク<input className="miyamaRankInput" size={1} value={newReport.changeRank || ""} onChange={(e) => setReport("changeRank", e.target.value)} /></label>
+            <label className="miyamaRankField"><span>🔄 変化点ランク</span><input className="miyamaRankInput" size={1} value={newReport.changeRank || ""} onChange={(e) => setReport("changeRank", e.target.value)} /></label>
             <label>🔍 FP点検<input value={newReport.fpInspection || ""} onChange={(e) => setReport("fpInspection", e.target.value)} /></label>
           </div>
             <div className="miyamaPreventionNotes">
@@ -11908,7 +11928,7 @@ function renderHome() {
           <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
             <div className="reportGrid miyamaPreventionGrid">
               <label>🛡️ 再発防止区分<input value={row.recurrenceCategory || ""} onChange={(e) => setRow("recurrenceCategory", e.target.value)} /></label>
-              <label>🔄 変化点ランク<input className="miyamaRankInput" size={1} value={row.changeRank || ""} onChange={(e) => setRow("changeRank", e.target.value)} /></label>
+              <label className="miyamaRankField"><span>🔄 変化点ランク</span><input className="miyamaRankInput" size={1} value={row.changeRank || ""} onChange={(e) => setRow("changeRank", e.target.value)} /></label>
               <label>🔍 FP点検<input value={row.fpInspection || ""} onChange={(e) => setRow("fpInspection", e.target.value)} /></label>
             </div>
             <div className="miyamaPreventionNotes">
