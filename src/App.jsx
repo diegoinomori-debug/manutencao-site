@@ -613,6 +613,15 @@ function getEquipmentNameFromRecord(record = {}) {
   return formal || cleaned[0] || "";
 }
 
+const PILOT_EQUIPMENT = ["78-60", "76-60", "NK", "NL"];
+
+function matchPilotEquipment(value) {
+  const code = String(value ?? "").normalize("NFKC").trim().toUpperCase()
+    .replace(/[‐‑–−]/g, "-").replace(/\s*-\s*/g, "-")
+    .replace(/^(78|76)-060$/, "$1-60");
+  return PILOT_EQUIPMENT.includes(code) ? code : "";
+}
+
 function normalizeMachineKey(value = "") {
   const cleaned = cleanEquipmentName(value);
   if (!cleaned) return "NL自動機";
@@ -7220,6 +7229,7 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
   }
 
   function renderGlobalSearchBox() {
+    const equipmentMatch = matchPilotEquipment(globalSearch);
     return (
       <div className="tableWrap" style={{ marginBottom: "18px" }}>
         <h2>🔍 AI統合検索</h2>
@@ -7244,6 +7254,16 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
 
         {globalSearch && (
           <div style={{ marginTop: "16px" }}>
+            {equipmentMatch && (
+              <button type="button" className="primaryButton" onClick={() => {
+                setEquipmentPilot(equipmentMatch);
+                setEquipmentHistoryLimit(10);
+                setGlobalSearch("");
+                setPage("equipmentCards");
+              }}>
+                🏭 {equipmentMatch} — {appLanguage === "en" ? "Open equipment history" : "設備カルテを開く"}
+              </button>
+            )}
             <h3>{appLanguage === "en" ? `Search results: ${globalResults.length}` : `検索結果：${globalResults.length}件`}</h3>
             {globalResults.length === 0 && <p>{appLanguage === "th" ? "ไม่พบข้อมูลที่เกี่ยวข้อง" : appLanguage === "en" ? "No related data was found." : "関連データが見つかりません。"}</p>}
             {appLanguage === "en" && globalTranslationLoading && (
@@ -15997,18 +16017,9 @@ Requirements:
 
   function renderEquipmentCards() {
     const en = appLanguage === "en";
-    const machines = ["78-60", "76-60", "NK", "NL"];
-    const matches = (row) => {
-      const aliases = equipmentPilot.includes("-")
-        ? [equipmentPilot, equipmentPilot.replace("-60", "-060")]
-        : [equipmentPilot];
-      return [row.equipment, row.machine, row.machineName, row.equipmentName,
-        row.equipment2Name, row.lineName].some((value) => {
-        const key = String(value ?? "").normalize("NFKC").trim().toUpperCase()
-          .replace(/[‐‑–−]/g, "-").replace(/\s*-\s*/g, "-");
-        return aliases.includes(key);
-      });
-    };
+    const matches = (row) => [row.equipment, row.machine, row.machineName,
+      row.equipmentName, row.equipment2Name, row.lineName]
+      .some((value) => matchPilotEquipment(value) === equipmentPilot);
     const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
     const history = reports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
     const latest = history[0];
@@ -16028,7 +16039,7 @@ Requirements:
       <section className="tableWrap">
         <h1>🏭 {en ? "Equipment History" : "設備カルテ"}</h1>
         <div role="group" aria-label={en ? "Equipment" : "設備"} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {machines.map((machine) => (
+          {PILOT_EQUIPMENT.map((machine) => (
             <button key={machine} type="button" className="primaryButton"
               aria-pressed={equipmentPilot === machine}
               style={equipmentPilot === machine ? { background: "#153e75", color: "#fff" } : undefined}
