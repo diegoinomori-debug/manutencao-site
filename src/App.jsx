@@ -5053,6 +5053,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [globalSearch, setGlobalSearch] = useState("");
   const GLOBAL_RESULTS_PER_PAGE = 20;
   const [globalPage, setGlobalPage] = useState(1);
+  const [equipmentPilot, setEquipmentPilot] = useState("78-60");
+  const [equipmentHistoryLimit, setEquipmentHistoryLimit] = useState(10);
   const [reportSearch, setReportSearch] = useState("");
   const [dashboardQueue, setDashboardQueue] = useState("");
   const [reportPage, setReportPage] = useState(1);
@@ -15993,9 +15995,84 @@ Requirements:
     );
   }
 
+  function renderEquipmentCards() {
+    const en = appLanguage === "en";
+    const machines = ["78-60", "76-60", "NK", "NL"];
+    const matches = (row) => {
+      const aliases = equipmentPilot.includes("-")
+        ? [equipmentPilot, equipmentPilot.replace("-60", "-060")]
+        : [equipmentPilot];
+      return [row.equipment, row.machine, row.machineName, row.equipmentName,
+        row.equipment2Name, row.lineName].some((value) => {
+        const key = String(value ?? "").normalize("NFKC").trim().toUpperCase()
+          .replace(/[‐‑–−]/g, "-").replace(/\s*-\s*/g, "-");
+        return aliases.includes(key);
+      });
+    };
+    const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
+    const history = reports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
+    const latest = history[0];
+    const scheduled = maintenanceRows.filter((row) => matches(row) && row.nextDate)
+      .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+    const next = scheduled.find((row) => row.nextDate >= todayText());
+    const overdue = scheduled.filter((row) => row.nextDate < todayText()).length;
+    const open = (row) => {
+      if (row.approvalStatus === "承認済み") return openApprovedReport(row.id);
+      setDashboardQueue("");
+      setReportSearch(row.id);
+      setReportPage(1);
+      setPage("report");
+    };
+
+    return (
+      <section className="tableWrap">
+        <h1>🏭 {en ? "Equipment History" : "設備カルテ"}</h1>
+        <div role="group" aria-label={en ? "Equipment" : "設備"} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {machines.map((machine) => (
+            <button key={machine} type="button" className="primaryButton"
+              aria-pressed={equipmentPilot === machine}
+              style={equipmentPilot === machine ? { background: "#153e75", color: "#fff" } : undefined}
+              onClick={() => { setEquipmentPilot(machine); setEquipmentHistoryLimit(10); }}>
+              {machine}
+            </button>
+          ))}
+        </div>
+        <h2 style={{ marginTop: 20 }}>{equipmentPilot}</h2>
+        <div className="calendarEditCard" style={{ overflowWrap: "anywhere" }}>
+          <h3>{en ? "Latest recorded incident" : "直近の不具合"}</h3>
+          {latest ? <>
+            <small>{date(latest) || "—"}</small>
+            <p style={{ whiteSpace: "pre-wrap", fontWeight: 700 }}>{latest.phenomenon || latest.troublePoint || "—"}</p>
+            <strong>{en ? "Action taken" : "処置内容"}</strong>
+            <p style={{ whiteSpace: "pre-wrap" }}>{latest.action || (en ? "No action recorded." : "処置の記録はありません。")}</p>
+            <button type="button" className="primaryButton" onClick={() => open(latest)}>{en ? "Open report" : "報告書を開く"}</button>
+          </> : <p>{en ? "No matching report in the loaded records." : "読み込み済みの報告書に該当する記録がありません。"}</p>}
+        </div>
+        <div className="calendarEditCard" style={{ marginTop: 10 }}>
+          <h3>{en ? "Next scheduled maintenance" : "次回の定期保全"}</h3>
+          <p>{next ? [next.nextDate, next.partName || next.maintenanceDetail].filter(Boolean).join(" · ")
+            : en ? "No upcoming date in the loaded records." : "読み込み済みの記録に今後の予定はありません。"}</p>
+          {overdue > 0 && <p>{en ? "Overdue" : "期限超過"}: {overdue}</p>}
+        </div>
+        <details key={equipmentPilot} style={{ marginTop: 16 }}>
+          <summary>{en ? "Report history" : "報告履歴"} ({history.length})</summary>
+          {history.slice(0, equipmentHistoryLimit).map((row) => (
+            <div key={row.id} className="calendarEditCard" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
+              <p>{date(row) || "—"} · {row.phenomenon || row.troublePoint || "—"}</p>
+              <button type="button" className="primaryButton" onClick={() => open(row)}>{en ? "Open report" : "報告書を開く"}</button>
+            </div>
+          ))}
+          {history.length > equipmentHistoryLimit && <button type="button" className="primaryButton"
+            onClick={() => setEquipmentHistoryLimit((limit) => limit + 10)}>{en ? "Show more" : "さらに表示"}</button>}
+        </details>
+      </section>
+    );
+  }
+
   function renderCurrentPage() {
     if (page === "home") return renderHome();
     if (page === "ai") return renderMiyamaAi();
+    if (page === "equipmentCards") return renderEquipmentCards();
     if (page === "report") return renderReports();
     if (page === "approvedReports") return renderApprovedReports();
     if (page === "maintenance") return renderMaintenance();
@@ -16067,6 +16144,7 @@ Requirements:
     { key: "miyamaAi", label: topMenuLabels.miyamaAi, icon: <Bot size={16} /> },
     { key: "calendar", label: topMenuLabels.calendar, icon: <CalendarDays size={16} /> },
     { key: "report", label: topMenuLabels.report, icon: <FileText size={16} /> },
+    { key: "equipmentCards", label: appLanguage === "en" ? "Equipment History" : "設備カルテ", icon: <Factory size={16} /> },
     { key: "approvedReports", label: appLanguage === "en" ? "Approved Maintenance Reports" : "保全報告書承認済み", icon: <FileText size={16} /> },
     { key: "maintenance", label: topMenuLabels.maintenance, icon: <Wrench size={16} /> },
     { key: "work", label: topMenuLabels.work, icon: <Hammer size={16} /> },
