@@ -2491,6 +2491,9 @@ textarea { min-height:96px !important; white-space:pre-wrap; }
 .card { min-width:0; }
 .card strong { overflow-wrap:anywhere; line-height:1.1; }
 .reportGrid { grid-template-columns:repeat(auto-fit,minmax(240px,1fr)) !important; }
+.subTabs.miyamaReportTabs { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
+.subTabs.miyamaReportTabs button { min-height: 38px; padding: 7px 12px !important; border: 1px solid #cbd9e8 !important; border-radius: 8px !important; background: #fff !important; color: #173454 !important; font-weight: 700; }
+.subTabs.miyamaReportTabs button.active { background: #164e91 !important; border-color: #164e91 !important; color: #fff !important; }
 .reportGrid.miyamaPreventionGrid { grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr) !important; align-items: end; gap: 10px !important; }
 .miyamaPreventionGrid .miyamaRankInput { width: 64px !important; max-width: 100% !important; text-align: center; font-weight: 700; }
 .miyamaPreventionNotes h3 { margin: 12px 0 5px; }
@@ -3738,7 +3741,8 @@ function ReportReplacementParts({ report, setField, calc, language, readOnly = f
 }
 
 const REPORT_CAUSE_LAYOUT = `
-  .miyamaWhyCompact { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+  .miyamaWhyCompact { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  @media (max-width: 640px) { .miyamaWhyCompact { grid-template-columns: minmax(0, 1fr); } }
   .miyamaWhyCompact > label { min-width: 0; background: #f8fafc; padding: 8px 10px; border: 1px solid #dbe5f1; border-radius: 10px; }
   .miyamaWhyCompact textarea { width: 100%; min-height: 52px !important; box-sizing: border-box; resize: vertical; }
   .miyamaActionExpanded { margin-top: 14px; padding: 10px 12px; background: #f0f9ff; border: 1px solid #cfe4f7; border-radius: 10px; }
@@ -3746,14 +3750,12 @@ const REPORT_CAUSE_LAYOUT = `
   .miyamaActionExpanded textarea { width: 100%; min-height: 180px !important; box-sizing: border-box; resize: vertical; }
 `;
 
-function Section({ sectionKey, title, children, openSections, toggleSection, compactGroup }) {
-  if (compactGroup) {
-    return (
-      <details name={compactGroup} className="calendarEditCard" style={{ marginTop: 8, padding: "8px 12px" }}>
-        <summary style={{ cursor: "pointer", fontWeight: 700, padding: "5px 0" }}>{title}</summary>
-        <div style={{ marginTop: 10 }}>{children}</div>
-      </details>
-    );
+function Section({ sectionKey, title, children, openSections, toggleSection, alwaysOpen }) {
+  if (alwaysOpen) {
+    return <div className="calendarEditCard" style={{ marginTop: 10 }}>
+      <h3 style={{ margin: "0 0 8px" }}>{title}</h3>
+      {children}
+    </div>;
   }
   const open = openSections?.[sectionKey] ?? true;
   return (
@@ -7244,11 +7246,11 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
     );
   }
 
-  function SubTabBar({ items, value, onChange }) {
+  function SubTabBar({ items, value, onChange, report = false }) {
     return (
-      <div className="subTabs">
+      <div className={report ? "subTabs miyamaReportTabs" : "subTabs"}>
         {items.map((item) => (
-          <button key={item.key} type="button" className={value === item.key ? "active" : ""} onClick={() => onChange(item.key)}>
+          <button key={item.key} type="button" aria-pressed={value === item.key} className={value === item.key ? "active" : ""} onClick={() => onChange(item.key)}>
             {item.icon} {item.label}
           </button>
         ))}
@@ -11548,7 +11550,7 @@ function renderHome() {
     ];
     const show = (key) => fullReport || reportViewMode === "all" || reportViewMode === key;
 
-    const compactGroup = fullReport || reportViewMode === "all" ? `report-sections-${sourceRow.id}` : undefined;
+    const alwaysOpen = fullReport || reportViewMode === "all";
 
     return (
       <div
@@ -11651,7 +11653,7 @@ function renderHome() {
             </div>
             <strong style={{ color: reportAccent }}>No.{index + 1}</strong>
           </div>
-          {!fullReport && <SubTabBar items={reportTabs} value={reportViewMode} onChange={setReportViewMode} />}
+          {!fullReport && <SubTabBar report items={reportTabs} value={reportViewMode} onChange={setReportViewMode} />}
         </div>
 
         {reportViewMode === "summary" && (
@@ -11709,25 +11711,13 @@ function renderHome() {
           </div>
         )}
 
-        {compactGroup && <p style={{ margin: "8px 0", color: "#475569" }}>{appLanguage === "en"
-          ? "Select a section to open it. The previous section closes automatically."
-          : "見出しを押すと開きます。別の項目を開くと、前の項目は閉じます。"}</p>}
-        {compactGroup ? (
-          <Section compactGroup={compactGroup} title={appLanguage === "en" ? "📦 Parts used / stock withdrawals" : "📦 使用部品・在庫出庫"}>
-            <ReportStockWithdrawal key={sourceRow.id} reportId={sourceRow.id} parts={parts} language={appLanguage}
-          locked={sourceRow.approvalStatus === "承認済み"} dirty={isDirty}
-          writable={userProfile?.readOnly !== true && ["operator", "inspector", "approver", "admin"].includes(currentRole)}
-          onStockChange={(id, stockQty) => { if (stockQty !== null) setParts(current => current.map(part => part.id === id ? { ...part, stockQty } : part)); }} />
-          </Section>
-        ) : (
           <ReportStockWithdrawal key={sourceRow.id} reportId={sourceRow.id} parts={parts} language={appLanguage}
           locked={sourceRow.approvalStatus === "承認済み"} dirty={isDirty}
           writable={userProfile?.readOnly !== true && ["operator", "inspector", "approver", "admin"].includes(currentRole)}
           onStockChange={(id, stockQty) => { if (stockQty !== null) setParts(current => current.map(part => part.id === id ? { ...part, stockQty } : part)); }} />
-        )}
 
         {show("basic") && (
-          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="🏭 基本情報・設備情報">
+          <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="🏭 基本情報・設備情報">
             <div className="reportGrid">
               <label>📅 作成日<input type="date" value={dateOnlyInputValue(row.createdAt)} onChange={(e) => setRow("createdAt", e.target.value)} /></label>
               <label>🗂️ 保全分類{appLanguage === "ja" ? (<input value={row.maintenanceType || ""} onChange={(e) => setRow("maintenanceType", e.target.value)} />) : (<TranslatedReadOnlyInput value={row.maintenanceType || ""} language={appLanguage} />)}</label>
@@ -11740,7 +11730,7 @@ function renderHome() {
         )}
 
         {show("time") && (
-          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="time" title={appLanguage === "en" ? "⏱️ Time / Downtime" : "⏱️ 時間・停止時間"}>
+          <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="time" title={appLanguage === "en" ? "⏱️ Time / Downtime" : "⏱️ 時間・停止時間"}>
             <div className="reportGrid">
               <label>{appLanguage === "en" ? "🚨 ① Failure Occurred At" : "🚨 ①不具合発生日時"}<input type="datetime-local" value={dateTimeInputValue(row.troubleDateTime)} onChange={(e) => setRow("troubleDateTime", e.target.value)} /></label>
               <label>{appLanguage === "en" ? "🛠️ ② Maintenance Started At" : "🛠️ ②保全作業開始日時"}<input type="datetime-local" value={dateTimeInputValue(row.workStartDateTime)} onChange={(e) => setRow("workStartDateTime", e.target.value)} /></label>
@@ -11755,7 +11745,7 @@ function renderHome() {
 
         {show("trouble") && (
           <Section
-            compactGroup={compactGroup}
+            alwaysOpen={alwaysOpen}
             openSections={openSections}
             toggleSection={toggleSection}
             sectionKey="trouble"
@@ -11829,7 +11819,7 @@ function renderHome() {
 
         {show("why") && (
           <Section
-            compactGroup={compactGroup}
+            alwaysOpen={alwaysOpen}
             openSections={openSections}
             toggleSection={toggleSection}
             sectionKey="why"
@@ -11888,7 +11878,7 @@ function renderHome() {
         )}
 
         {show("prevention") && (
-          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
+          <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
             <div className="reportGrid miyamaPreventionGrid">
               <label>🛡️ 再発防止区分<input value={row.recurrenceCategory || ""} onChange={(e) => setRow("recurrenceCategory", e.target.value)} /></label>
               <label>🔄 変化点ランク<input className="miyamaRankInput" size={1} value={row.changeRank || ""} onChange={(e) => setRow("changeRank", e.target.value)} /></label>
@@ -11936,7 +11926,7 @@ function renderHome() {
         )}
 
         {show("cost") && (
-          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="cost" title="💴 参考費用">
+          <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="cost" title="💴 参考費用">
             <div className="reportGrid">
               <label>👤 作業者数<input type="number" min="1" value={Math.max(1, toNumber(row.workerCount, 1))} onChange={(e) => setRow("workerCount", Math.max(1, toNumber(e.target.value, 1)))} /></label>
               <label>💴 時間単価<input type="number" value={row.laborRate || 3000} onChange={(e) => setRow("laborRate", e.target.value)} /></label>
@@ -11950,7 +11940,7 @@ function renderHome() {
         )}
 
         {show("approval") && (
-          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="approval" title="✅ 確認・承認">
+          <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="approval" title="✅ 確認・承認">
             <div className="approvalFlow">
               <div className="approvalStep"><div className="approvalStepIcon">👤</div><span>STEP 1</span><strong>作成</strong><small>{row.createdBy || row.worker || "未入力"}</small></div>
               <div className="approvalStep"><div className="approvalStepIcon">🔎</div><span>STEP 2</span><strong>点検</strong><small>{row.inspectedBy || "未入力"}</small></div>
@@ -12082,7 +12072,7 @@ function renderHome() {
         )}
 
         {show("other") && (
-          <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="other" title="📷 写真・備考">
+          <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="other" title="📷 写真・備考">
             <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "maintenanceReports", row.id)} />
             {row.image && <img src={row.image} alt="" className="calendarPhoto" />}
             <h3>📝 備考</h3>{appLanguage === "ja" ? (
@@ -12183,7 +12173,7 @@ function renderHome() {
         <div className="tableWrap" style={{ marginBottom: "18px" }}>
           <h3>🗂️ 表示テーマ</h3>
           <p>報告書が長い時は、ここで「概要・時間・費用・承認」などを切り替えると見やすくなります。</p>
-          <SubTabBar
+          <SubTabBar report
             items={[
               { key: "summary", label: "概要", icon: "📌" },
               { key: "basic", label: "基本", icon: "🏭" },
