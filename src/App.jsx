@@ -2824,7 +2824,7 @@ div[style*="grid-template-columns: 320px 1fr"] select { max-width:100%; }
 .miyamaSpareSummary small { display: block; color: #52677b; }
 .miyamaSpareToggle { color: #164e91; font-weight: 700; }
 .miyamaSpareEmpty { color: #a62035; font-weight: 700; }
-.miyamaSpareEditor { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 14px; padding: 12px; border-top: 1px solid #dbe5f1; }
+.miyamaSpareEditor { min-width: 0; margin: 0; border: 0; display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 14px; padding: 12px; border-top: 1px solid #dbe5f1; }
 .miyamaSpareEditor h3 { margin: 12px 0 6px; font-size: 15px; }
 .miyamaSpareEditor .reportGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr)) !important; gap: 8px !important; }
 .miyamaSpareHint { margin: 6px 0 0; color: #52677b; font-size: 13px; }
@@ -4350,6 +4350,10 @@ async function reportStockRequest(body) {
   return data;
 }
 
+function hasSparePartIdentity(part) {
+  return [part.partName, part.partNo, part.serialNo].some(value => String(value ?? "").trim());
+}
+
 function ReportStockWithdrawal({ reportId, parts, language, locked, writable, dirty, onStockChange }) {
   const en = language === "en";
   const [opened, setOpened] = useState(false);
@@ -4361,8 +4365,9 @@ function ReportStockWithdrawal({ reportId, parts, language, locked, writable, di
   const [message, setMessage] = useState("");
   const pending = useRef(null);
   const inFlight = useRef(false);
-  const selected = parts.find(part => part.id === partId);
-  const options = parts.filter(part => `${part.partName || ""} ${part.partNo || ""} ${part.equipment || ""}`.toLowerCase().includes(query.toLowerCase()));
+  const selectableParts = parts.filter(hasSparePartIdentity);
+  const selected = selectableParts.find(part => part.id === partId);
+  const options = selectableParts.filter(part => `${part.partName || ""} ${part.partNo || ""} ${part.serialNo || ""} ${part.equipment || ""}`.toLowerCase().includes(query.toLowerCase()));
   const history = async () => {
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setMessage("");
@@ -4374,7 +4379,6 @@ function ReportStockWithdrawal({ reportId, parts, language, locked, writable, di
     if (inFlight.current || !writable || locked || dirty) return;
     const count = Number(quantity);
     if (!selected || !Number.isSafeInteger(count) || count < 1) { setMessage(en ? "Select a part and a positive whole quantity." : "部品と1以上の整数数量を指定してください。"); return; }
-    if (!window.confirm(en ? `Withdraw ${count} × ${selected.partName || selected.partNo}? This reduces stock.` : `${selected.partName || selected.partNo} を ${count} 個出庫します。在庫数を減らします。よろしいですか？`)) return;
     // Reuse the same operation after a network error, including after a page reload.
     const key = `miyamaWithdrawal:${reportId}`;
     const payloadKey = `${partId}|${count}`;
@@ -4382,6 +4386,12 @@ function ReportStockWithdrawal({ reportId, parts, language, locked, writable, di
       const saved = JSON.parse(sessionStorage.getItem(key) || "null");
       if (saved?.payloadKey === payloadKey) pending.current = saved;
     } catch { /* Storage may be unavailable. The in-memory token still prevents repeat retries. */ }
+    const available = Number(selected.stockQty ?? 0);
+    if (pending.current?.payloadKey !== payloadKey && (!Number.isFinite(available) || count > available)) {
+      setMessage(en ? "Quantity exceeds the displayed stock. Check the inventory before withdrawing." : "出庫数が表示在庫を超えています。在庫数を確認してください。");
+      return;
+    }
+    if (!window.confirm(en ? `Withdraw ${count} × ${selected.partName || selected.partNo}? This reduces stock.` : `${selected.partName || selected.partNo} を ${count} 個出庫します。在庫数を減らします。よろしいですか？`)) return;
     if (pending.current?.payloadKey !== payloadKey) pending.current = { payloadKey, operationId: crypto.randomUUID() };
     try { sessionStorage.setItem(key, JSON.stringify(pending.current)); } catch { /* Optional recovery storage. */ }
     inFlight.current = true; setBusy(true); setMessage("");
@@ -5052,6 +5062,67 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [spareSearch, setSpareSearch] = useState("");
   const [spareStockFilter, setSpareStockFilter] = useState("all");
   const [openSpareId, setOpenSpareId] = useState(null);
+  const [spareEdits, setSpareEdits] = useState({});
+  const [spareSaveMessages, setSpareSaveMessages] = useState({});
+  const [spareSavingId, setSpareSavingId] = useState(null);
+  const spareSaveLock = useRef(false);
+
+  function stageSpareEdit(id, changes) {
+    const stockBefore = parts.find(part => part.id === id)?.stockQty;
+    setSpareEdits(current => ({
+      ...current,
+      [id]: {
+        stockBefore: current[id] ? current[id].stockBefore : Number(stockBefore ?? 0),
+        fields: { ...current[id]?.fields, ...changes },
+      },
+    }));
+    setSpareSaveMessages(current => ({ ...current, [id]: "" }));
+  }
+
+  async function saveSpareEdit(id) {
+    const edit = spareEdits[id];
+    if (!edit || spareSaveLock.current) return;
+    const en = appLanguage === "en";
+    const fields = { ...edit.fields };
+    let stockConflict = false;
+    spareSaveLock.current = true;
+    setSpareSavingId(id);
+    try {
+      for (const field of ["stockQty", "minStock"]) {
+        if (!(field in fields)) continue;
+        const value = Number(fields[field]);
+        if (String(fields[field]).trim() === "" || !Number.isSafeInteger(value) || value < 0)
+          throw new Error(en ? "Enter a nonnegative whole stock quantity." : "在庫数と最低在庫には0以上の整数を入力してください。");
+        fields[field] = value;
+      }
+      const ref = doc(db, "parts", id);
+      await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(ref);
+        if (!snapshot.exists()) throw new Error(en ? "This part no longer exists." : "この部品は存在しません。");
+        if ("stockQty" in fields && Number(snapshot.data().stockQty ?? 0) !== edit.stockBefore) {
+          stockConflict = true;
+          throw new Error(en ? "Stock changed. Refresh and check the current balance before editing it again." : "在庫数が変更されています。更新して現在の在庫数を確認してください。");
+        }
+        if (!hasSparePartIdentity({ ...snapshot.data(), ...fields }))
+          throw new Error(en ? "Enter a part name or code." : "部品名または型式・品番を入力してください。");
+        transaction.update(ref, fields);
+      });
+      setParts(current => current.map(part => part.id === id ? { ...part, ...fields } : part));
+      const latest = maintenanceSavedRows.current.get(id);
+      if (latest) maintenanceSavedRows.current.set(id, { ...latest, ...fields });
+      setSpareEdits(current => {
+        if (current[id] !== edit) return current;
+        const next = { ...current }; delete next[id]; return next;
+      });
+      setSpareSaveMessages(current => ({ ...current, [id]: en ? "Saved." : "保存しました。" }));
+    } catch (error) {
+      setSpareSaveMessages(current => ({ ...current, [id]: (en ? "Could not save. Your edits are still here. " : "保存できませんでした。入力内容は保持されています。") + error.message }));
+      if (stockConflict) await loadParts().catch(console.error);
+    } finally {
+      spareSaveLock.current = false;
+      setSpareSavingId(null);
+    }
+  }
   const [maintenanceSearch, setMaintenanceSearch] = useState("");
   const [maintenanceTypeFilter, setMaintenanceTypeFilter] = useState("全て");
   const [maintenanceEquipmentFilter, setMaintenanceEquipmentFilter] = useState("全て");
@@ -5741,7 +5812,19 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   async function removeItem(collectionName, id) {
     if (!isAdmin) { alert("削除は管理者のみ実行できます。 / Only administrators can delete records."); return; }
-    await deleteDoc(doc(db, collectionName, id));
+    const items = { parts, calendar: calendarEvents, maintenanceReports: reports, plannedWorks, dailyProductions }[collectionName];
+    const item = items?.find(row => row.id === id);
+    const name = item?.partName || item?.partNo || item?.title || item?.equipment || id;
+    if (!window.confirm(appLanguage === "en" ? `Delete “${name}”? This cannot be undone.` : `「${name}」を削除しますか？この操作は元に戻せません。`)) return;
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+    } catch (error) {
+      window.alert((appLanguage === "en" ? "Could not delete: " : "削除できませんでした：") + error.message);
+      return;
+    }
+    if (collectionName === "parts") {
+      setSpareEdits(current => { const next = { ...current }; delete next[id]; return next; });
+    }
     if (collectionName === "parts") loadParts();
     if (collectionName === "calendar") loadCalendar();
     if (collectionName === "maintenanceReports") loadReports();
@@ -6412,7 +6495,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const spareRows = useMemo(() => {
     return parts.map((part) => {
       const stockQty = Number(part.stockQty || 0);
-      const minStock = Number(part.minStock || 1);
+      const minStock = Number(part.minStock === "" ? 1 : (part.minStock ?? 1));
       let stockStatus = "🟢 在庫OK";
 
       if (stockQty <= 0) {
@@ -9794,15 +9877,13 @@ function renderHome() {
       ].join("\n");
     }
 
-    for (const [field, value] of Object.entries(updates)) {
-      await updateField("parts", row.id, field, value);
-    }
+    if (Object.keys(updates).length) stageSpareEdit(row.id, updates);
 
     window.open(makeSearchUrl(row, "image"), "_blank");
     setTimeout(() => window.open(makeSearchUrl(row, "misumi"), "_blank"), 250);
     setTimeout(() => window.open(makeSearchUrl(row, "monotaro"), "_blank"), 500);
 
-    alert("AI補完しました。画像検索・MISUMI・MonotaROを開きました。必要な写真URLや購入URLを確認して貼り付けてください。");
+    alert("AI補完候補を入力しました。内容を確認し、「保存」を押してください。");
   }
 
   function findHeaderIndex(rows, names) {
@@ -10611,9 +10692,8 @@ function renderHome() {
     };
 
     const en = appLanguage === "en";
-    const hasPartIdentity = (row) => [row.partName, row.partNo, row.serialNo].some((value) => String(value ?? "").trim());
-    const registeredCount = spareRows.filter(hasPartIdentity).length;
-    const rowsToShow = filteredSpareRows.filter(hasPartIdentity)
+    const registeredCount = spareRows.filter(hasSparePartIdentity).length;
+    const rowsToShow = filteredSpareRows.filter(hasSparePartIdentity)
       .filter((row) => spareStockFilter !== "empty" || row.stockQty <= 0);
 
     return (
@@ -10655,6 +10735,9 @@ function renderHome() {
         <div className="miyamaSpareTools">
           <details>
             <summary>📊 {en ? "Stock analysis & orders" : "在庫分析・発注"}</summary>
+            {registeredCount === 0 ? (
+              <p className="miyamaSpareHint">{en ? "Register a spare part to see stock analysis." : "予備品を登録すると、在庫分析が表示されます。"}</p>
+            ) : <>
         <section className="miyamaSpareEliteHero">
           <div>
             <span className="miyamaElitePhaseBadge">
@@ -10832,6 +10915,7 @@ function renderHome() {
           <div className="card yellow"><span>🛒 発注予定額</span><strong className="moneyText">{formatYen(stockSummary.orderPlanValue)}</strong></div>
         </div>
 
+            </>}
           </details>
           <details>
             <summary>🤖 {en ? "AI part assistant" : "AI部品アシスタント"}</summary>
@@ -10844,20 +10928,22 @@ function renderHome() {
           {!registeredCount && <button type="button" className="primaryButton" onClick={addPart}>＋ {en ? "Register part" : "予備品を登録"}</button>}
         </div>}
 
-        {rowsToShow.map((row) => (
+        {rowsToShow.map((savedRow) => {
+          const row = { ...savedRow, ...spareEdits[savedRow.id]?.fields };
+          return (
           <article key={row.id} className="miyamaSpareItem">
             <button type="button" className="miyamaSpareSummary" aria-expanded={openSpareId === row.id}
               onClick={() => setOpenSpareId(openSpareId === row.id ? null : row.id)}>
-              <span><strong>{row.partName || row.partNo || row.serialNo}</strong><small>{row.partNo || row.serialNo || "—"}</small></span>
-              <span><small>{en ? "Equipment" : "設備"}</small>{row.equipment || "—"}</span>
-              <span><small>{en ? "Location" : "保管場所"}</small>{row.location || row.locationRack || "—"}</span>
-              <span><small>{en ? "Stock / Min." : "在庫 / 最低"}</small><strong>{row.stockQty} / {row.minStock}</strong></span>
-              <span className={row.stockQty <= 0 ? "miyamaSpareEmpty" : ""}>
-                {en ? (row.stockQty <= 0 ? "Out of stock" : row.stockQty <= row.minStock ? "Low stock" : "In stock") : row.stockStatus}
+              <span><strong>{savedRow.partName || savedRow.partNo || savedRow.serialNo}</strong><small>{savedRow.partNo || savedRow.serialNo || "—"}</small></span>
+              <span><small>{en ? "Equipment" : "設備"}</small>{savedRow.equipment || "—"}</span>
+              <span><small>{en ? "Location" : "保管場所"}</small>{savedRow.location || savedRow.locationRack || "—"}</span>
+              <span><small>{en ? "Stock / Min." : "在庫 / 最低"}</small><strong>{savedRow.stockQty} / {savedRow.minStock}</strong></span>
+              <span className={savedRow.stockQty <= 0 ? "miyamaSpareEmpty" : ""}>
+                {en ? (savedRow.stockQty <= 0 ? "Out of stock" : savedRow.stockQty <= savedRow.minStock ? "Low stock" : "In stock") : savedRow.stockStatus}
               </span>
               <span className="miyamaSpareToggle">{openSpareId === row.id ? (en ? "Close" : "閉じる") : (en ? "Details" : "詳細")} {openSpareId === row.id ? "▲" : "▼"}</span>
             </button>
-            {openSpareId === row.id && <div className="miyamaSpareEditor">
+            {openSpareId === row.id && <fieldset className="miyamaSpareEditor" disabled={spareSavingId === row.id || userProfile?.readOnly === true || !["operator", "inspector", "approver", "admin"].includes(currentRole)}>
             <div style={{ textAlign: "center" }}>
               {row.image || row.imageUrl ? (
                 <img
@@ -10894,14 +10980,14 @@ function renderHome() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => handleImageUpload(e, "parts", row.id)}
+                onChange={(e) => handleDraftImageUpload(e, (update) => stageSpareEdit(row.id, update({})))}
                 style={{ marginTop: "10px" }}
               />
 
               <input
                 placeholder="画像URLを貼り付け"
                 value={row.imageUrl || ""}
-                onChange={(e) => updateField("parts", row.id, "imageUrl", e.target.value)}
+                onChange={(e) => stageSpareEdit(row.id, { imageUrl: e.target.value })}
                 style={{ marginTop: "10px" }}
               />
             </div>
@@ -10923,20 +11009,20 @@ function renderHome() {
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: "16px", color: "#64748b" }}>在庫状態</div>
                   <div style={{ fontSize: "26px", fontWeight: "900" }}>{row.stockStatus}</div>
-                  <div style={{ fontSize: "18px" }}>在庫：{row.stockQty || 0} / 最低：{row.minStock || 1}</div>
+                  <div style={{ fontSize: "18px" }}>在庫：{savedRow.stockQty} / 最低：{savedRow.minStock}</div>
                 </div>
               </div>
 
               <h3>{en ? "Basic information" : "基本情報"}</h3>
               <div className="reportGrid">
-                <label>🔩 部品名<input value={row.partName || ""} onChange={(e) => updateField("parts", row.id, "partName", e.target.value)} /></label>
-                <label>🏷️ 型式・品番<input value={row.partNo || row.serialNo || ""} onChange={(e) => { updateField("parts", row.id, "partNo", e.target.value); updateField("parts", row.id, "serialNo", e.target.value); }} /></label>
-                <label>🏭 メーカー<input value={row.maker || ""} onChange={(e) => updateField("parts", row.id, "maker", e.target.value)} /></label>
-                <label>⚙️ 使用設備<input value={row.equipment || ""} onChange={(e) => updateField("parts", row.id, "equipment", e.target.value)} /></label>
-                <label>🏗️ ライン<input value={row.lineName || ""} onChange={(e) => updateField("parts", row.id, "lineName", e.target.value)} /></label>
+                <label>🔩 部品名<input value={row.partName || ""} onChange={(e) => stageSpareEdit(row.id, { partName: e.target.value })} /></label>
+                <label>🏷️ 型式・品番<input value={row.partNo || row.serialNo || ""} onChange={(e) => { stageSpareEdit(row.id, { partNo: e.target.value }); stageSpareEdit(row.id, { serialNo: e.target.value }); }} /></label>
+                <label>🏭 メーカー<input value={row.maker || ""} onChange={(e) => stageSpareEdit(row.id, { maker: e.target.value })} /></label>
+                <label>⚙️ 使用設備<input value={row.equipment || ""} onChange={(e) => stageSpareEdit(row.id, { equipment: e.target.value })} /></label>
+                <label>🏗️ ライン<input value={row.lineName || ""} onChange={(e) => stageSpareEdit(row.id, { lineName: e.target.value })} /></label>
                 <label>
                   🚦 {appLanguage === "es" ? "Criticidad" : appLanguage === "en" ? "Criticality" : "部品重要度"}
-                  <select value={row.criticality || "B"} onChange={(e) => updateField("parts", row.id, "criticality", e.target.value)}>
+                  <select value={row.criticality || "B"} onChange={(e) => stageSpareEdit(row.id, { criticality: e.target.value })}>
                     <option value="S">{appLanguage === "ja" ? "S - 安全・品質重大" : appLanguage === "en" ? "S - Safety / quality critical" : "S - Seguridad / calidad crítica"}</option>
                     <option value="A">{appLanguage === "ja" ? "A - 生産停止重大" : appLanguage === "en" ? "A - Major production impact" : "A - Impacto mayor en producción"}</option>
                     <option value="B">{appLanguage === "ja" ? "B - 影響中" : appLanguage === "en" ? "B - Medium impact" : "B - Impacto medio"}</option>
@@ -10947,7 +11033,7 @@ function renderHome() {
                   🛡️ {appLanguage === "es" ? "Repuesto crítico" : appLanguage === "en" ? "Critical Spare" : "重要予備品"}
                   <select
                     value={row.criticalSpare === true ? "yes" : "no"}
-                    onChange={(e) => updateField("parts", row.id, "criticalSpare", e.target.value === "yes")}
+                    onChange={(e) => stageSpareEdit(row.id, { criticalSpare: e.target.value === "yes" })}
                   >
                     <option value="no">{appLanguage === "es" ? "Automático / No" : appLanguage === "en" ? "Automatic / No" : "自動判定 / No"}</option>
                     <option value="yes">{appLanguage === "es" ? "Sí - crítico" : appLanguage === "en" ? "Yes - Critical" : "Yes - 重要指定"}</option>
@@ -10956,33 +11042,33 @@ function renderHome() {
               </div>
               <h3>{en ? "Stock & storage" : "在庫・保管"}</h3>
               <div className="reportGrid">
-                <label>📍 保管場所<input value={row.location || row.locationRack || ""} onChange={(e) => { updateField("parts", row.id, "location", e.target.value); updateField("parts", row.id, "locationRack", e.target.value); }} /></label>
-                <label>📦 在庫数<input type="number" value={row.stockQty || 0} onChange={(e) => updateField("parts", row.id, "stockQty", e.target.value)} /></label>
-                <label>⚠️ 最低在庫<input type="number" value={row.minStock || 1} onChange={(e) => updateField("parts", row.id, "minStock", e.target.value)} /></label>
+                <label>📍 保管場所<input value={row.location || row.locationRack || ""} onChange={(e) => { stageSpareEdit(row.id, { location: e.target.value }); stageSpareEdit(row.id, { locationRack: e.target.value }); }} /></label>
+                <label>📦 在庫数<input type="number" value={row.stockQty ?? 0} onChange={(e) => stageSpareEdit(row.id, { stockQty: e.target.value })} /></label>
+                <label>⚠️ 最低在庫<input type="number" value={row.minStock ?? 1} onChange={(e) => stageSpareEdit(row.id, { minStock: e.target.value })} /></label>
                 <label>
                   📅 {appLanguage === "es" ? "Cantidad anual planificada" : appLanguage === "en" ? "Annual Planned Qty" : "年間予定数量"}
                   <input
                     type="number"
                     min="0"
                     value={row.annualPlannedQty || ""}
-                    onChange={(e) => updateField("parts", row.id, "annualPlannedQty", e.target.value)}
+                    onChange={(e) => stageSpareEdit(row.id, { annualPlannedQty: e.target.value })}
                     placeholder={appLanguage === "ja" ? "空欄＝履歴/周期から自動推定" : ""}
                   />
                 </label>
               </div>
               <h3>{en ? "Purchasing & delivery" : "購入・入荷"}</h3>
               <div className="reportGrid">
-                <label>💴 価格<input value={row.price || ""} onChange={(e) => updateField("parts", row.id, "price", e.target.value)} /></label>
-                <label>🛒 購入先<input value={row.supplier || ""} onChange={(e) => updateField("parts", row.id, "supplier", e.target.value)} /></label>
-                <label>🔗 購入URL<input value={row.purchaseUrl || ""} onChange={(e) => updateField("parts", row.id, "purchaseUrl", e.target.value)} /></label>
-                <label>🚚 納期<input value={row.leadTime || ""} onChange={(e) => updateField("parts", row.id, "leadTime", e.target.value)} /></label>
+                <label>💴 価格<input value={row.price || ""} onChange={(e) => stageSpareEdit(row.id, { price: e.target.value })} /></label>
+                <label>🛒 購入先<input value={row.supplier || ""} onChange={(e) => stageSpareEdit(row.id, { supplier: e.target.value })} /></label>
+                <label>🔗 購入URL<input value={row.purchaseUrl || ""} onChange={(e) => stageSpareEdit(row.id, { purchaseUrl: e.target.value })} /></label>
+                <label>🚚 納期<input value={row.leadTime || ""} onChange={(e) => stageSpareEdit(row.id, { leadTime: e.target.value })} /></label>
                 <label>📅 {appLanguage === "en" ? "Expected delivery date" : "入荷予定日"}
                   <input type="date" value={dateOnlyInputValue(row.expectedDeliveryDate)}
-                    onChange={(e) => updateField("parts", row.id, "expectedDeliveryDate", e.target.value)} />
+                    onChange={(e) => stageSpareEdit(row.id, { expectedDeliveryDate: e.target.value })} />
                 </label>
                 <label>🚚 {appLanguage === "en" ? "Receipt status" : "入荷状況"}
                   <select value={row.deliveryStatus === "received" ? "received" : "pending"}
-                    onChange={(e) => updateField("parts", row.id, "deliveryStatus", e.target.value)}>
+                    onChange={(e) => stageSpareEdit(row.id, { deliveryStatus: e.target.value })}>
                     <option value="pending">{appLanguage === "en" ? "Awaiting receipt" : "入荷待ち"}</option>
                     <option value="received">{appLanguage === "en" ? "Received" : "入荷済み"}</option>
                   </select>
@@ -10994,8 +11080,8 @@ function renderHome() {
               <textarea
                 value={row.stockNote || row.note || ""}
                 onChange={(e) => {
-                  updateField("parts", row.id, "stockNote", e.target.value);
-                  updateField("parts", row.id, "note", e.target.value);
+                  stageSpareEdit(row.id, { stockNote: e.target.value });
+                  stageSpareEdit(row.id, { note: e.target.value });
                 }}
               />
 
@@ -11006,10 +11092,15 @@ function renderHome() {
               )}
 
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
+                <button type="button" className="primaryButton" disabled={!spareEdits[row.id]} onClick={() => saveSpareEdit(row.id)}>{en ? "Save" : "保存"}</button>
+                {spareEdits[row.id] && <button type="button" className="primaryButton" onClick={() => {
+                  setSpareEdits(current => { const next = { ...current }; delete next[row.id]; return next; });
+                  setSpareSaveMessages(current => ({ ...current, [row.id]: "" }));
+                }}>{en ? "Discard edits" : "変更を取り消す"}</button>}
                 <button className="primaryButton" onClick={() => smartFillSpare(row)}>🤖 AI補完</button>
                 <button
                   className={row.isMaintenanceTarget ? "deleteButton" : "primaryButton"}
-                  onClick={() => updateField("parts", row.id, "isMaintenanceTarget", !row.isMaintenanceTarget)}
+                  onClick={() => stageSpareEdit(row.id, { isMaintenanceTarget: !row.isMaintenanceTarget })}
                 >
                   {row.isMaintenanceTarget ? "定期保全から外す" : "🔧 定期保全へ追加"}
                 </button>
@@ -11021,10 +11112,13 @@ function renderHome() {
                 )}
                 <button className="deleteButton" onClick={() => removeItem("parts", row.id)}><Trash2 size={16} /> 削除</button>
               </div>
+              {spareEdits[row.id] && <p className="miyamaSpareHint">{en ? "Unsaved changes" : "未保存の変更があります"}</p>}
+              {spareSaveMessages[row.id] && <p role="status">{spareSaveMessages[row.id]}</p>}
             </div>
-            </div>}
+            </fieldset>}
           </article>
-        ))}
+          );
+        })}
       </>
     );
   }
