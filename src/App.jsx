@@ -5062,6 +5062,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [globalSearch, setGlobalSearch] = useState("");
   const GLOBAL_RESULTS_PER_PAGE = 20;
   const [globalPage, setGlobalPage] = useState(1);
+  const [equipmentIncident, setEquipmentIncident] = useState(null);
+  const [equipmentIncidentSaving, setEquipmentIncidentSaving] = useState(false);
   const [equipmentPilot, setEquipmentPilot] = useState("78-60");
   const [equipmentHistoryLimit, setEquipmentHistoryLimit] = useState(10);
   const [reportSearch, setReportSearch] = useState("");
@@ -5976,7 +5978,9 @@ function MaintenanceApp({ currentUser, userProfile }) {
     setNewReport(null);
   }
 
-  async function saveNewReport() {
+  const reportDraftForSave = newReport;
+
+  async function saveNewReport(_event, newReport = reportDraftForSave) {
     if (!newReport) return;
     if (!newReport.equipment && !newReport.phenomenon) {
       alert(
@@ -6217,7 +6221,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
     await batch.commit();
     reportCommitted = true;
-    setNewReport(null);
+    if (newReport === reportDraftForSave) setNewReport(null);
     await Promise.all([
       loadReports(),
       automaticReadCache.current.has("calendar") ? loadCalendar() : Promise.resolve(),
@@ -6241,6 +6245,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
           ? "画像の合計サイズが大きすぎます。画像を縮小してから保存してください。"
           : "保存に失敗しました。入力内容を保持しています。接続と権限を確認してください。");
     } finally { reportSaveInFlight.current = false; }
+    return reportCommitted;
 
   }
 
@@ -16015,6 +16020,78 @@ Requirements:
     );
   }
 
+  async function submitEquipmentIncident(event) {
+    event.preventDefault();
+    if (equipmentIncidentSaving || reportSaveInFlight.current || !equipmentIncident) return;
+    const { machine, symptom, stopped, photo } = equipmentIncident;
+    if (!symptom.trim() || !stopped) return;
+    setEquipmentIncidentSaving(true);
+    try {
+      const beforeImage = photo ? await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reader.onabort = reject;
+        reader.readAsDataURL(photo);
+      }) : "";
+      const stopText = { yes: "あり / Yes", no: "なし / No", unknown: "不明 / Unknown" }[stopped];
+      const saved = await saveNewReport(null, {
+        ...createBlankReport(),
+        equipment: machine,
+        phenomenon: symptom.trim(),
+        note: `異常報告 / Incident report — 設備停止 / Machine stopped: ${stopText}`,
+        beforeImage,
+      });
+      if (saved) setEquipmentIncident(null);
+    } catch {
+      alert(appLanguage === "en" ? "Could not read the photo. Please select it again." : "写真を読み込めませんでした。もう一度選択してください。");
+    } finally {
+      setEquipmentIncidentSaving(false);
+    }
+  }
+
+  function renderEquipmentIncident(en) {
+    const draft = equipmentIncident;
+    const change = (key, value) => setEquipmentIncident((current) => ({ ...current, [key]: value }));
+    return (
+      <form className="calendarEditCard" style={{ marginBottom: 12 }} onSubmit={submitEquipmentIncident}>
+        <h3>{en ? "Report an abnormality" : "異常報告"} · {draft.machine}</h3>
+        <p>{en ? "This saves a report awaiting inspection." : "点検待ちの報告書として保存します。"}</p>
+        <fieldset disabled={equipmentIncidentSaving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <label>{en ? "What happened?" : "異常内容"}
+            <textarea required maxLength={2000} rows={3} value={draft.symptom}
+              onChange={(e) => change("symptom", e.target.value)} />
+          </label>
+          <label>{en ? "Did the machine stop?" : "設備は停止しましたか？"}
+            <select required value={draft.stopped} onChange={(e) => change("stopped", e.target.value)}>
+              <option value="">{en ? "Select" : "選択してください"}</option>
+              <option value="yes">{en ? "Yes" : "停止あり"}</option>
+              <option value="no">{en ? "No" : "停止なし"}</option>
+              <option value="unknown">{en ? "Unknown" : "不明"}</option>
+            </select>
+          </label>
+          <label>{en ? "Optional photo (up to 250 KB)" : "写真（任意・250KB以下）"}
+            <input type="file" accept="image/*" onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file && (!file.type.startsWith("image/") || file.size > 250 * 1024)) {
+                e.target.value = "";
+                change("photo", null);
+                alert(en ? "Select an image of 250 KB or less." : "250KB以下の画像を選択してください。");
+                return;
+              }
+              change("photo", file || null);
+            }} />
+          </label>
+          {draft.photo && <small>{draft.photo.name}</small>}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <button type="submit" className="primaryButton" disabled={!draft.symptom.trim() || !draft.stopped}>{en ? "Save report" : "報告を保存"}</button>
+            <button type="button" className="deleteButton" onClick={() => setEquipmentIncident(null)}>{en ? "Cancel" : "キャンセル"}</button>
+          </div>
+        </fieldset>
+        {equipmentIncidentSaving && <p role="status">{en ? "Saving…" : "保存中…"}</p>}
+      </form>
+    );
+  }
+
   function renderEquipmentCards() {
     const en = appLanguage === "en";
     const matches = (row) => [row.equipment, row.machine, row.machineName,
@@ -16042,6 +16119,7 @@ Requirements:
           {PILOT_EQUIPMENT.map((machine) => (
             <button key={machine} type="button" className="primaryButton"
               aria-pressed={equipmentPilot === machine}
+              disabled={Boolean(equipmentIncident)}
               style={equipmentPilot === machine ? { background: "#153e75", color: "#fff" } : undefined}
               onClick={() => { setEquipmentPilot(machine); setEquipmentHistoryLimit(10); }}>
               {machine}
@@ -16049,6 +16127,17 @@ Requirements:
           ))}
         </div>
         <h2 style={{ marginTop: 20 }}>{equipmentPilot}</h2>
+        {equipmentIncident?.machine === equipmentPilot ? renderEquipmentIncident(en) : equipmentIncident ? (
+          <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
+            onClick={() => { setEquipmentPilot(equipmentIncident.machine); setEquipmentHistoryLimit(10); }}>
+            {en ? "Resume incident report" : "入力中の異常報告に戻る"} · {equipmentIncident.machine}
+          </button>
+        ) : (
+          <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
+            onClick={() => setEquipmentIncident({ machine: equipmentPilot, symptom: "", stopped: "", photo: null })}>
+            ⚠️ {en ? "Report an abnormality" : "異常報告"}
+          </button>
+        )}
         <div className="calendarEditCard" style={{ overflowWrap: "anywhere" }}>
           <h3>{en ? "Latest recorded incident" : "直近の不具合"}</h3>
           {latest ? <>
