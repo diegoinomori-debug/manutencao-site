@@ -1557,7 +1557,7 @@ Object.assign(MIYAMA_TRANSLATIONS.en, {
   "保存済み":"Saved",
   "PDF/印刷":"PDF / Print",
   "表示テーマを選択":"Select Display Section",
-  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"Show only the sections you need instead of the entire report.",
+  "必要な項目を選択できます。「全部」で報告書を一度に表示します。":"Show only the sections you need instead of the entire report.",
   "概要":"Overview",
   "基本":"Basic",
   "不具合":"Failure",
@@ -1602,7 +1602,7 @@ Object.assign(MIYAMA_TRANSLATIONS.es, {
   "保存済み":"Guardado",
   "PDF/印刷":"PDF / Imprimir",
   "表示テーマを選択":"Seleccionar sección",
-  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"Muestra solo las secciones necesarias en lugar del informe completo.",
+  "必要な項目を選択できます。「全部」で報告書を一度に表示します。":"Muestra solo las secciones necesarias en lugar del informe completo.",
   "概要":"Resumen",
   "基本":"Básico",
   "不具合":"Falla",
@@ -1664,14 +1664,14 @@ MIYAMA_TRANSLATIONS.th = {
   "今月停止時間":"เวลาหยุดเดือนนี้", "今月修理時間":"เวลาซ่อมเดือนนี้", "今月参考費用":"ค่าใช้จ่ายโดยประมาณเดือนนี้", "今月報告書":"รายงานเดือนนี้",
   "推定稼働率（2直16H基準）":"อัตราการเดินเครื่องโดยประมาณ (2 กะ / 16 ชม.)", "保全作業に使った時間":"เวลาที่ใช้ในงานบำรุงรักษา",
   "労務費＋部品費":"ค่าแรง + ค่าอะไหล่", "統合AI":"AI แบบรวม", "対象期間":"ช่วงเวลา",
-  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"แสดงเฉพาะหัวข้อที่จำเป็นแทนรายงานทั้งหมด"
+  "必要な項目を選択できます。「全部」で報告書を一度に表示します。":"แสดงเฉพาะหัวข้อที่จำเป็นแทนรายงานทั้งหมด"
 };
 
 
 // ===== Thai final UI patch: complete fixed labels used across reports / maintenance =====
 Object.assign(MIYAMA_TRANSLATIONS.th, {
   "表示テーマを選択":"เลือกหัวข้อที่จะแสดง",
-  "長い報告書を全部出さず、必要なテーマだけ表示できます。":"แสดงเฉพาะหัวข้อที่จำเป็น โดยไม่ต้องเปิดรายงานทั้งหมด",
+  "必要な項目を選択できます。「全部」で報告書を一度に表示します。":"แสดงเฉพาะหัวข้อที่จำเป็น โดยไม่ต้องเปิดรายงานทั้งหมด",
   "報告書概要":"สรุปรายงาน",
   "概要未入力":"ยังไม่ได้กรอกข้อมูลสรุป",
   "設備名未入力":"ยังไม่ได้กรอกชื่อเครื่องจักร",
@@ -1805,7 +1805,7 @@ Object.assign(MIYAMA_TRANSLATIONS.th, {
   // Report theme / sections
   "選択テーマ": "หัวข้อที่เลือก",
   "表示テーマを選択": "เลือกหัวข้อที่จะแสดง",
-  "長い報告書を全部出さず、必要なテーマだけ表示できます。": "แสดงเฉพาะหัวข้อที่จำเป็น โดยไม่ต้องเปิดรายงานทั้งหมด",
+  "必要な項目を選択できます。「全部」で報告書を一度に表示します。": "แสดงเฉพาะหัวข้อที่จำเป็น โดยไม่ต้องเปิดรายงานทั้งหมด",
   "不具合内容": "รายละเอียดความผิดปกติ",
   "不具合現象": "อาการผิดปกติ",
   "不具合箇所": "ตำแหน่งที่ผิดปกติ",
@@ -2006,7 +2006,7 @@ Object.assign(MIYAMA_TRANSLATIONS.en, {
   "報告書分類から集計": "Calculated from report classification",
   "どの設備が一番長く止まっているかを、保全修理報告書の停止時間から集計します。": "Ranks which equipment stopped the longest, based on downtime in maintenance repair reports.",
   "表示テーマを選択": "Choose Display Theme",
-  "長い報告書を全部出さず、必要なテーマだけ表示できます。": "Show only the needed sections instead of the whole long report.",
+  "必要な項目を選択できます。「全部」で報告書を一度に表示します。": "Show only the needed sections instead of the whole long report.",
   "報告書概要": "Report Summary",
   "作成日": "Created Date",
   "作業者": "Worker",
@@ -2813,6 +2813,33 @@ div[style*="grid-template-columns: 320px 1fr"] select { max-width:100%; }
 .subTabs button { border:1px solid #dbe3ef; background:#fff; color:#334155; border-radius:999px; padding:10px 14px; min-height:42px; font-weight:800; cursor:pointer; box-shadow:0 6px 16px rgba(15,23,42,.06); }
 .subTabs button.active { color:#fff; background:linear-gradient(135deg,#2563eb,#1d4ed8); border-color:#1d4ed8; }
 .reportCardShell { position:relative; overflow:hidden; }
+/* Maintenance report sizing */
+.miyamaReportForm { padding: 12px !important; font-size: 14px; line-height: 1.45; }
+.miyamaReportForm .calendarEditCard { padding: 12px !important; border-radius: 12px !important; }
+.miyamaReportForm h2 { font-size: 19px !important; line-height: 1.35 !important; }
+.miyamaReportForm h3 { font-size: 15px !important; line-height: 1.4 !important; }
+.miyamaReportForm label { min-width: 0; font-size: 13px !important; font-weight: 650 !important; margin: 0 !important; }
+.miyamaReportForm input:not([type="checkbox"]):not([type="radio"]), .miyamaReportForm select {
+  min-width: 0 !important; min-height: 34px !important; padding: 5px 8px !important;
+  font-size: 14px !important; line-height: 1.4 !important; box-sizing: border-box;
+}
+.miyamaReportForm textarea { min-height: 72px !important; padding: 8px 10px !important; font-size: 14px !important; line-height: 1.55 !important; box-sizing: border-box; }
+.miyamaReportForm .miyamaWhyCompact textarea { min-height: 54px !important; }
+.miyamaReportForm .miyamaActionExpanded textarea { min-height: 128px !important; }
+.miyamaReportForm .reportHeaderPanel { padding: 10px 12px !important; margin-bottom: 10px; border-radius: 12px; }
+.miyamaReportForm .reportTitleCompact { padding: 10px 12px !important; }
+.miyamaReportForm .reportActionBar { gap: 6px !important; padding: 7px 9px !important; }
+.miyamaReportForm .reportActionBar button, .miyamaReportForm .miyamaReportTabs button { min-height: 34px !important; font-size: 13px !important; }
+.miyamaReportForm .reportGrid { gap: 8px 10px !important; }
+.miyamaReportForm .reportGrid.miyamaCostGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 118px), 1fr)) !important; }
+.miyamaReportForm .miyamaCostGrid input { width: 100% !important; }
+.miyamaReportForm .miyamaCostGrid label:last-child input[readonly] { background: #eaf3ff !important; font-weight: 700 !important; }
+@media (max-width: 560px) {
+  .miyamaReportForm { padding: 8px !important; }
+  .miyamaReportForm .reportActionBar button { flex: 0 1 auto !important; width: auto !important; }
+  .miyamaReportForm textarea, .miyamaReportForm input:not([type="checkbox"]):not([type="radio"]), .miyamaReportForm select { font-size: 16px !important; }
+}
+
 .reportCardShell::before { content:""; position:absolute; inset:0 auto 0 0; width:9px; background:var(--report-accent,#2563eb); }
 .reportCardShell > * { position:relative; }
 .reportHeaderPanel { border-radius:20px; background:linear-gradient(135deg, rgba(37,99,235,.10), rgba(255,255,255,.96)); border:1px solid #dbe3ef; padding:16px; margin-bottom:14px; }
@@ -7931,7 +7958,7 @@ Rules:
     }
 
     return (
-      <div className="tableWrap" style={{ border: "2px solid #2563eb" }}>
+      <div className="tableWrap miyamaReportForm" style={{ border: "2px solid #2563eb" }}>
         <div
           style={{
             border: "2px solid #0f172a",
@@ -8691,7 +8718,7 @@ Rules:
           </Section>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="cost" title="💰 参考費用（自動計算）">
-          <div className="reportGrid">
+          <div className="reportGrid miyamaCostGrid">
             <label>👤 作業者数<input type="number" min="1" value={Math.max(1, toNumber(newReport.workerCount, 1))} onChange={(e) => setReport("workerCount", Math.max(1, toNumber(e.target.value, 1)))} /></label>
             <label>💴 時間単価<input type="number" value={newReport.laborRate || 3000} onChange={(e) => setReport("laborRate", e.target.value)} /></label>
             <label>⏳ 保全工数H<input readOnly value={calc.laborHours} /></label>
@@ -11555,7 +11582,7 @@ function renderHome() {
     return (
       <div
         id={`maintenance-report-${sourceRow.id}`}
-        className="tableWrap reportCardShell"
+        className="tableWrap reportCardShell miyamaReportForm"
         key={row.id}
         style={{ marginTop: "20px", "--report-accent": reportAccent }}
       >
@@ -11649,7 +11676,7 @@ function renderHome() {
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
             <div>
               <h3 style={{ margin: 0 }}>🗂️ 表示テーマを選択</h3>
-              <p style={{ margin: "6px 0 0", color: "#64748b" }}>長い報告書を全部出さず、必要なテーマだけ表示できます。</p>
+              <p style={{ margin: "6px 0 0", color: "#64748b" }}>必要な項目を選択できます。「全部」で報告書を一度に表示します。</p>
             </div>
             <strong style={{ color: reportAccent }}>No.{index + 1}</strong>
           </div>
@@ -11927,7 +11954,7 @@ function renderHome() {
 
         {show("cost") && (
           <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="cost" title="💴 参考費用">
-            <div className="reportGrid">
+            <div className="reportGrid miyamaCostGrid">
               <label>👤 作業者数<input type="number" min="1" value={Math.max(1, toNumber(row.workerCount, 1))} onChange={(e) => setRow("workerCount", Math.max(1, toNumber(e.target.value, 1)))} /></label>
               <label>💴 時間単価<input type="number" value={row.laborRate || 3000} onChange={(e) => setRow("laborRate", e.target.value)} /></label>
               <label>⏳ 保全工数H<input readOnly value={calc.laborHours} /></label>
