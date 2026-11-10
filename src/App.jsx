@@ -2848,6 +2848,9 @@ div[style*="grid-template-columns: 320px 1fr"] select { max-width:100%; }
 .miyamaReportForm .miyamaWhyCompact textarea { min-height: 54px !important; }
 .miyamaReportForm .miyamaActionExpanded textarea { min-height: 128px !important; }
 .miyamaReportForm .reportHeaderPanel { padding: 10px 12px !important; margin-bottom: 10px; border-radius: 12px; }
+.miyamaReportIncident { margin-top: 10px; padding: 9px 12px; border-left: 4px solid #2563eb; border-radius: 6px; background: #eff6ff; text-align: left; color: #102440; }
+.miyamaReportIncident > strong { display: block; color: #174e8b; font-size: 13px; }
+.miyamaReportForm .miyamaReportIncident > p { margin: 4px 0 0; color: #102440 !important; font-size: 16px !important; font-weight: 700; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .miyamaReportForm .reportTitleCompact { padding: 10px 12px !important; }
 .miyamaReportForm .reportActionBar { gap: 6px !important; padding: 7px 9px !important; }
 .miyamaReportForm .reportActionBar button, .miyamaReportForm .miyamaReportTabs button { min-height: 34px !important; font-size: 13px !important; }
@@ -11752,12 +11755,10 @@ function renderHome() {
             <div className="reportTitleCompact" style={{ padding: "16px", textAlign: "center", flex: "1 1 520px", minWidth: "280px" }}>
               <h2 style={{ margin: 0 }}>📝 保全作業報告書</h2>
               <h3 style={{ margin: "8px 0 0" }}>{row.equipment || "設備名未入力"} / {row.lineName || "ライン未入力"}</h3>
-              <p style={{ margin: "8px 0 0", color: "#64748b" }}>
-                <AsyncTranslatedText
-                  text={row.phenomenon || "不具合現象未入力"}
-                  language={appLanguage}
-                />
-              </p>
+              <div className="miyamaReportIncident">
+                <strong>{appLanguage === "en" ? "What happened" : "不具合現象"}</strong>
+                <AsyncTranslatedText as="p" text={row.phenomenon || "不具合現象未入力"} language={appLanguage} />
+              </div>
             </div>
             <div className="reportApprovalCompact" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", borderLeft: 0, borderTop: "2px solid #0f172a", flex: "1 1 100%", minWidth: 0, maxWidth: "100%", width: "100%" }}>
               {[
