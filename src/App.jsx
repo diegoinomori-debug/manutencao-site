@@ -2813,6 +2813,9 @@ div[style*="grid-template-columns: 320px 1fr"] select { max-width:100%; }
 .subTabs button { border:1px solid #dbe3ef; background:#fff; color:#334155; border-radius:999px; padding:10px 14px; min-height:42px; font-weight:800; cursor:pointer; box-shadow:0 6px 16px rgba(15,23,42,.06); }
 .subTabs button.active { color:#fff; background:linear-gradient(135deg,#2563eb,#1d4ed8); border-color:#1d4ed8; }
 
+.miyamaSpareTools { display: grid; gap: 6px; margin: 8px 0 12px; }
+.miyamaSpareTools > details { min-width: 0; padding: 0 10px; border: 1px solid #dbe5f1; border-radius: 8px; background: #fff; }
+.miyamaSpareTools > details > summary { cursor: pointer; padding: 8px 0; font-size: 13px; font-weight: 650; color: #173454; }
 .miyamaSpareFilters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 180px); gap: 8px; }
 .miyamaSpareItem { margin: 8px 0; background: #fff; border: 1px solid #dbe5f1; border-radius: 12px; }
 .miyamaSpareSummary { display: grid; grid-template-columns: 2fr 1fr 1fr .7fr 1fr auto; gap: 10px; align-items: center; text-align: left; width: 100%; padding: 10px 12px; color: #16314c; background: #fff; border: 0; border-radius: 12px; cursor: pointer; font-size: 13px; }
@@ -5106,7 +5109,6 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [analysisDrilldown, setAnalysisDrilldown] = useState(null);
   const [reportViewMode, setReportViewMode] = useState("summary");
   const [maintenanceViewMode, setMaintenanceViewMode] = useState("cards");
-  const [spareViewMode, setSpareViewMode] = useState("cards");
   const [workViewMode, setWorkViewMode] = useState("cards");
 
   const [newReport, setNewReport] = useState(null);
@@ -10636,12 +10638,23 @@ function renderHome() {
           </div>
         </div>
 
-        <div className="tableWrap" style={{ marginBottom: "18px" }}>
-          <h3>📦 表示メニュー</h3>
-          <p>部品・在庫・金額・発注をアイコンで分けて見やすくしました。</p>
-          <SubTabBar items={[{ key: "cards", label: "商品カード", icon: "📦" }, { key: "money", label: "金額確認", icon: "💴" }, { key: "order", label: "発注確認", icon: "🛒" }, { key: "photo", label: "写真AI", icon: "📷" }]} value={spareViewMode} onChange={setSpareViewMode} />
+        <div className="tableWrap" style={{ marginBottom: "8px" }}>
+          <h3>🔍 {en ? "Search spare parts" : "予備品検索"}</h3>
+          <div className="miyamaSpareFilters">
+            <input type="search" aria-label={en ? "Search spare parts" : "予備品検索"}
+              value={spareSearch} onChange={(e) => setSpareSearch(e.target.value)}
+              placeholder={en ? "Part, code, equipment or location" : "部品名・型式・設備・保管場所"} />
+            <select aria-label={en ? "Stock filter" : "在庫絞り込み"} value={spareStockFilter} onChange={(e) => setSpareStockFilter(e.target.value)}>
+              <option value="all">{en ? "All stock levels" : "すべての在庫"}</option>
+              <option value="empty">{en ? "Out of stock" : "在庫なし"}</option>
+            </select>
+          </div>
+          <p style={{ color: "#64748b", margin: "8px 0 0" }}>{rowsToShow.length} / {registeredCount} {en ? "parts" : "件"}</p>
         </div>
 
+        <div className="miyamaSpareTools">
+          <details>
+            <summary>📊 {en ? "Stock analysis & orders" : "在庫分析・発注"}</summary>
         <section className="miyamaSpareEliteHero">
           <div>
             <span className="miyamaElitePhaseBadge">
@@ -10811,7 +10824,7 @@ function renderHome() {
         </div>
 
         <div className="cards" style={{ marginBottom: "18px" }}>
-          <div className="card"><span>📦 登録部品</span><strong>{spareRows.length}</strong></div>
+          <div className="card"><span>📦 登録部品</span><strong>{registeredCount}</strong></div>
           <div className="card red"><span>🚨 在庫なし</span><strong>{stockSummary.noStock}</strong></div>
           <div className="card yellow"><span>⚠️ 在庫注意</span><strong>{stockSummary.warningStock}</strong></div>
           <div className="card"><span>🏷️ 価格登録済み</span><strong>{stockSummary.priceRegistered}</strong></div>
@@ -10819,20 +10832,11 @@ function renderHome() {
           <div className="card yellow"><span>🛒 発注予定額</span><strong className="moneyText">{formatYen(stockSummary.orderPlanValue)}</strong></div>
         </div>
 
-        {renderSpareAiAssistant()}
-
-        <div className="tableWrap" style={{ marginBottom: "18px" }}>
-          <h3>🔍 {en ? "Search spare parts" : "予備品検索"}</h3>
-          <div className="miyamaSpareFilters">
-            <input type="search" aria-label={en ? "Search spare parts" : "予備品検索"}
-              value={spareSearch} onChange={(e) => setSpareSearch(e.target.value)}
-              placeholder={en ? "Part, code, equipment or location" : "部品名・型式・設備・保管場所"} />
-            <select aria-label={en ? "Stock filter" : "在庫絞り込み"} value={spareStockFilter} onChange={(e) => setSpareStockFilter(e.target.value)}>
-              <option value="all">{en ? "All stock levels" : "すべての在庫"}</option>
-              <option value="empty">{en ? "Out of stock" : "在庫なし"}</option>
-            </select>
-          </div>
-          <p style={{ color: "#64748b", margin: "8px 0 0" }}>{rowsToShow.length} / {registeredCount} {en ? "parts" : "件"}</p>
+          </details>
+          <details>
+            <summary>🤖 {en ? "AI part assistant" : "AI部品アシスタント"}</summary>
+            {renderSpareAiAssistant()}
+          </details>
         </div>
 
         {!rowsToShow.length && <div className="tableWrap">
@@ -16062,9 +16066,9 @@ return (
         </button>
       </div>
 
-      {page !== "home" && page !== "miyamaAi" && renderGlobalSearchBox()}
+      {page !== "home" && page !== "miyamaAi" && page !== "spare" && renderGlobalSearchBox()}
 
-      {renderPageGuide()}
+      {page !== "spare" && renderPageGuide()}
       {renderDashboardQueueBanner()}
       {renderCurrentPage()}
       {renderAnalysisDrilldown()}
