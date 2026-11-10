@@ -2491,6 +2491,16 @@ textarea { min-height:96px !important; white-space:pre-wrap; }
 .card { min-width:0; }
 .card strong { overflow-wrap:anywhere; line-height:1.1; }
 .reportGrid { grid-template-columns:repeat(auto-fit,minmax(240px,1fr)) !important; }
+.reportGrid.miyamaPreventionGrid { grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr) !important; align-items: end; gap: 10px !important; }
+.miyamaPreventionGrid .miyamaRankInput { width: 64px !important; max-width: 100% !important; text-align: center; font-weight: 700; }
+.miyamaPreventionNotes h3 { margin: 12px 0 5px; }
+.miyamaPreventionNotes textarea { min-height: 68px !important; width: 100%; resize: vertical; box-sizing: border-box; }
+.reportGrid.miyamaPartGrid { grid-template-columns: minmax(0, 2fr) minmax(65px, .5fr) minmax(90px, .8fr) minmax(90px, .8fr) !important; gap: 10px !important; }
+@media (max-width: 640px) {
+  .reportGrid.miyamaPreventionGrid { grid-template-columns: minmax(0, 1fr) 112px !important; }
+  .reportGrid.miyamaPartGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
 
 .calendarLayout { grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr) !important; }
 .calendarDay { min-width:0; }
@@ -3694,6 +3704,47 @@ tbody tr:hover td { background:#f8fbff !important; }
 }
 `;
 
+
+function ReportReplacementParts({ report, setField, calc, language, readOnly = false }) {
+  const [added, setAdded] = useState([]);
+  const en = language === "en";
+  const slots = [1, 2, 3];
+  const hasData = (n) => ["partName", "partQty", "partUnitPrice"].some((field) =>
+    String(report[`${field}${n}`] ?? "").trim() !== "");
+  const visible = slots.filter((n) => hasData(n) || added.includes(n));
+  const next = slots.find((n) => !visible.includes(n));
+
+  if (readOnly && !visible.length) return null;
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+        <strong>{en ? "Replacement parts" : "🔩 保全交換部品"}</strong>
+        {!readOnly && next && (
+          <button type="button" className="primaryButton" onClick={() => setAdded((current) => current.includes(next) ? current : [...current, next])}>
+            ＋ {en ? "Add part" : "部品を追加"}
+          </button>
+        )}
+      </div>
+      {visible.map((n) => (
+        <div className="reportGrid miyamaPartGrid" key={n} style={{ marginBottom: 8, padding: 10, border: "1px solid #dbe5f1", borderRadius: 10, background: "#f8fafc" }}>
+          <label>{en ? "Part name" : "部品名"} {n}<input readOnly={readOnly} value={report[`partName${n}`] ?? ""} onChange={(e) => setField(`partName${n}`, e.target.value)} /></label>
+          <label>{en ? "Quantity" : "個数"}<input type="number" readOnly={readOnly} value={report[`partQty${n}`] ?? ""} onChange={(e) => setField(`partQty${n}`, e.target.value)} /></label>
+          <label>{en ? "Unit price" : "単価"}<input type="number" readOnly={readOnly} value={report[`partUnitPrice${n}`] ?? ""} onChange={(e) => setField(`partUnitPrice${n}`, e.target.value)} /></label>
+          <label>{en ? "Part cost" : "部品費"}<input readOnly value={(calc[`partAmount${n}`] || 0).toLocaleString()} /></label>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const REPORT_CAUSE_LAYOUT = `
+  .miyamaWhyCompact { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+  .miyamaWhyCompact > label { min-width: 0; background: #f8fafc; padding: 8px 10px; border: 1px solid #dbe5f1; border-radius: 10px; }
+  .miyamaWhyCompact textarea { width: 100%; min-height: 52px !important; box-sizing: border-box; resize: vertical; }
+  .miyamaActionExpanded { margin-top: 14px; padding: 10px 12px; background: #f0f9ff; border: 1px solid #cfe4f7; border-radius: 10px; }
+  .miyamaActionExpanded h3 { margin: 0 0 6px; }
+  .miyamaActionExpanded textarea { width: 100%; min-height: 180px !important; box-sizing: border-box; resize: vertical; }
+`;
 
 function Section({ sectionKey, title, children, openSections, toggleSection, compactGroup }) {
   if (compactGroup) {
@@ -8198,6 +8249,8 @@ Rules:
             </div>
           )}
 
+          <style>{REPORT_CAUSE_LAYOUT}</style>
+          <div className="miyamaWhyCompact">
           {[1, 2, 3].map((num) => (
             <label key={num}>
               {appLanguage === "es" ? `Por qué ${num}` : appLanguage === "en" ? `Why ${num}` : `なぜ${num}`}
@@ -8207,11 +8260,14 @@ Rules:
               />
             </label>
           ))}
+          </div>
+          <div className="miyamaActionExpanded">
 
           <h3>
             🛠️ {appLanguage === "es" ? "Acción correctiva" : appLanguage === "en" ? "Corrective Action" : "処置内容"}
           </h3>
           <textarea value={newReport.action || ""} onChange={(e) => setReport("action", e.target.value)} />
+        </div>
         </Section>
 
         <Section
@@ -8612,7 +8668,7 @@ Rules:
         </Section>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
-          <div className="reportGrid">
+          <div className="reportGrid miyamaPreventionGrid">
             <label>🛡️ 再発防止区分
               <select value={newReport.recurrenceCategory || "必要"} onChange={(e) => setReport("recurrenceCategory", e.target.value)}>
                 <option value="必要">必要</option>
@@ -8621,14 +8677,16 @@ Rules:
                 <option value="必要 未実施">必要 未実施</option>
               </select>
             </label>
-            <label>🔄 変化点ランク<input value={newReport.changeRank || ""} onChange={(e) => setReport("changeRank", e.target.value)} /></label>
+            <label>🔄 変化点ランク<input className="miyamaRankInput" size={1} value={newReport.changeRank || ""} onChange={(e) => setReport("changeRank", e.target.value)} /></label>
             <label>🔍 FP点検<input value={newReport.fpInspection || ""} onChange={(e) => setReport("fpInspection", e.target.value)} /></label>
           </div>
+            <div className="miyamaPreventionNotes">
           <h3>🛡️ 再発防止・残工事</h3>
           <textarea value={newReport.recurrencePrevention || ""} onChange={(e) => setReport("recurrencePrevention", e.target.value)} />
           <h3>🚧 流出防止</h3>
           <textarea value={newReport.outflowPrevention || ""} onChange={(e) => setReport("outflowPrevention", e.target.value)} />
-        </Section>
+        </div>
+          </Section>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="cost" title="💰 参考費用（自動計算）">
           <div className="reportGrid">
@@ -8638,15 +8696,7 @@ Rules:
             <label>💰 労務費<input readOnly value={calc.laborCost.toLocaleString()} /></label>
           </div>
 
-          <h3>💰 保全交換部品費・外注費</h3>
-          {[1, 2, 3].map((num) => (
-            <div className="reportGrid" key={num} style={{ marginBottom: "8px" }}>
-              <label>🔩 部品名{num}<input value={newReport[`partName${num}`] || ""} onChange={(e) => setReport(`partName${num}`, e.target.value)} /></label>
-              <label>🔢 a 個数<input type="number" value={newReport[`partQty${num}`] || ""} onChange={(e) => setReport(`partQty${num}`, e.target.value)} /></label>
-              <label>💴 b 単価<input type="number" value={newReport[`partUnitPrice${num}`] || ""} onChange={(e) => setReport(`partUnitPrice${num}`, e.target.value)} /></label>
-              <label>🧾 部品費(a×b)<input readOnly value={(calc[`partAmount${num}`] || 0).toLocaleString()} /></label>
-            </div>
-          ))}
+          <ReportReplacementParts report={newReport} setField={setReport} calc={calc} language={appLanguage} />
 
           <div className="cards" style={{ marginTop: "12px" }}>
             <div className="card"><span>⑨部品費合計</span><strong>¥{calc.partsCost.toLocaleString()}</strong></div>
@@ -11791,7 +11841,9 @@ function renderHome() {
                   : "🔍 不具合原因・なぜなぜ分析"
             }
           >
-            {[1, 2, 3].map((num) => (
+            <style>{REPORT_CAUSE_LAYOUT}</style>
+          <div className="miyamaWhyCompact">
+          {[1, 2, 3].map((num) => (
               <label key={num}>
                 {appLanguage === "es"
                   ? `Por qué ${num}`
@@ -11811,6 +11863,8 @@ function renderHome() {
                 )}
               </label>
             ))}
+          </div>
+          <div className="miyamaActionExpanded">
             <h3>
               {appLanguage === "es"
                 ? "🛠️ Acción correctiva"
@@ -11829,16 +11883,18 @@ function renderHome() {
                 language={appLanguage}
               />
             )}
-          </Section>
+          </div>
+        </Section>
         )}
 
         {show("prevention") && (
           <Section compactGroup={compactGroup} openSections={openSections} toggleSection={toggleSection} sectionKey="prevention" title="🛠️ 再発防止・流出防止・変化点">
-            <div className="reportGrid">
+            <div className="reportGrid miyamaPreventionGrid">
               <label>🛡️ 再発防止区分<input value={row.recurrenceCategory || ""} onChange={(e) => setRow("recurrenceCategory", e.target.value)} /></label>
-              <label>🔄 変化点ランク<input value={row.changeRank || ""} onChange={(e) => setRow("changeRank", e.target.value)} /></label>
+              <label>🔄 変化点ランク<input className="miyamaRankInput" size={1} value={row.changeRank || ""} onChange={(e) => setRow("changeRank", e.target.value)} /></label>
               <label>🔍 FP点検<input value={row.fpInspection || ""} onChange={(e) => setRow("fpInspection", e.target.value)} /></label>
             </div>
+            <div className="miyamaPreventionNotes">
             <h3>
               {appLanguage === "es"
                 ? "🛡️ Prevención de recurrencia / trabajo pendiente"
@@ -11875,6 +11931,7 @@ function renderHome() {
                 language={appLanguage}
               />
             )}
+          </div>
           </Section>
         )}
 
@@ -11888,15 +11945,7 @@ function renderHome() {
               <label>🧾 部品費合計<input readOnly value={calc.partsCost.toLocaleString()} /></label>
               <label>参考費用合計<input readOnly value={calc.totalCost.toLocaleString()} /></label>
             </div>
-            <h3>🔩 保全交換部品</h3>
-            {[1, 2, 3].map((num) => (
-              <div className="reportGrid" key={num}>
-                <label>🔩 部品名{num}<input value={row[`partName${num}`] || ""} onChange={(e) => setRow(`partName${num}`, e.target.value)} /></label>
-                <label>🔢 個数<input type="number" value={row[`partQty${num}`] || ""} onChange={(e) => setRow(`partQty${num}`, e.target.value)} /></label>
-                <label>💴 単価<input type="number" value={row[`partUnitPrice${num}`] || ""} onChange={(e) => setRow(`partUnitPrice${num}`, e.target.value)} /></label>
-                <label>🧾 部品費<input readOnly value={(calc[`partAmount${num}`] || 0).toLocaleString()} /></label>
-              </div>
-            ))}
+            <ReportReplacementParts key={sourceRow.id} report={row} setField={setRow} calc={calc} language={appLanguage} readOnly={isApprovedLocked} />
           </Section>
         )}
 
