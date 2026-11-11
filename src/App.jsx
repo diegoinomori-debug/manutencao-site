@@ -682,6 +682,21 @@ function filterEquipmentCards(keys, query, group, line) {
   });
 }
 
+function filterEquipmentReportHistory(rows, filters, getDate) {
+  const normalize = (value) => String(value ?? "").normalize("NFKC").toLowerCase();
+  const terms = normalize(filters.query).trim().split(/\s+/).filter(Boolean);
+  if (filters.from && filters.to && filters.from > filters.to) return [];
+  return rows.filter((row) => {
+    const date = getDate(row);
+    if (filters.from && (!date || date < filters.from)) return false;
+    if (filters.to && (!date || date > filters.to)) return false;
+    const text = normalize([row.phenomenon, row.troublePoint, row.failureCauseCategory,
+      row.failureCauseDetail, row.why1, row.why2, row.why3, row.action,
+      row.recurrencePrevention, row.worker, row.createdBy, row.note].filter(Boolean).join(" "));
+    return terms.every((term) => text.includes(term));
+  });
+}
+
 function reportFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -5204,6 +5219,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [equipmentIncidentSaving, setEquipmentIncidentSaving] = useState(false);
   const [equipmentPilot, setEquipmentPilot] = useState(() => equipmentFromUrl() || PILOT_EQUIPMENT[0]);
   const [equipmentHistoryLimit, setEquipmentHistoryLimit] = useState(10);
+  const [equipmentHistoryFilter, setEquipmentHistoryFilter] = useState({ machine: "", query: "", from: "", to: "" });
+
   const [equipmentFind, setEquipmentFind] = useState("");
   const [equipmentGroupFilter, setEquipmentGroupFilter] = useState("");
   const [equipmentLineFilter, setEquipmentLineFilter] = useState("");
@@ -16304,6 +16321,14 @@ Requirements:
     const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
     const history = reports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
     const latest = history[0];
+    const filters = equipmentHistoryFilter.machine === equipmentPilot
+      ? equipmentHistoryFilter : { machine: equipmentPilot, query: "", from: "", to: "" };
+    const filteredHistory = filterEquipmentReportHistory(history, filters, date);
+    const setHistoryFilter = (field, value) => {
+      setEquipmentHistoryFilter({ ...filters, [field]: value });
+      setEquipmentHistoryLimit(10);
+    };
+
     const scheduled = maintenanceRows.filter((row) => matches(row) && row.nextDate)
       .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
     const next = scheduled.find((row) => row.nextDate >= todayText());
@@ -16383,16 +16408,39 @@ Requirements:
             : en ? "No upcoming date in the loaded records." : "読み込み済みの記録に今後の予定はありません。"}</p>
           {overdue > 0 && <p>{en ? "Overdue" : "期限超過"}: {overdue}</p>}
         </div>
-        <details key={equipmentPilot} style={{ marginTop: 16 }}>
-          <summary>{en ? "Report history" : "報告履歴"} ({history.length})</summary>
-          {history.slice(0, equipmentHistoryLimit).map((row) => (
-            <div key={row.id} className="calendarEditCard" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
-              <p>{date(row) || "—"} · {row.phenomenon || row.troublePoint || "—"}</p>
-              <button type="button" className="primaryButton" onClick={() => open(row)}>{en ? "Open report" : "報告書を開く"}</button>
-            </div>
+        <details style={{ marginTop: 16 }} data-no-translate="true">
+          <summary>{en ? "Search repair history" : "修理履歴を検索"} ({history.length})</summary>
+          <div className="reportGrid" style={{ marginTop: 12 }}>
+            <label>{en ? "Symptom, cause, action or technician" : "現象・原因・処置・作業者"}
+              <input value={filters.query} onChange={(e) => setHistoryFilter("query", e.target.value)}
+                placeholder={en ? "Example: sensor replacement" : "例：センサー 交換"} />
+            </label>
+            <label>{en ? "From" : "開始日"}
+              <input type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => setHistoryFilter("from", e.target.value)} />
+            </label>
+            <label>{en ? "To" : "終了日"}
+              <input type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => setHistoryFilter("to", e.target.value)} />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
+            <span role="status">{en ? "Matches in loaded history" : "読み込み済み履歴の検索結果"}: {filteredHistory.length} / {history.length}</span>
+            <button type="button" className="primaryButton" onClick={() => {
+              setEquipmentHistoryFilter({ machine: equipmentPilot, query: "", from: "", to: "" });
+              setEquipmentHistoryLimit(10);
+            }}>{en ? "Clear history filters" : "履歴の絞り込みを解除"}</button>
+          </div>
+          {filters.from && filters.to && filters.from > filters.to && <p role="alert">{en ? "Start date must be before the end date." : "開始日は終了日以前にしてください。"}</p>}
+          {!filteredHistory.length && <p>{en ? "No matching report in the loaded history." : "読み込み済みの履歴に該当する報告書がありません。"}</p>}
+          {filteredHistory.slice(0, equipmentHistoryLimit).map((row) => (
+            <article key={row.id} className="calendarEditCard" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
+              <small>{date(row) || (en ? "Date not recorded" : "日付未入力")} · {en ? "Approval" : "承認状況"}: {row.approvalStatus || "—"}</small>
+              <p style={{ whiteSpace: "pre-wrap", fontWeight: 700 }}>{row.phenomenon || row.troublePoint || "—"}</p>
+              {row.action && <p style={{ whiteSpace: "pre-wrap" }}><strong>{en ? "Action" : "処置"}: </strong>{row.action}</p>}
+              <button type="button" className="primaryButton" onClick={() => open(row)}>{en ? "Open full report" : "報告書の詳細を開く"}</button>
+            </article>
           ))}
-          {history.length > equipmentHistoryLimit && <button type="button" className="primaryButton"
-            onClick={() => setEquipmentHistoryLimit((limit) => limit + 10)}>{en ? "Show more" : "さらに表示"}</button>}
+          {filteredHistory.length > equipmentHistoryLimit && <button type="button" className="primaryButton"
+            onClick={() => setEquipmentHistoryLimit((limit) => limit + 10)}>{en ? "Show 10 more" : "さらに10件表示"}</button>}
         </details>
       </section>
     );
