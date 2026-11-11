@@ -6478,9 +6478,9 @@ function MaintenanceApp({ currentUser, userProfile }) {
       strategyActionType: "",
       linkedMaintenanceId: "",
       linkedPlannedWorkId: "",
-      eliteHistoryMatchCount: Number(newReport.eliteHistoryMatchCount || eliteHistoryCount || 0),
-      eliteRecommendedStrategy: newReport.eliteRecommendedStrategy || eliteRecommendation.strategy || "",
-      eliteRecommendationReason: newReport.eliteRecommendationReason || eliteRecommendation.reason || "",
+      eliteHistoryMatchCount: toNumber(newReport.eliteHistoryMatchCount, 0),
+      eliteRecommendedStrategy: newReport.eliteRecommendedStrategy || "",
+      eliteRecommendationReason: newReport.eliteRecommendationReason || "",
       eliteDiagnosisAt: newReport.eliteDiagnosisAt || createdNow,
     };
 
