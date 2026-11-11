@@ -19,7 +19,7 @@ import {
   X,
   Printer,
   Download,
-  QrCode,
+  Link2,
   ShieldCheck,
   AlertTriangle,
   BarChart3,
@@ -682,6 +682,13 @@ function filterEquipmentCards(keys, query, group, line) {
   });
 }
 
+function reportFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("page") === "report" ? String(params.get("id") || "").slice(0, 1500) : "";
+  } catch { return ""; }
+}
+
 function equipmentFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -690,7 +697,7 @@ function equipmentFromUrl() {
 }
 
 function EquipmentQr({ machine, language }) {
-  const [qr, setQr] = useState("");
+  const [qrResult, setQr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const requestId = useRef(0);
@@ -700,8 +707,16 @@ function EquipmentQr({ machine, language }) {
   url.searchParams.set("page", "equipmentCards");
   url.searchParams.set("machine", machine);
   const link = url.toString();
-  // Invalidate an unfinished request when this machine's QR component unmounts.
-  useEffect(() => () => { requestId.current += 1; }, [link]);
+  const qr = qrResult?.link === link ? qrResult.data : "";
+  // Keep one mounted QR control. Reset it when the selected machine changes.
+  useEffect(() => {
+    requestId.current += 1;
+    inFlight.current = false;
+    setQr(null);
+    setBusy(false);
+    setError(false);
+    return () => { requestId.current += 1; };
+  }, [link]);
 
   async function generateQr() {
     if (inFlight.current) return;
@@ -711,7 +726,7 @@ function EquipmentQr({ machine, language }) {
     setError(false);
     try {
       const data = await QRCode.toDataURL(link, { width: 256, margin: 4, errorCorrectionLevel: "M" });
-      if (requestId.current === request) setQr(data);
+      if (requestId.current === request) setQr({ link, data });
     } catch {
       if (requestId.current === request) setError(true);
     } finally {
@@ -727,7 +742,7 @@ function EquipmentQr({ machine, language }) {
     catch { window.prompt(en ? "Copy this link" : "リンクをコピーしてください", link); }
   }
 
-  return <section aria-label={en ? "Equipment QR code" : "設備QRコード"} style={{ margin: "12px 0" }}>
+  return <div data-no-translate="true" aria-label={en ? "Equipment QR code" : "設備QRコード"} style={{ margin: "12px 0" }}>
     {!qr && <button type="button" className="primaryButton" disabled={busy} onClick={generateQr}>
       {busy ? (en ? "Generating…" : "作成中…") : (en ? "Create QR code" : "QRコードを作成")}
     </button>}
@@ -739,10 +754,10 @@ function EquipmentQr({ machine, language }) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <a className="primaryButton" href={qr} download={"MIYAMA-" + machine.replace(/[^a-zA-Z0-9_-]/g, "_") + "-QR.png"}>{en ? "Download QR" : "QRをダウンロード"}</a>
         <button type="button" className="primaryButton" onClick={copyLink}>{en ? "Copy machine link" : "設備リンクをコピー"}</button>
-        <button type="button" className="primaryButton" onClick={() => { setQr(""); setError(false); }}>{en ? "Close QR" : "QRを閉じる"}</button>
+        <button type="button" className="primaryButton" onClick={() => { setQr(null); setError(false); }}>{en ? "Close QR" : "QRを閉じる"}</button>
       </div>
     </div>}
-  </section>;
+  </div>;
 }
 
 function normalizeMachineKey(value = "") {
@@ -5160,7 +5175,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [reportDirty, setReportDirty] = useState({});
   const [reportSavingId, setReportSavingId] = useState(null);
 
-  const [page, setPage] = useState(() => equipmentFromUrl() ? "equipmentCards" : "home");
+  const [page, setPage] = useState(() => equipmentFromUrl() ? "equipmentCards" : reportFromUrl() ? "report" : "home");
   const topMenuRef = useRef(null);
   const [appLanguage, setAppLanguage] = useState(() => {
     const savedLanguage = localStorage.getItem("miyamaLanguage") || "ja";
@@ -5193,7 +5208,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [equipmentGroupFilter, setEquipmentGroupFilter] = useState("");
   const [equipmentLineFilter, setEquipmentLineFilter] = useState("");
 
-  const [reportSearch, setReportSearch] = useState("");
+  const [reportSearch, setReportSearch] = useState(() => reportFromUrl());
   const [dashboardQueue, setDashboardQueue] = useState("");
   const [reportPage, setReportPage] = useState(1);
   const [approvedReportSearch, setApprovedReportSearch] = useState("");
@@ -5201,6 +5216,22 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [approvedReportTo, setApprovedReportTo] = useState("");
   const [approvedReportPage, setApprovedReportPage] = useState(1);
   const [approvedReportId, setApprovedReportId] = useState(null);
+  const reportLinkHandled = useRef(false);
+  useEffect(() => {
+    const id = reportFromUrl();
+    if (!id || reportLinkHandled.current) return;
+    const report = reports.find((row) => row.id === id);
+    if (!report) return;
+    reportLinkHandled.current = true;
+    if (page !== "report") return;
+    if (report.approvalStatus === "承認済み") {
+      openApprovedReport(id);
+    } else {
+      setReportSearch(id);
+      setReportPage(1);
+    }
+  }, [reports, page]);
+
   const REPORTS_PER_PAGE = 8;
   const [spareSearch, setSpareSearch] = useState("");
   const [spareStockFilter, setSpareStockFilter] = useState("all");
@@ -7623,12 +7654,12 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
     return `${base}/?page=report&id=${encodeURIComponent(reportId || "")}`;
   }
 
-  async function copyReportQrLink(reportId) {
+  async function copyReportLink(reportId) {
     const url = getReportUrl(reportId);
     try {
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
-        alert(`QRリンクをコピーしました。\n\n${url}`);
+        alert(`${appLanguage === "en" ? "Report link copied." : "報告書リンクをコピーしました。"}\n\n${url}`);
         return;
       }
     } catch (error) {
@@ -11993,7 +12024,7 @@ function renderHome() {
             )}
             <button className="primaryButton" onClick={() => printReport(row)}><Printer size={16} /> PDF/印刷</button>
             <button className="primaryButton" onClick={() => exportReportCsv(row)}><FileSpreadsheet size={16} /> Excel/CSV</button>
-            <button className="primaryButton" onClick={() => copyReportQrLink(sourceRow.id)}><QrCode size={16} /> QRリンク</button>
+            <button className="primaryButton" onClick={() => copyReportLink(sourceRow.id)}><Link2 size={16} /> {appLanguage === "en" ? "Report link" : "報告書リンク"}</button>
             <button className="deleteButton" onClick={() => removeItem("maintenanceReports", sourceRow.id)}><Trash2 size={16} /> 削除</button>
           </div>
         </div>
@@ -12054,12 +12085,12 @@ function renderHome() {
             )}
 
             <div className="qrPreviewBox">
-              <div style={{ fontSize: "34px" }}>🔳</div>
+              <Link2 size={24} aria-hidden="true" />
               <div>
-                <strong>QRコード用リンク</strong>
-                <p style={{ margin: "4px 0 0", color: "#64748b" }}>現場でQR化して貼ると、スマホからこの報告書へすぐアクセスできます。</p>
+                <strong>{appLanguage === "en" ? "Report link" : "報告書リンク"}</strong>
+                <p style={{ margin: "4px 0 0", color: "#64748b" }}>{appLanguage === "en" ? "Copy the address of this report to share it. Sign in if requested." : "この報告書のURLをコピーして共有できます。閲覧にはログインが必要です。"}</p>
               </div>
-              <button className="primaryButton" onClick={() => copyReportQrLink(sourceRow.id)}>リンクコピー</button>
+              <button className="primaryButton" onClick={() => copyReportLink(sourceRow.id)}>{appLanguage === "en" ? "Copy link" : "リンクをコピー"}</button>
             </div>
           </div>
         )}
@@ -16324,7 +16355,7 @@ Requirements:
         </label> : <p>{en ? "No matching card. Try a different name or clear the filters." : "該当するカルテがありません。検索語を変更するか、絞り込みを解除してください。"}</p>}
         <p style={{ fontSize: 13 }}>{en ? "The open card below changes only when you select equipment." : "下のカルテは、設備を選択すると切り替わります。"}</p>
         <h2 style={{ marginTop: 20 }}>{equipmentLabel(equipmentPilot)}</h2>
-        <EquipmentQr key={equipmentPilot} machine={equipmentPilot} language={appLanguage} />
+        <EquipmentQr machine={equipmentPilot} language={appLanguage} />
         {equipmentIncident?.machine === equipmentPilot ? renderEquipmentIncident(en) : equipmentIncident ? (
           <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
             onClick={() => { setEquipmentPilot(equipmentIncident.machine); setEquipmentHistoryLimit(10); }}>
