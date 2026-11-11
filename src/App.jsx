@@ -682,6 +682,29 @@ function filterEquipmentCards(keys, query, group, line) {
   });
 }
 
+function ReportPhotoPreview({ photo, onClose }) {
+  const dialogRef = useRef(null);
+  useEffect(() => {
+    if (!photo || !dialogRef.current) return;
+    const previousFocus = document.activeElement;
+    if (!dialogRef.current.open) dialogRef.current.showModal();
+    return () => { previousFocus?.focus?.(); };
+  }, [Boolean(photo)]);
+  if (!photo) return null;
+  return <dialog ref={dialogRef} aria-label={photo.label} onClose={onClose}
+    onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
+    style={{ margin: "auto", padding: 0, border: "1px solid #cbd5e1", borderRadius: 12,
+      maxWidth: "96vw", maxHeight: "94dvh", background: "#fff" }}>
+    <div style={{ padding: 14 }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <strong>{photo.label}</strong>
+        <button type="button" autoFocus className="primaryButton" onClick={onClose}>{photo.closeLabel}</button>
+      </div>
+      <img src={photo.src} alt={photo.label} style={{ display: "block", maxWidth: "90vw", maxHeight: "78dvh", width: "auto", height: "auto", objectFit: "contain" }} />
+    </div>
+  </dialog>;
+}
+
 function blobAsDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -5265,6 +5288,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const GLOBAL_RESULTS_PER_PAGE = 20;
   const [globalPage, setGlobalPage] = useState(1);
   const [equipmentIncident, setEquipmentIncident] = useState(null);
+  const [reportPhotoPreview, setReportPhotoPreview] = useState(null);
+  const openReportPhoto = (src, label) => setReportPhotoPreview({
+    src, label, closeLabel: appLanguage === "en" ? "Close" : "閉じる"
+  });
+
   const [equipmentIncidentSaving, setEquipmentIncidentSaving] = useState(false);
   const [equipmentPilot, setEquipmentPilot] = useState(() => equipmentFromUrl() || PILOT_EQUIPMENT[0]);
   const [equipmentHistoryLimit, setEquipmentHistoryLimit] = useState(10);
@@ -9146,8 +9174,19 @@ Rules:
             <label>📸 工事後写真<input type="file" accept="image/*" onChange={(e) => handleReportDraftPhotoUpload(e, "afterImage")} /></label>
           </div>
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-            {newReport.beforeImage && <img src={newReport.beforeImage} alt="工事前" className="calendarPhoto" />}
-            {newReport.afterImage && <img src={newReport.afterImage} alt="工事後" className="calendarPhoto" />}
+            {["beforeImage", "afterImage"].filter((field) => newReport[field]).map((field) => {
+              const label = field === "beforeImage" ? (appLanguage === "en" ? "Before repair" : "工事前写真") : (appLanguage === "en" ? "After repair" : "工事後写真");
+              return <div key={field} style={{ maxWidth: "100%" }}>
+                <button type="button" aria-label={label + (appLanguage === "en" ? ": enlarge" : "を拡大")}
+                  style={{ display: "block", border: 0, padding: 0, background: "transparent", cursor: "zoom-in", maxWidth: "100%" }}
+                  onClick={() => openReportPhoto(newReport[field], label)}>
+                  <img src={newReport[field]} alt={label} className="calendarPhoto" />
+                </button>
+                <button type="button" className="deleteButton" onClick={() => {
+                  if (window.confirm(appLanguage === "en" ? "Remove this photo from the draft?" : "下書きからこの写真を削除しますか？")) setReport(field, "");
+                }}>{appLanguage === "en" ? "Remove photo" : "写真を削除"}</button>
+              </div>;
+            })}
           </div>
           <h3>📝 備考</h3>
           <textarea value={newReport.note || ""} onChange={(e) => setReport("note", e.target.value)} />
@@ -12523,8 +12562,27 @@ function renderHome() {
 
         {show("other") && (
           <Section alwaysOpen={alwaysOpen} openSections={openSections} toggleSection={toggleSection} sectionKey="other" title="📷 写真・備考">
-            <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, "maintenanceReports", row.id)} />
-            {row.image && <img src={row.image} alt="" className="calendarPhoto" />}
+            <input type="file" accept="image/*" disabled={isApprovedLocked || reportSavingId === sourceRow.id} onChange={(e) => handleImageUpload(e, "maintenanceReports", row.id)} />
+            <p>{appLanguage === "en" ? "Click a photo to enlarge it." : "写真をクリックすると拡大表示します。"}</p>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              {[["image", appLanguage === "en" ? "Photo" : "写真"], ["beforeImage", appLanguage === "en" ? "Before repair" : "工事前写真"], ["afterImage", appLanguage === "en" ? "After repair" : "工事後写真"]].filter(([field]) => row[field]).map(([field, label]) => (
+                <div key={field} style={{ maxWidth: "100%" }}>
+                  <p><strong>{label}</strong></p>
+                  <button type="button" aria-label={label + (appLanguage === "en" ? ": enlarge" : "を拡大")}
+                    style={{ display: "block", border: 0, padding: 0, background: "transparent", cursor: "zoom-in", maxWidth: "100%" }}
+                    onClick={() => openReportPhoto(row[field], label)}>
+                    <img src={row[field]} alt={label} className="calendarPhoto" />
+                  </button>
+                  {!isApprovedLocked && <button type="button" className="deleteButton" disabled={reportSavingId === sourceRow.id}
+                    onClick={() => {
+                      if (window.confirm(appLanguage === "en" ? "Remove this photo? Save changes to apply the removal." : "この写真を削除しますか？「変更を保存」で削除が確定します。")) setRow(field, "");
+                    }}>{appLanguage === "en" ? "Remove photo" : "写真を削除"}</button>}
+                </div>
+              ))}
+            </div>
+            {isApprovedLocked ? <p>{appLanguage === "en" ? "Approved reports are locked. An approver must return the report before editing photos." : "承認済みのため写真は変更できません。承認権限者による差戻しが必要です。"}</p>
+              : <button type="button" className="primaryButton" disabled={!isDirty || reportSavingId === sourceRow.id}
+                onClick={() => saveReportDraft(sourceRow.id)}>{appLanguage === "en" ? "Save report changes" : "報告書の変更を保存"}</button>}
             <h3>📝 備考</h3>{appLanguage === "ja" ? (
               <textarea value={row.note || ""} onChange={(e) => setRow("note", e.target.value)} />
             ) : (
@@ -16662,6 +16720,7 @@ return (
       {page !== "spare" && renderPageGuide()}
       {renderDashboardQueueBanner()}
       {renderCurrentPage()}
+      <ReportPhotoPreview photo={reportPhotoPreview} onClose={() => setReportPhotoPreview(null)} />
       {renderAnalysisDrilldown()}
 
     </div>
