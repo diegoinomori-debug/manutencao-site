@@ -682,6 +682,55 @@ function filterEquipmentCards(keys, query, group, line) {
   });
 }
 
+function blobAsDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reader.onabort = () => reject(new Error("photo-read"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function prepareIncidentPhoto(file) {
+  if (!file) return "";
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024) {
+    throw new Error("photo-format");
+  }
+  const targetBytes = 240 * 1024;
+  if (file.size <= targetBytes) return blobAsDataUrl(file);
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("photo-read"));
+      img.src = objectUrl;
+    });
+    if (!image.naturalWidth || !image.naturalHeight || image.naturalWidth * image.naturalHeight > 50000000) throw new Error("photo-size");
+    let longest = Math.min(1600, Math.max(image.naturalWidth, image.naturalHeight));
+    let quality = 0.85;
+    const canvas = document.createElement("canvas");
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const scale = longest / Math.max(image.naturalWidth, image.naturalHeight);
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("photo-read");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (!blob) throw new Error("photo-read");
+      if (blob.size <= targetBytes) return blobAsDataUrl(blob);
+      if (quality > 0.5) quality -= 0.15;
+      else { longest = Math.max(320, Math.round(longest * 0.75)); quality = 0.75; }
+    }
+    throw new Error("photo-size");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function filterEquipmentReportHistory(rows, filters, getDate) {
   const normalize = (value) => String(value ?? "").normalize("NFKC").toLowerCase();
   const terms = normalize(filters.query).trim().split(/\s+/).filter(Boolean);
@@ -16217,12 +16266,7 @@ Requirements:
     if (!symptom.trim() || !stopped || !occurredAt || (!identity.equipment && !component.trim())) return;
     setEquipmentIncidentSaving(true);
     try {
-      const beforeImage = photo ? await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reader.onabort = reject;
-        reader.readAsDataURL(photo);
-      }) : "";
+      const beforeImage = await prepareIncidentPhoto(photo);
       const stopText = { yes: "あり / Yes", no: "なし / No", unknown: "不明 / Unknown" }[stopped];
       const saved = await saveNewReport(null, {
         ...createBlankReport(),
@@ -16282,19 +16326,20 @@ Requirements:
               <option value="unknown">{en ? "Unknown" : "不明"}</option>
             </select>
           </label>
-          <label>{en ? "Optional photo (up to 250 KB)" : "写真（任意・250KB以下）"}
-            <input type="file" accept="image/*" onChange={(e) => {
+          <label>{en ? "Optional photo (JPG/PNG/WebP, up to 20 MB)" : "写真（任意・JPG/PNG/WebP・20MB以下）"}
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file && (!file.type.startsWith("image/") || file.size > 250 * 1024)) {
+              if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024)) {
                 e.target.value = "";
                 change("photo", null);
-                alert(en ? "Select an image of 250 KB or less." : "250KB以下の画像を選択してください。");
+                alert(en ? "Select JPG, PNG or WebP up to 20 MB. For HEIC, export as JPG first." : "20MB以下のJPG・PNG・WebPを選択してください。HEICはJPGに変換してください。");
                 return;
               }
               change("photo", file || null);
             }} />
           </label>
-          {draft.photo && <small>{draft.photo.name}</small>}
+          <p style={{ fontSize: 13 }}>{en ? "Photos are reduced automatically in this browser when you save. The original file stays unchanged." : "保存時にこのブラウザ内で写真を自動縮小します。元の写真は変更しません。"}</p>
+          {draft.photo && <small>{draft.photo.name} · {Math.round(draft.photo.size / 1024)} KB</small>}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
             <button type="submit" className="primaryButton" disabled={!draft.symptom.trim() || !draft.stopped || !draft.occurredAt || (!identity.equipment && !draft.component.trim())}>{en ? "Save report" : "報告を保存"}</button>
             <button type="button" className="deleteButton" onClick={() => {
@@ -16303,7 +16348,7 @@ Requirements:
             }}>{en ? "Cancel" : "キャンセル"}</button>
           </div>
         </fieldset>
-        {equipmentIncidentSaving && <p role="status">{en ? "Saving…" : "保存中…"}</p>}
+        {equipmentIncidentSaving && <p role="status">{en ? "Preparing photo and saving…" : "写真を処理・保存中…"}</p>}
       </form>
     );
   }
