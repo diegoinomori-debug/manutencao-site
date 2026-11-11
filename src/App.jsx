@@ -5328,6 +5328,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const reportSaveInFlight = useRef(false);
   const dailyProductionRowsRef = useRef(null);
   const [calendarEvents, setCalendarEvents] = useState([]);
+  const pendingCalendarReads = useRef(new Set());
   const [reports, setReports] = useState([]);
   const reportCursor = useRef(null);
   const reportPageLock = useRef(false);
@@ -5832,8 +5833,18 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function loadCalendar() {
-    const snap = await getDocs(collection(db, "calendar"));
-    setCalendarEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const additions = new Map();
+    pendingCalendarReads.current.add(additions);
+    try {
+      const snap = await getDocs(collection(db, "calendar"));
+      const rows = new Map(snap.docs.map((d) => [d.id, { ...d.data(), id: d.id }]));
+      for (const [id, event] of additions) {
+        if (!rows.has(id)) rows.set(id, event);
+      }
+      setCalendarEvents([...rows.values()]);
+    } finally {
+      pendingCalendarReads.current.delete(additions);
+    }
   }
 
   async function loadReports() {
@@ -6478,8 +6489,14 @@ function MaintenanceApp({ currentUser, userProfile }) {
     }
     const reportRef = doc(collection(db, "maintenanceReports"));
     batch.set(reportRef, reportToSave);
+    const createdCalendarEvents = [];
+    const addCalendarEvent = (event) => {
+      const ref = doc(collection(db, "calendar"));
+      batch.set(ref, event);
+      createdCalendarEvents.push({ ...event, id: ref.id });
+    };
 
-    batch.set(doc(collection(db, "calendar")), {
+    addCalendarEvent({
       date: reportToSave.createdAt || todayText(),
       time: "",
       title: `保全修理報告書：${reportToSave.equipment || "設備名なし"}`,
@@ -6615,7 +6632,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       linkedPlannedWorkId = workRef.id;
       strategyActionType = "CM";
 
-      batch.set(doc(collection(db, "calendar")), {
+      addCalendarEvent({
         date: work.date || todayText(),
         time: "",
         title: `改良保全：${work.title}`,
@@ -6647,11 +6664,15 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
     await batch.commit();
     reportCommitted = true;
+    for (const additions of pendingCalendarReads.current) {
+      for (const event of createdCalendarEvents) additions.set(event.id, event);
+    }
+    const addedCalendarIds = new Set(createdCalendarEvents.map((event) => event.id));
+    setCalendarEvents((current) => [...current.filter((event) => !addedCalendarIds.has(event.id)), ...createdCalendarEvents]);
     const savedReport = { ...reportToSave, ...strategyPatch, id: reportRef.id };
     setReports((current) => [savedReport, ...current.filter((row) => row.id !== savedReport.id)]);
     if (newReport === reportDraftForSave) setNewReport(null);
     await Promise.all([
-      automaticReadCache.current.has("calendar") ? loadCalendar() : Promise.resolve(),
       linkedMaintenanceId ? loadParts() : Promise.resolve(),
       linkedPlannedWorkId && automaticReadCache.current.has("works") ? loadPlannedWorks() : Promise.resolve(),
     ]);
