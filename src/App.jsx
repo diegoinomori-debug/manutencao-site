@@ -2,6 +2,7 @@ import { calculateReport } from "./utils/reportCalculations";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 // V14: 日本語IME対応、設備選択、日付入力補正、次回実施日・残り日数の即時計算を安定化。
 import * as XLSX from "xlsx";
+import QRCode from "qrcode";
 
 import {
   Plus,
@@ -613,13 +614,100 @@ function getEquipmentNameFromRecord(record = {}) {
   return formal || cleaned[0] || "";
 }
 
-const PILOT_EQUIPMENT = ["78-60", "76-60", "NK", "NL"];
+// Official naming source: ライン・設備一覧表, 2025-07-25.
+const EQUIPMENT_CATALOG = [{"group":"1G","line":"53-300","equipment":"プレス","note":"段取りローラー、QDCはプレス"},{"group":"1G","line":"53-300","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"53-300","equipment":"箱替え機","note":""},{"group":"1G","line":"53-300","equipment":"空気清浄機","note":""},{"group":"1G","line":"53-300","equipment":"スクラップコンベア","note":""},{"group":"1G","line":"57-200","equipment":"プレス","note":"段取りローラー、QDCはプレス"},{"group":"1G","line":"57-200","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"57-200","equipment":"箱替え機","note":""},{"group":"1G","line":"65-300","equipment":"プレス","note":"段取りローラー、QDCはプレス"},{"group":"1G","line":"65-300","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"65-300","equipment":"箱替え機","note":""},{"group":"1G","line":"71-300","equipment":"プレス","note":"段取りローラー、QDCはプレス"},{"group":"1G","line":"71-300","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"71-300","equipment":"箱替え機","note":""},{"group":"1G","line":"83-300","equipment":"プレス","note":"段取りローラー、QDCはプレス"},{"group":"1G","line":"83-300","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"83-300","equipment":"箱替え機","note":""},{"group":"1G","line":"89-400","equipment":"プレス","note":"周辺装置・フィード、金型も「プレス」にしている（ワーク反転が多い）"},{"group":"1G","line":"89-400","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"89-400","equipment":"トランスファフィーダー","note":"現状入力なし（フィンガーとか分ける？？）"},{"group":"1G","line":"89-400","equipment":"LE検査機","note":"LE検査機"},{"group":"1G","line":"90-600","equipment":"プレス","note":"周辺装置・金型も「プレス」にしている"},{"group":"1G","line":"90-600","equipment":"レベラー","note":"レベラー・アンコイラー"},{"group":"1G","line":"90-600","equipment":"トランスファフィーダー","note":"こっちは分けている・・・"},{"group":"1G","line":"90-600","equipment":"塗油装置","note":"扶桑精機のやつで分けている"},{"group":"1G","line":"94-300","equipment":"プレス","note":"段取りローラー、QDCはプレス"},{"group":"1G","line":"94-300","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"94-300","equipment":"スライダー整列機","note":"1箱切り替えの箱替え機も込み（同じ操作盤）"},{"group":"1G","line":"95-300","equipment":"プレス","note":"段取りローラー、QDCはプレス"},{"group":"1G","line":"95-300","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"1G","line":"95-300","equipment":"箱替え機","note":""},{"group":"1G","line":"RL-5","equipment":"60-060","note":""},{"group":"1G","line":"RL-5","equipment":"61-060","note":""},{"group":"1G","line":"RL-5","equipment":"62-060","note":""},{"group":"1G","line":"RL-5","equipment":"63-060","note":""},{"group":"1G","line":"RL-5","equipment":"64-080","note":""},{"group":"1G","line":"RL-5","equipment":"搬送ロボット","note":"アーム、ロボット"},{"group":"1G","line":"RL-5","equipment":"ブランクフィーダー","note":"フローター、スタッカー"},{"group":"1G","line":"RL-5","equipment":"D6かしめ機","note":""},{"group":"1G","line":"RL-5","equipment":"D9Cかしめ機","note":""},{"group":"1G","line":"RL-5","equipment":"D9Cねじ切り機","note":""},{"group":"1G","line":"RL-5","equipment":"D12かしめ機","note":""},{"group":"1G","line":"RL-5","equipment":"4859かしめ機","note":""},{"group":"1G","line":"キャップねじ切り機","equipment":"6号機","note":""},{"group":"1G","line":"キャップねじ切り機","equipment":"7号機","note":""},{"group":"1G","line":"洗浄","equipment":"2号機","note":""},{"group":"1G","line":"TPS03","equipment":"ねじ切り機","note":""},{"group":"1G","line":"A棟スクラップコンベア","equipment":"制御盤","note":""},{"group":"1G","line":"A棟スクラップコンベア","equipment":"№1","note":"PMXライン下"},{"group":"1G","line":"A棟スクラップコンベア","equipment":"№2","note":"南側→№1のライン"},{"group":"1G","line":"A棟スクラップコンベア","equipment":"№3","note":"89、94、90のライン"},{"group":"1G","line":"ホイストクレーン","equipment":"A棟1階東","note":""},{"group":"1G","line":"ホイストクレーン","equipment":"A棟1階中央","note":""},{"group":"1G","line":"ホイストクレーン","equipment":"A棟1階西","note":""},{"group":"1G","line":"A棟自動倉庫","equipment":"クレーン","note":""},{"group":"1G","line":"A棟自動倉庫","equipment":"荷受台","note":"№1（1G）、№2（工機）"},{"group":"1G","line":"6182・6239かしめ機","equipment":"D10かしめ機","note":"旧2Gエリア（A棟2F）　1G管轄"},{"group":"1G","line":"4F補給設備","equipment":"BIGかしめ機","note":"C棟4F"},{"group":"1G","line":"その他","equipment":"○○","note":"建屋照明、ファクトライン、ニブラ等"},{"group":"3G","line":"30-060","equipment":"プレス","note":"プロテクタのスクラップシュートもプレス"},{"group":"3G","line":"30-060","equipment":"レベラー","note":"レベラー・アンコイラー"},{"group":"3G","line":"30-060","equipment":"フィーダー","note":"ダイマック"},{"group":"3G","line":"30-060","equipment":"箱替え機","note":""},{"group":"3G","line":"41-200","equipment":"プレス","note":""},{"group":"3G","line":"41-200","equipment":"搬送ロボット","note":"アーム、ロボット"},{"group":"3G","line":"41-200","equipment":"ブランクフィーダー","note":"フローター、スタッカー"},{"group":"3G","line":"41-200","equipment":"箱替え機","note":""},{"group":"3G","line":"42-250","equipment":"プレス","note":"銅のスクラップシュートもプレス"},{"group":"3G","line":"42-250","equipment":"レベラー","note":"レベラー・アンコイラー"},{"group":"3G","line":"42-250","equipment":"箱替え機","note":""},{"group":"3G","line":"49-060","equipment":"プレス","note":""},{"group":"3G","line":"49-060","equipment":"フィーダー","note":"ダイマック"},{"group":"3G","line":"49-060","equipment":"アンコイラー","note":""},{"group":"3G","line":"49-060","equipment":"箱替え機","note":""},{"group":"3G","line":"51-110","equipment":"プレス","note":""},{"group":"3G","line":"51-110","equipment":"フィーダー","note":"シリンダー機構のやつ、ケースのカタカタ供給シュート"},{"group":"3G","line":"51-110","equipment":"アンコイラー","note":""},{"group":"3G","line":"51-110","equipment":"搬送ロボット","note":""},{"group":"3G","line":"51-110","equipment":"箱替え機","note":""},{"group":"3G","line":"70-080","equipment":"プレス","note":""},{"group":"3G","line":"70-080","equipment":"D12パケトレかしめ機","note":""},{"group":"3G","line":"72-160","equipment":"プレス","note":""},{"group":"3G","line":"72-160","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"3G","line":"72-160","equipment":"箱替え機","note":""},{"group":"3G","line":"76-060","equipment":"プレスかしめ機","note":"プレス・かしめ機"},{"group":"3G","line":"76-060","equipment":"TPS05","note":"ねじ切り機"},{"group":"3G","line":"78-060","equipment":"プレスかしめ機","note":"プレス・かしめ機"},{"group":"3G","line":"78-060","equipment":"TPS04","note":"ねじ切り機"},{"group":"3G","line":"82-045","equipment":"プレス","note":"プレス・治具関係"},{"group":"3G","line":"87-400","equipment":"プレス","note":"QDCはプレス　BSコンベアもプレス？"},{"group":"3G","line":"87-400","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"3G","line":"87-400","equipment":"箱替え機","note":""},{"group":"3G","line":"88-400","equipment":"プレス","note":"段取りローラー・QDC・スクラップシュートはプレス"},{"group":"3G","line":"88-400","equipment":"レベラー","note":"レベラー・アンコイラー・塗油装置"},{"group":"3G","line":"88-400","equipment":"箱替え機","note":""},{"group":"3G","line":"91-200","equipment":"プレス","note":""},{"group":"3G","line":"91-200","equipment":"レベラー","note":"レベラー・アンコイラー"},{"group":"3G","line":"91-200","equipment":"箱替え機","note":""},{"group":"3G","line":"CY","equipment":"ねじ切り1号機","note":""},{"group":"3G","line":"CY","equipment":"ねじ切り2号機","note":""},{"group":"3G","line":"CY","equipment":"洗浄4号機","note":""},{"group":"3G","line":"CY","equipment":"箱替え機","note":"洗浄出口の光電センサも箱替え機"},{"group":"3G","line":"RL-1","equipment":"66-060","note":""},{"group":"3G","line":"RL-1","equipment":"67-060","note":""},{"group":"3G","line":"RL-1","equipment":"68-060","note":""},{"group":"3G","line":"RL-1","equipment":"69-060","note":""},{"group":"3G","line":"RL-1","equipment":"搬送ロボット","note":"アーム、ロボット"},{"group":"3G","line":"RL-1","equipment":"ブランクフィーダー","note":"フローター、スタッカー"},{"group":"3G","line":"RL-1","equipment":"D9かしめ機","note":""},{"group":"3G","line":"RL-1","equipment":"D9ねじ切り機","note":""},{"group":"3G","line":"RL-1","equipment":"D10かしめ機","note":""},{"group":"3G","line":"RL-1","equipment":"D12ジャイロかしめ機","note":""},{"group":"3G","line":"RL-3","equipment":"55-060","note":""},{"group":"3G","line":"RL-3","equipment":"56-060","note":""},{"group":"3G","line":"RL-3","equipment":"59-080","note":""},{"group":"3G","line":"RL-3","equipment":"搬送ロボット","note":"アーム、ロボット"},{"group":"3G","line":"RL-3","equipment":"ブランクフィーダー","note":"フローター、スタッカー"},{"group":"3G","line":"RL-3","equipment":"D13ねじ切り機","note":""},{"group":"3G","line":"RL-3","equipment":"D13かしめ機","note":""},{"group":"3G","line":"RL-4","equipment":"84-060","note":""},{"group":"3G","line":"RL-4","equipment":"85-060","note":""},{"group":"3G","line":"RL-4","equipment":"86-080","note":""},{"group":"3G","line":"RL-4","equipment":"搬送ロボット","note":"アーム、ロボット"},{"group":"3G","line":"RL-4","equipment":"ブランクフィーダー","note":"フローター、スタッカー"},{"group":"3G","line":"RL-4","equipment":"D11ねじ切り機","note":""},{"group":"3G","line":"RL-4","equipment":"D11かしめ機","note":""},{"group":"3G","line":"RL-4","equipment":"D14ねじ切り機","note":""},{"group":"3G","line":"RL-4","equipment":"D16かしめねじ切り機","note":""},{"group":"3G","line":"RMI-01","equipment":"樹脂成型機","note":""},{"group":"3G","line":"RMI-01","equipment":"乾燥機","note":""},{"group":"3G","line":"RMI-01","equipment":"チラー","note":""},{"group":"3G","line":"RMI-01","equipment":"その他","note":""},{"group":"3G","line":"キャップ旋盤","equipment":"8号機","note":""},{"group":"3G","line":"キャップ旋盤","equipment":"9号機","note":""},{"group":"3G","line":"キャップ旋盤","equipment":"10号機","note":""},{"group":"3G","line":"B棟スクラップコンベア","equipment":"制御盤","note":"RL側、順送側"},{"group":"3G","line":"B棟スクラップコンベア","equipment":"№1","note":"RL-3→87・88間→A棟の東西メインのライン"},{"group":"3G","line":"B棟スクラップコンベア","equipment":"№2","note":"RLラインを周回しているライン"},{"group":"3G","line":"B棟スクラップコンベア","equipment":"№3","note":"中央エリアを周回しているライン"},{"group":"3G","line":"B棟スクラップコンベア","equipment":"№4","note":"72→88→№1の南北ライン"},{"group":"3G","line":"B棟スクラップコンベア","equipment":"№5","note":"87-400用90度カーブしているライン"},{"group":"3G","line":"ホイストクレーン","equipment":"B棟1階東","note":""},{"group":"3G","line":"ホイストクレーン","equipment":"B棟1階中央","note":""},{"group":"3G","line":"ホイストクレーン","equipment":"B棟1階西","note":""},{"group":"3G","line":"4F補給設備","equipment":"D11ガイドシャフトねじ切り機","note":""},{"group":"3G","line":"その他","equipment":"○○","note":"建屋照明、ファクトライン、ニブラ等"},{"group":"4G","line":"きよちゃん","equipment":"溶接機","note":""},{"group":"4G","line":"きよちゃん","equipment":"ナットフィーダー","note":""},{"group":"4G","line":"きよちゃん","equipment":"その他","note":"チラー、排出シュート等"},{"group":"4G","line":"かなちゃん","equipment":"溶接機","note":""},{"group":"4G","line":"かなちゃん","equipment":"ナットフィーダー","note":"2台設置"},{"group":"4G","line":"かなちゃん","equipment":"その他","note":"チラー、排出シュート等"},{"group":"4G","line":"ゆきちゃん","equipment":"溶接機","note":""},{"group":"4G","line":"ゆきちゃん","equipment":"ナットフィーダー","note":"2台設置"},{"group":"4G","line":"ゆきちゃん","equipment":"その他","note":"チラー、排出シュート等"},{"group":"4G","line":"PWI01-90","equipment":"溶接機","note":"インバーター（油持ち込みNG）"},{"group":"4G","line":"PWI01-90","equipment":"ベースねじ切り機","note":"ブラザー（油持ち込みNG）"},{"group":"4G","line":"PWA01-50","equipment":"溶接機","note":""},{"group":"4G","line":"PWA01-50","equipment":"ナットフィーダー","note":"ミヤマ製"},{"group":"4G","line":"AHS02-07","equipment":"汎用かしめ機","note":""},{"group":"4G","line":"すみちゃん","equipment":"溶接機","note":"旧2Gエリア（A棟2F）　4G管轄"},{"group":"4G","line":"すみちゃん","equipment":"自動排出装置","note":"旧2Gエリア（A棟2F）　4G管轄"},{"group":"4G","line":"たかちゃん","equipment":"溶接機","note":"旧2Gエリア（A棟2F）　4G管轄"},{"group":"4G","line":"TB-1","equipment":"溶接ロボット","note":""},{"group":"4G","line":"TB-1","equipment":"溶接治具","note":""},{"group":"4G","line":"TB-1","equipment":"ハイスピンかしめ機","note":""},{"group":"4G","line":"TB-2","equipment":"圧入機","note":"観覧車も含む"},{"group":"4G","line":"TB-3","equipment":"圧入機","note":"観覧車も含む"},{"group":"4G","line":"TB-4","equipment":"グリス塗布","note":""},{"group":"4G","line":"TB-4","equipment":"スプリング組付け","note":""},{"group":"4G","line":"TB-4","equipment":"圧入機","note":"観覧車も含む"},{"group":"4G","line":"TB-5","equipment":"溶接機","note":""},{"group":"4G","line":"TB-5","equipment":"ハイスピンかしめ機","note":""},{"group":"4G","line":"TB-6","equipment":"溶接ロボット","note":""},{"group":"4G","line":"TB-6","equipment":"溶接治具","note":""},{"group":"4G","line":"TB-6","equipment":"ハイスピンかしめ機","note":"インデックス全行程"},{"group":"4G","line":"TB-7","equipment":"圧入機","note":""},{"group":"4G","line":"TB-8","equipment":"ハイスピンかしめ機","note":""},{"group":"4G","line":"TB-8","equipment":"シールはがし","note":""},{"group":"4G","line":"TR-1","equipment":"RT2かしめ1号機","note":"串替え機も込み"},{"group":"4G","line":"TR-1","equipment":"RT2かしめ2号機","note":""},{"group":"4G","line":"TK-1","equipment":"溶接ロボット","note":"ロボット、トーチ関係、ガス関係など"},{"group":"4G","line":"TK-1","equipment":"溶接機左側","note":"治具、カーテン、排出など"},{"group":"4G","line":"TK-1","equipment":"溶接機右側","note":"治具、カーテン、排出など"},{"group":"4G","line":"TK-1","equipment":"スプリンク組付け","note":""},{"group":"4G","line":"TK-1","equipment":"ハイスピンかしめ機","note":""},{"group":"4G","line":"TK-2","equipment":"グリス塗布ロータリーかしめ機①","note":"ドラムフィーダー含む"},{"group":"4G","line":"TK-2","equipment":"グリス塗布ロータリーかしめ機②","note":"ドラムフィーダー含む"},{"group":"4G","line":"TK-2","equipment":"グリス塗布ロータリーかしめ機③","note":"ドラムフィーダー×2含む"},{"group":"4G","line":"TK-2","equipment":"画像検査","note":""},{"group":"4G","line":"24-045","equipment":"プレス","note":""},{"group":"4G","line":"4F補給設備","equipment":"○○","note":""},{"group":"4G","line":"集塵機","equipment":"№1","note":""},{"group":"4G","line":"集塵機","equipment":"№2","note":""},{"group":"4G","line":"集塵機","equipment":"№3","note":""},{"group":"4G","line":"その他","equipment":"○○","note":"建屋照明、ファクトライン、グリスルブリケータ等"},{"group":"5G","line":"NB","equipment":"ロッキング組付け","note":""},{"group":"5G","line":"NB","equipment":"リベットかしめ機","note":""},{"group":"5G","line":"NF","equipment":"刻印機","note":""},{"group":"5G","line":"NI","equipment":"刻印機","note":""},{"group":"5G","line":"NJ","equipment":"グリス塗布機","note":""},{"group":"5G","line":"NJ","equipment":"ロッキング組付け","note":""},{"group":"5G","line":"NJ","equipment":"リベットかしめ機","note":""},{"group":"5G","line":"NJ","equipment":"刻印機","note":""},{"group":"5G","line":"NJ","equipment":"ボルト組付け","note":""},{"group":"5G","line":"NK","equipment":"整列機","note":""},{"group":"5G","line":"NK","equipment":"スライダーASSY","note":""},{"group":"5G","line":"NK","equipment":"ロッキングASSY","note":""},{"group":"5G","line":"NK","equipment":"ベースASSY","note":""},{"group":"5G","line":"NK","equipment":"メイン制御盤","note":""},{"group":"5G","line":"NK","equipment":"刻印機右側","note":""},{"group":"5G","line":"NK","equipment":"刻印機左側","note":""},{"group":"5G","line":"NL","equipment":"スライダー整列機","note":""},{"group":"5G","line":"NL","equipment":"スライダーASSY","note":""},{"group":"5G","line":"NL","equipment":"ロッキングASSY","note":""},{"group":"5G","line":"NL","equipment":"ベースASSY","note":"スライダー搬送（移送）治具、シュー挿入工程はベースASSY"},{"group":"5G","line":"NL","equipment":"メイン制御盤","note":""},{"group":"5G","line":"NL","equipment":"刻印機右側","note":""},{"group":"5G","line":"NL","equipment":"刻印機左側","note":""},{"group":"5G","line":"NL","equipment":"箱詰め装置","note":""},{"group":"5G","line":"TC","equipment":"ピンアジャスタ組付け","note":""},{"group":"5G","line":"TC","equipment":"スプリング組付け","note":""},{"group":"5G","line":"TC","equipment":"カバー組付け","note":""},{"group":"5G","line":"TC","equipment":"リベットかしめ機","note":"搬送→挿入→カメラ→かしめ"},{"group":"5G","line":"TC","equipment":"切り起こし工程","note":""},{"group":"5G","line":"TC","equipment":"刻印機","note":""},{"group":"5G","line":"4F補給設備","equipment":"○○","note":""},{"group":"5G","line":"ホイストクレーン","equipment":"C棟3階","note":""},{"group":"5G","line":"その他","equipment":"○○","note":"建屋照明、ファクトライン、グリスルブリケータ等"},{"group":"6G","line":"G0","equipment":"ブッシュ圧入機","note":""},{"group":"6G","line":"G0","equipment":"スプールピン圧入機","note":""},{"group":"6G","line":"G0","equipment":"センサーCP圧入機","note":""},{"group":"6G","line":"G0","equipment":"スプリング巻き機","note":""},{"group":"6G","line":"G0","equipment":"スプリングCP圧入機","note":""},{"group":"6G","line":"G0","equipment":"グリス塗布機","note":""},{"group":"6G","line":"G0","equipment":"画像検査","note":"注射器含む"},{"group":"6G","line":"G0","equipment":"カム圧入機","note":""},{"group":"6G","line":"G0","equipment":"カバーセンサー圧入機","note":""},{"group":"6G","line":"G0","equipment":"QR印刷機","note":""},{"group":"6G","line":"G0","equipment":"ソレノイドCP圧入機","note":""},{"group":"6G","line":"G0","equipment":"ソレノイドCP用スプールピン圧入機","note":""},{"group":"6G","line":"G1S","equipment":"ブッシュ圧入機","note":""},{"group":"6G","line":"G1S","equipment":"スプールピン圧入機","note":""},{"group":"6G","line":"G1S","equipment":"センサーCP圧入機","note":""},{"group":"6G","line":"G1S","equipment":"スプリング巻き機","note":""},{"group":"6G","line":"G1S","equipment":"スプリングCP圧入機","note":""},{"group":"6G","line":"G1S","equipment":"グリス塗布機","note":""},{"group":"6G","line":"G1S","equipment":"画像検査","note":""},{"group":"6G","line":"G1S","equipment":"カム圧入機","note":""},{"group":"6G","line":"G1S","equipment":"カバーセンサー圧入機","note":""},{"group":"6G","line":"G1S","equipment":"QR印刷機","note":""},{"group":"6G","line":"LO1","equipment":"ボタンコネクタ組付治具","note":""},{"group":"6G","line":"LO1","equipment":"誤組付け確認機","note":""},{"group":"6G","line":"LO1","equipment":"カバーピン圧入機","note":""},{"group":"6G","line":"LO1","equipment":"刻印機","note":""},{"group":"6G","line":"LO1","equipment":"着脱確認","note":"手でやるやつ"},{"group":"6G","line":"LO2","equipment":"ボタンコネクタ組付治具","note":""},{"group":"6G","line":"LO2","equipment":"誤組付け確認機","note":""},{"group":"6G","line":"LO2","equipment":"カバーピン圧入機","note":"A/B"},{"group":"6G","line":"LO2","equipment":"着脱確認刻印機","note":""},{"group":"6G","line":"LO3","equipment":"19-010","note":""},{"group":"6G","line":"TR-2","equipment":"D11ガイドシャフトかしめ機","note":"※6Gエリアにあり"},{"group":"6G","line":"TR-3","equipment":"バーサポートかしめ機","note":""},{"group":"6G","line":"TR-3","equipment":"シャフト圧入機","note":""},{"group":"6G","line":"TR-3","equipment":"スプリングCP巻き装置","note":""},{"group":"6G","line":"TR-3","equipment":"スプリングCPギボシ圧入機","note":""},{"group":"6G","line":"TR-3","equipment":"画像検査機","note":""},{"group":"6G","line":"TR-3","equipment":"カバーセンサー圧入機","note":""},{"group":"6G","line":"TR-3","equipment":"カバーリトラクタ圧入機","note":""},{"group":"6G","line":"TR-3","equipment":"ボルト締め付け装置","note":""},{"group":"6G","line":"補給設備","equipment":"○○","note":"4Fと6Gエリアの補給設備"},{"group":"6G","line":"その他","equipment":"○○","note":"建屋照明、ファクトライン、グリスルブリケータ等"},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックA","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックB","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックC","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックE","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックF","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックG","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックI","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックJ","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックK","note":""},{"group":"工機","line":"保全作業台","equipment":"チェーンブロックL","note":"象印製移動式"},{"group":"工機","line":"ホイストクレーン","equipment":"A棟3階東","note":""},{"group":"工機","line":"ホイストクレーン","equipment":"A棟3階西南","note":"ワイヤーカット室側"},{"group":"工機","line":"ホイストクレーン","equipment":"A棟3階西北","note":"金型保全台側"},{"group":"工機","line":"その他","equipment":"○○","note":"建屋照明、ファクトライン、工作機械等"},{"group":"工務","line":"B棟自動倉庫","equipment":"クレーン","note":""},{"group":"工務","line":"B棟自動倉庫","equipment":"荷受台","note":"№1、№2（工務）、№3（5G・6G）、№4（4階工務）"},{"group":"工務","line":"ホイストクレーン","equipment":"C棟1階","note":""},{"group":"工務","line":"その他","equipment":"○○","note":"建屋照明、ファクトライン、フォークリフト等"},{"group":"第二工場","line":"ホイストクレーン","equipment":"第二工場","note":""},{"group":"第二工場","line":"その他","equipment":"○○","note":"建屋照明、電気設備、工作機械等"},{"group":"DAPAC","line":"23-060","equipment":"プレス","note":""},{"group":"DAPAC","line":"23-060","equipment":"レベラー","note":""},{"group":"DAPAC","line":"23-060","equipment":"フィーダー","note":""},{"group":"DAPAC","line":"25-045","equipment":"プレス","note":""},{"group":"DAPAC","line":"15-015","equipment":"LOコネクタバーサポートかしめ","note":"プレスはミヤマのじゃない（はず）"},{"group":"DAPAC","line":"16-015","equipment":"LOコネクタバーサポートかしめ","note":"プレスはミヤマのじゃない（はず）"}];
 
 function matchPilotEquipment(value) {
-  const code = String(value ?? "").normalize("NFKC").trim().toUpperCase()
+  return String(value ?? "").normalize("NFKC").trim().toUpperCase()
     .replace(/[‐‑–−]/g, "-").replace(/\s*-\s*/g, "-")
-    .replace(/^(78|76)-060$/, "$1-60");
-  return PILOT_EQUIPMENT.includes(code) ? code : "";
+    .replace(/^(78|76)-60$/, "$1-060");
+}
+
+function equipmentKey(group, line, equipment = "") {
+  return "asset:" + JSON.stringify([group, line, equipment]);
+}
+
+function parseEquipmentKey(key) {
+  try {
+    if (key.startsWith("asset:")) {
+      const [group, line, equipment] = JSON.parse(key.slice(6));
+      return { group, line, equipment };
+    }
+  } catch {}
+  return { group: "", line: "", equipment: key };
+}
+
+function equipmentLabel(key) {
+  const value = parseEquipmentKey(key);
+  return [value.group, value.line, value.equipment].filter(Boolean).join(" / ");
+}
+
+function equipmentNamesFromRecord(row = {}) {
+  const group = String(row.groupName || "").trim();
+  let line = String(row.lineName || "").trim();
+  let equipment = String(row.equipment || row.machine || row.machineName || row.equipmentName || "").trim();
+  const norm = matchPilotEquipment;
+  // Legacy reports sometimes put a line code in the equipment field.
+  if ((!line || norm(line) === norm(equipment)) && EQUIPMENT_CATALOG.some((item) => norm(item.line) === norm(equipment))) {
+    line = equipment; equipment = "";
+  }
+  if (!line && !equipment) return [];
+  if (!line && ["未設定", "設備未設定", "設備名なし", "-", "—"].includes(equipment)) return [];
+  const candidates = EQUIPMENT_CATALOG.filter((item) =>
+    (!group || norm(item.group) === norm(group)) &&
+    (!line || norm(item.line) === norm(line)) &&
+    (!equipment || norm(item.equipment) === norm(equipment)));
+  const lines = [...new Set(candidates.map((item) => JSON.stringify([item.group, item.line])))];
+  if (lines.length === 1) {
+    const [g, l] = JSON.parse(lines[0]);
+    const exact = candidates.find((item) => norm(item.equipment) === norm(equipment));
+    return [...new Set([equipmentKey(g, l), equipmentKey(g, l, exact?.equipment || equipment)])];
+  }
+  // Do not infer a line for ambiguous equipment names such as プレス.
+  return [equipmentKey(group, line, equipment)];
+}
+
+const PILOT_EQUIPMENT = [
+  equipmentKey("3G", "78-060"), equipmentKey("3G", "76-060"),
+  equipmentKey("5G", "NK"), equipmentKey("5G", "NL"),
+];
+
+function equipmentFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("page") === "equipmentCards" ? String(params.get("machine") || "").slice(0, 500) : "";
+  } catch { return ""; }
+}
+
+function EquipmentQr({ machine, language }) {
+  const [qr, setQr] = useState("");
+  const [error, setError] = useState(false);
+  const en = language === "en";
+  const url = new URL(window.location.pathname, window.location.origin);
+  url.searchParams.set("page", "equipmentCards");
+  url.searchParams.set("machine", machine);
+  const link = url.toString();
+  useEffect(() => {
+    let active = true;
+    setQr(""); setError(false);
+    QRCode.toDataURL(link, { width: 256, margin: 4, errorCorrectionLevel: "M" })
+      .then((data) => { if (active) setQr(data); })
+      .catch(() => { if (active) setError(true); });
+    return () => { active = false; };
+  }, [link]);
+  async function copyLink() {
+    try { await navigator.clipboard.writeText(link); }
+    catch { window.prompt(en ? "Copy this link" : "リンクをコピーしてください", link); }
+  }
+  return <details style={{ margin: "12px 0" }}>
+    <summary>{en ? "Machine QR code / Share link" : "設備QRコード・リンク共有"}</summary>
+    <p>{en ? "Scan to open this machine's history. Sign in if requested." : "読み取ると、この設備のカルテが開きます。必要に応じてログインしてください。"}</p>
+    {qr && <div><img width="256" height="256" style={{ maxWidth: "100%", height: "auto" }} src={qr} alt={equipmentLabel(machine) + " QR"} />
+      <p><a className="primaryButton" href={qr} download={"MIYAMA-" + machine.replace(/[^a-zA-Z0-9_-]/g, "_") + "-QR.png"}>{en ? "Download QR" : "QRをダウンロード"}</a></p></div>}
+    {error && <p role="alert">{en ? "QR generation failed. You can still copy the link." : "QRを作成できませんでした。リンクはコピーできます。"}</p>}
+    <button type="button" className="primaryButton" onClick={copyLink}>{en ? "Copy machine link" : "設備リンクをコピー"}</button>
+    <p style={{ overflowWrap: "anywhere" }}><a href={link}>{link}</a></p>
+  </details>;
 }
 
 function normalizeMachineKey(value = "") {
@@ -5037,7 +5125,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [reportDirty, setReportDirty] = useState({});
   const [reportSavingId, setReportSavingId] = useState(null);
 
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(() => equipmentFromUrl() ? "equipmentCards" : "home");
   const topMenuRef = useRef(null);
   const [appLanguage, setAppLanguage] = useState(() => {
     const savedLanguage = localStorage.getItem("miyamaLanguage") || "ja";
@@ -5064,7 +5152,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [globalPage, setGlobalPage] = useState(1);
   const [equipmentIncident, setEquipmentIncident] = useState(null);
   const [equipmentIncidentSaving, setEquipmentIncidentSaving] = useState(false);
-  const [equipmentPilot, setEquipmentPilot] = useState("78-60");
+  const [equipmentPilot, setEquipmentPilot] = useState(() => equipmentFromUrl() || PILOT_EQUIPMENT[0]);
   const [equipmentHistoryLimit, setEquipmentHistoryLimit] = useState(10);
   const [reportSearch, setReportSearch] = useState("");
   const [dashboardQueue, setDashboardQueue] = useState("");
@@ -6704,6 +6792,12 @@ function MaintenanceApp({ currentUser, userProfile }) {
     );
   }, [reports, reportSearch, dashboardQueue]);
 
+  const equipmentNames = useMemo(() => [...new Set([
+    ...PILOT_EQUIPMENT,
+    ...reports.flatMap(equipmentNamesFromRecord),
+    ...maintenanceRows.flatMap(equipmentNamesFromRecord),
+  ])].sort((a, b) => a.localeCompare(b, "ja", { numeric: true })), [reports, maintenanceRows]);
+
   const globalResults = useMemo(() => {
     const keyword = globalSearch.toLowerCase().trim();
     if (!keyword) return [];
@@ -7234,7 +7328,11 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
   }
 
   function renderGlobalSearchBox() {
-    const equipmentMatch = matchPilotEquipment(globalSearch);
+    const equipmentCandidate = matchPilotEquipment(globalSearch);
+    const equipmentMatches = equipmentNames.filter((key) => {
+      const item = parseEquipmentKey(key);
+      return equipmentCandidate && [item.line, item.equipment, equipmentLabel(key)].some((name) => matchPilotEquipment(name) === equipmentCandidate);
+    });
     return (
       <div className="tableWrap" style={{ marginBottom: "18px" }}>
         <h2>🔍 AI統合検索</h2>
@@ -7259,16 +7357,16 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
 
         {globalSearch && (
           <div style={{ marginTop: "16px" }}>
-            {equipmentMatch && (
-              <button type="button" className="primaryButton" onClick={() => {
+            {equipmentMatches.slice(0, 12).map((equipmentMatch) => (
+              <button key={equipmentMatch} type="button" className="primaryButton" onClick={() => {
                 setEquipmentPilot(equipmentMatch);
                 setEquipmentHistoryLimit(10);
                 setGlobalSearch("");
                 setPage("equipmentCards");
               }}>
-                🏭 {equipmentMatch} — {appLanguage === "en" ? "Open equipment history" : "設備カルテを開く"}
+                🏭 {equipmentLabel(equipmentMatch)} — {appLanguage === "en" ? "Open equipment history" : "設備カルテを開く"}
               </button>
-            )}
+            ))}
             <h3>{appLanguage === "en" ? `Search results: ${globalResults.length}` : `検索結果：${globalResults.length}件`}</h3>
             {globalResults.length === 0 && <p>{appLanguage === "th" ? "ไม่พบข้อมูลที่เกี่ยวข้อง" : appLanguage === "en" ? "No related data was found." : "関連データが見つかりません。"}</p>}
             {appLanguage === "en" && globalTranslationLoading && (
@@ -8222,11 +8320,15 @@ Rules:
         </div>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="📌 基本情報・設備情報">
+          <datalist id="officialReportGroups">{[...new Set(EQUIPMENT_CATALOG.map((item) => item.group))].map((name) => <option key={name} value={name} />)}</datalist>
+          <datalist id="officialReportLines">{[...new Set(EQUIPMENT_CATALOG.filter((item) => !newReport.groupName || item.group === newReport.groupName).map((item) => item.line))].map((name) => <option key={name} value={name} />)}</datalist>
+          <datalist id="officialReportEquipment">{[...new Set(EQUIPMENT_CATALOG.filter((item) => (!newReport.groupName || item.group === newReport.groupName) && (!newReport.lineName || matchPilotEquipment(item.line) === matchPilotEquipment(newReport.lineName))).map((item) => item.equipment))].map((name) => <option key={name} value={name} />)}</datalist>
+
           <div className="reportGrid">
             <label>📅 作成日<input type="date" value={dateOnlyInputValue(newReport.createdAt)} onChange={(e) => setReport("createdAt", e.target.value)} /></label>
-            <label>👥 グループ名<input value={newReport.groupName || ""} onChange={(e) => setReport("groupName", e.target.value)} /></label>
-            <label>🏭 ライン名<input value={newReport.lineName || ""} onChange={(e) => setReport("lineName", e.target.value)} /></label>
-            <label>⚙️ 設備名<input value={newReport.equipment || ""} onChange={(e) => setReport("equipment", e.target.value)} /></label>
+            <label>👥 グループ名<input list="officialReportGroups" value={newReport.groupName || ""} onChange={(e) => setReport("groupName", e.target.value)} /></label>
+            <label>🏭 ライン名<input list="officialReportLines" value={newReport.lineName || ""} onChange={(e) => setReport("lineName", e.target.value)} /></label>
+            <label>⚙️ 設備名<input list="officialReportEquipment" value={newReport.equipment || ""} onChange={(e) => setReport("equipment", e.target.value)} /></label>
             <label>👤 作業者<input value={newReport.worker || ""} onChange={(e) => { setReport("worker", e.target.value); setReport("createdBy", newReport.createdBy || e.target.value); }} /></label>
           </div>
         </Section>
@@ -16023,8 +16125,9 @@ Requirements:
   async function submitEquipmentIncident(event) {
     event.preventDefault();
     if (equipmentIncidentSaving || reportSaveInFlight.current || !equipmentIncident) return;
-    const { machine, symptom, stopped, photo, occurredAt } = equipmentIncident;
-    if (!symptom.trim() || !stopped || !occurredAt) return;
+    const { machine, symptom, stopped, photo, occurredAt, component } = equipmentIncident;
+    const identity = parseEquipmentKey(machine);
+    if (!symptom.trim() || !stopped || !occurredAt || (!identity.equipment && !component.trim())) return;
     setEquipmentIncidentSaving(true);
     try {
       const beforeImage = photo ? await new Promise((resolve, reject) => {
@@ -16036,7 +16139,9 @@ Requirements:
       const stopText = { yes: "あり / Yes", no: "なし / No", unknown: "不明 / Unknown" }[stopped];
       const saved = await saveNewReport(null, {
         ...createBlankReport(),
-        equipment: machine,
+        groupName: identity.group,
+        lineName: identity.line,
+        equipment: identity.equipment || component.trim(),
         troubleDateTime: occurredAt,
         reportCreatedDate: todayText(),
         createdBy: currentUserName,
@@ -16054,15 +16159,17 @@ Requirements:
 
   function renderEquipmentIncident(en) {
     const draft = equipmentIncident;
+    const identity = parseEquipmentKey(draft.machine);
+    const components = EQUIPMENT_CATALOG.filter((item) => item.group === identity.group && item.line === identity.line);
     const change = (key, value) => setEquipmentIncident((current) => ({ ...current, [key]: value }));
     return (
       <form className="calendarEditCard" style={{ marginBottom: 12 }} onSubmit={submitEquipmentIncident}>
-        <h3>{en ? "Report an abnormality" : "異常報告"} · {draft.machine}</h3>
+        <h3>{en ? "Report an abnormality" : "異常報告"} · {equipmentLabel(draft.machine)}</h3>
         <p>{en ? "This saves a report awaiting inspection." : "点検待ちの報告書として保存します。"}</p>
         <fieldset disabled={equipmentIncidentSaving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <div className="reportGrid">
             <label>{en ? "Equipment" : "設備"}
-              <input readOnly value={draft.machine} />
+              <input readOnly value={equipmentLabel(draft.machine)} />
             </label>
             <label>{en ? "Reported by" : "報告者"}
               <input readOnly value={currentUserName || "—"} />
@@ -16072,6 +16179,10 @@ Requirements:
                 onChange={(e) => change("occurredAt", e.target.value)} />
             </label>
           </div>
+          {!identity.equipment && <label>{en ? "Equipment" : "設備名"}
+            <input required list="incidentEquipmentOptions" value={draft.component} onChange={(e) => change("component", e.target.value)} />
+            <datalist id="incidentEquipmentOptions">{components.map((item, index) => <option key={index} value={item.equipment}>{item.note}</option>)}</datalist>
+          </label>}
           <label>{en ? "What happened?" : "異常内容"}
             <textarea required maxLength={2000} rows={3} value={draft.symptom}
               onChange={(e) => change("symptom", e.target.value)} />
@@ -16098,7 +16209,7 @@ Requirements:
           </label>
           {draft.photo && <small>{draft.photo.name}</small>}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            <button type="submit" className="primaryButton" disabled={!draft.symptom.trim() || !draft.stopped || !draft.occurredAt}>{en ? "Save report" : "報告を保存"}</button>
+            <button type="submit" className="primaryButton" disabled={!draft.symptom.trim() || !draft.stopped || !draft.occurredAt || (!identity.equipment && !draft.component.trim())}>{en ? "Save report" : "報告を保存"}</button>
             <button type="button" className="deleteButton" onClick={() => {
               if ((draft.symptom.trim() || draft.photo) && !window.confirm(en ? "Discard this unsaved report?" : "未保存の入力内容を破棄しますか？")) return;
               setEquipmentIncident(null);
@@ -16112,9 +16223,7 @@ Requirements:
 
   function renderEquipmentCards() {
     const en = appLanguage === "en";
-    const matches = (row) => [row.equipment, row.machine, row.machineName,
-      row.equipmentName, row.equipment2Name, row.lineName]
-      .some((value) => matchPilotEquipment(value) === equipmentPilot);
+    const matches = (row) => equipmentNamesFromRecord(row).includes(equipmentPilot);
     const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
     const history = reports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
     const latest = history[0];
@@ -16133,26 +16242,24 @@ Requirements:
     return (
       <section className="tableWrap">
         <h1>🏭 {en ? "Equipment History" : "設備カルテ"}</h1>
-        <div role="group" aria-label={en ? "Equipment" : "設備"} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {PILOT_EQUIPMENT.map((machine) => (
-            <button key={machine} type="button" className="primaryButton"
-              aria-pressed={equipmentPilot === machine}
-              disabled={Boolean(equipmentIncident)}
-              style={equipmentPilot === machine ? { background: "#153e75", color: "#fff" } : undefined}
-              onClick={() => { setEquipmentPilot(machine); setEquipmentHistoryLimit(10); }}>
-              {machine}
-            </button>
-          ))}
-        </div>
-        <h2 style={{ marginTop: 20 }}>{equipmentPilot}</h2>
+        <p>{en ? "New machines appear automatically after their repair report is saved. Use the same equipment name to keep their history together." : "修理報告書を保存すると、設備名からカルテとQRコードを自動作成します。同じ設備は同じ名前で登録してください。"}</p>
+        <label>{en ? "Select machine" : "設備を選択"}
+          <select value={equipmentPilot} disabled={Boolean(equipmentIncident)} onChange={(e) => {
+            setEquipmentPilot(e.target.value); setEquipmentHistoryLimit(10);
+          }}>
+            {[...new Set([equipmentPilot, ...equipmentNames])].map((machine) => <option key={machine} value={machine}>{equipmentLabel(machine)}</option>)}
+          </select>
+        </label>
+        <h2 style={{ marginTop: 20 }}>{equipmentLabel(equipmentPilot)}</h2>
+        <EquipmentQr key={equipmentPilot} machine={equipmentPilot} language={appLanguage} />
         {equipmentIncident?.machine === equipmentPilot ? renderEquipmentIncident(en) : equipmentIncident ? (
           <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
             onClick={() => { setEquipmentPilot(equipmentIncident.machine); setEquipmentHistoryLimit(10); }}>
-            {en ? "Resume incident report" : "入力中の異常報告に戻る"} · {equipmentIncident.machine}
+            {en ? "Resume incident report" : "入力中の異常報告に戻る"} · {equipmentLabel(equipmentIncident.machine)}
           </button>
         ) : (
           <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
-            onClick={() => setEquipmentIncident({ machine: equipmentPilot, symptom: "", stopped: "", photo: null, occurredAt: (() => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16); })() })}>
+            onClick={() => setEquipmentIncident({ machine: equipmentPilot, component: "", symptom: "", stopped: "", photo: null, occurredAt: (() => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16); })() })}>
             ⚠️ {en ? "Report an abnormality" : "異常報告"}
           </button>
         )}
