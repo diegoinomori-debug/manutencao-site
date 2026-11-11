@@ -691,33 +691,58 @@ function equipmentFromUrl() {
 
 function EquipmentQr({ machine, language }) {
   const [qr, setQr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const requestId = useRef(0);
+  const inFlight = useRef(false);
   const en = language === "en";
   const url = new URL(window.location.pathname, window.location.origin);
   url.searchParams.set("page", "equipmentCards");
   url.searchParams.set("machine", machine);
   const link = url.toString();
-  useEffect(() => {
-    let active = true;
-    setQr(""); setError(false);
-    QRCode.toDataURL(link, { width: 256, margin: 4, errorCorrectionLevel: "M" })
-      .then((data) => { if (active) setQr(data); })
-      .catch(() => { if (active) setError(true); });
-    return () => { active = false; };
-  }, [link]);
+  // Invalidate an unfinished request when this machine's QR component unmounts.
+  useEffect(() => () => { requestId.current += 1; }, [link]);
+
+  async function generateQr() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const request = ++requestId.current;
+    setBusy(true);
+    setError(false);
+    try {
+      const data = await QRCode.toDataURL(link, { width: 256, margin: 4, errorCorrectionLevel: "M" });
+      if (requestId.current === request) setQr(data);
+    } catch {
+      if (requestId.current === request) setError(true);
+    } finally {
+      if (requestId.current === request) {
+        inFlight.current = false;
+        setBusy(false);
+      }
+    }
+  }
+
   async function copyLink() {
     try { await navigator.clipboard.writeText(link); }
     catch { window.prompt(en ? "Copy this link" : "リンクをコピーしてください", link); }
   }
-  return <details style={{ margin: "12px 0" }}>
-    <summary>{en ? "Machine QR code / Share link" : "設備QRコード・リンク共有"}</summary>
-    <p>{en ? "Scan to open this machine's history. Sign in if requested." : "読み取ると、この設備のカルテが開きます。必要に応じてログインしてください。"}</p>
-    {qr && <div><img width="256" height="256" style={{ maxWidth: "100%", height: "auto" }} src={qr} alt={equipmentLabel(machine) + " QR"} />
-      <p><a className="primaryButton" href={qr} download={"MIYAMA-" + machine.replace(/[^a-zA-Z0-9_-]/g, "_") + "-QR.png"}>{en ? "Download QR" : "QRをダウンロード"}</a></p></div>}
-    {error && <p role="alert">{en ? "QR generation failed. You can still copy the link." : "QRを作成できませんでした。リンクはコピーできます。"}</p>}
-    <button type="button" className="primaryButton" onClick={copyLink}>{en ? "Copy machine link" : "設備リンクをコピー"}</button>
-    <p style={{ overflowWrap: "anywhere" }}><a href={link}>{link}</a></p>
-  </details>;
+
+  return <section aria-label={en ? "Equipment QR code" : "設備QRコード"} style={{ margin: "12px 0" }}>
+    {!qr && <button type="button" className="primaryButton" disabled={busy} onClick={generateQr}>
+      {busy ? (en ? "Generating…" : "作成中…") : (en ? "Create QR code" : "QRコードを作成")}
+    </button>}
+    {error && <p role="alert">{en ? "QR generation failed. Please try again." : "QRコードを作成できませんでした。もう一度お試しください。"}</p>}
+    {qr && <div style={{ marginTop: 12 }}>
+      <strong>{equipmentLabel(machine)}</strong>
+      <p>{en ? "Scan to open this equipment's history. Sign in if requested." : "読み取ると、この設備のカルテが開きます。必要に応じてログインしてください。"}</p>
+      <img width="256" height="256" style={{ maxWidth: "100%", height: "auto" }} src={qr} alt={equipmentLabel(machine) + " QR"} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <a className="primaryButton" href={qr} download={"MIYAMA-" + machine.replace(/[^a-zA-Z0-9_-]/g, "_") + "-QR.png"}>{en ? "Download QR" : "QRをダウンロード"}</a>
+        <button type="button" className="primaryButton" onClick={copyLink}>{en ? "Copy machine link" : "設備リンクをコピー"}</button>
+        <button type="button" className="primaryButton" onClick={() => { setQr(""); setError(false); }}>{en ? "Close QR" : "QRを閉じる"}</button>
+      </div>
+    </div>}
+  </section>;
 }
 
 function normalizeMachineKey(value = "") {
