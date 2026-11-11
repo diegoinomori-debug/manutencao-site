@@ -744,7 +744,17 @@ function RepairProgress({ report, actor, writable, dirty, saving, language, onSa
         "repair-action": en ? "Enter the action taken." : "処置内容を入力してください。",
         "repair-missing": en ? "The report no longer exists." : "報告書が見つかりません。",
       };
-      setMessage(messages[error.message] || (en ? "Could not save. Your input is retained. Check your connection and permissions." : "保存できませんでした。入力は保持しています。接続と権限を確認してください。"));
+      const code = String(error?.code || "").replace(/^firestore\//, "");
+      const reasons = {
+        "permission-denied": en ? "Firestore denied the update. Check the account and deployed rules." : "更新が拒否されました。アカウントと適用中の権限ルールを確認してください。",
+        "resource-exhausted": en ? "Firestore usage limit reached. Check the usage dashboard." : "Firestoreの利用上限に達しました。使用状況を確認してください。",
+        "unavailable": en ? "Firestore is temporarily unavailable. Check the connection and retry." : "Firestoreに接続できません。接続を確認して再試行してください。",
+        "unauthenticated": en ? "Sign in again before saving." : "もう一度ログインしてから保存してください。",
+        "aborted": en ? "The update conflicted with another change. Reload and retry." : "別の更新と競合しました。再読み込みしてから再試行してください。",
+      };
+      console.error("Repair progress save failed:", error);
+      const fallback = en ? "Could not save repair progress. Your input is retained." : "修理の対応状況を保存できませんでした。入力は保持しています。";
+      setMessage(messages[error?.message] || ((reasons[code] || fallback) + " (" + (code || error?.name || "unknown") + ")"));
     } finally { lock.current = false; setBusy(false); }
   }
   return <section data-no-translate="true" className="calendarEditCard" style={{ margin: "12px 0" }}>
@@ -6556,21 +6566,21 @@ function MaintenanceApp({ currentUser, userProfile }) {
             : " 工事管理にCM改良工事を自動作成しました。";
     }
 
-    if (strategyActionType) {
-      batch.update(reportRef, {
-        strategyActionCreated: true,
-        strategyActionType,
-        linkedMaintenanceId,
-        linkedPlannedWorkId,
-        strategyActionCreatedAt: createdNow,
-      });
-    }
+    const strategyPatch = strategyActionType ? {
+      strategyActionCreated: true,
+      strategyActionType,
+      linkedMaintenanceId,
+      linkedPlannedWorkId,
+      strategyActionCreatedAt: createdNow,
+    } : {};
+    if (strategyActionType) batch.update(reportRef, strategyPatch);
 
     await batch.commit();
     reportCommitted = true;
+    const savedReport = { ...reportToSave, ...strategyPatch, id: reportRef.id };
+    setReports((current) => [savedReport, ...current.filter((row) => row.id !== savedReport.id)]);
     if (newReport === reportDraftForSave) setNewReport(null);
     await Promise.all([
-      loadReports(),
       automaticReadCache.current.has("calendar") ? loadCalendar() : Promise.resolve(),
       linkedMaintenanceId ? loadParts() : Promise.resolve(),
       linkedPlannedWorkId && automaticReadCache.current.has("works") ? loadPlannedWorks() : Promise.resolve(),
