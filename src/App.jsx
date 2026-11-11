@@ -45,6 +45,11 @@ import {
   collection,
   addDoc,
   getDocs,
+  query,
+  orderBy,
+  documentId,
+  startAfter,
+  limit,
   deleteDoc,
   doc,
   updateDoc,
@@ -5324,6 +5329,12 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const dailyProductionRowsRef = useRef(null);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [reports, setReports] = useState([]);
+  const reportCursor = useRef(null);
+  const reportPageLock = useRef(false);
+  const [reportReadBusy, setReportReadBusy] = useState(false);
+  const [reportHasMore, setReportHasMore] = useState(true);
+  const [reportReadError, setReportReadError] = useState("");
+  const [reportLinkError, setReportLinkError] = useState(false);
   const [similarProblems, setSimilarProblems] = useState([]);
   const [plannedWorks, setPlannedWorks] = useState([]);
 
@@ -5826,9 +5837,68 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function loadReports() {
-    const snap = await getDocs(collection(db, "maintenanceReports"));
-    // Firebaseに過去取込の 1899/12/30 が残っていても、表示時に正しい日時へ補正します。
-    setReports(snap.docs.map((d) => sanitizeReportDates({ id: d.id, ...d.data() })));
+    return readReportPage(false);
+  }
+
+  async function readReportPage(append) {
+    if (reportPageLock.current) return false;
+    reportPageLock.current = true;
+    setReportReadBusy(true);
+    setReportReadError("");
+    try {
+      const pageSize = 100;
+      const cursor = append ? reportCursor.current : null;
+      // Document IDs include legacy rows that lack a creation date.
+      const snap = await getDocs(query(collection(db, "maintenanceReports"),
+        orderBy(documentId()), ...(cursor ? [startAfter(cursor)] : []), limit(pageSize)));
+      const rows = snap.docs.map((d) => sanitizeReportDates({ ...d.data(), id: d.id }));
+      if (!append) {
+        const id = reportFromUrl();
+        setReportLinkError(false);
+        if (id && !id.includes("/") && !rows.some((row) => row.id === id)) {
+          try {
+            const linked = await getDoc(doc(db, "maintenanceReports", id));
+            if (linked.exists()) rows.push(sanitizeReportDates({ ...linked.data(), id: linked.id }));
+            else setReportLinkError(true);
+          } catch (error) {
+            console.error("Could not read linked report:", error);
+            setReportLinkError(true);
+          }
+        }
+      }
+      reportCursor.current = snap.docs.at(-1) || cursor;
+      setReportHasMore(snap.size === pageSize);
+      setReports((current) => {
+        const merged = new Map((append ? current : []).map((row) => [row.id, row]));
+        for (const row of rows) {
+          if (!append || !merged.has(row.id)) merged.set(row.id, row);
+        }
+        return [...merged.values()];
+      });
+      return true;
+    } catch (error) {
+      console.error("Could not read report page:", error);
+      setReportReadError(String(error?.code || error?.name || "error"));
+      return false;
+    } finally {
+      reportPageLock.current = false;
+      setReportReadBusy(false);
+    }
+  }
+
+  function renderReportReadControls() {
+    const en = appLanguage === "en";
+    if (!reportHasMore && !reportReadError && !reportLinkError) return null;
+    return <aside className="calendarEditCard" style={{ margin: "12px 0" }} data-no-translate="true">
+      <p>{en ? `${reports.length} reports loaded. Search, history and totals use only loaded reports.`
+        : `報告書 ${reports.length}件を読み込み済み。検索・履歴・集計は読み込み済みの報告書が対象です。`}</p>
+      {reportHasMore && <button type="button" className="primaryButton" disabled={reportReadBusy}
+        onClick={() => readReportPage(true)}>
+        {reportReadBusy ? (en ? "Loading…" : "読み込み中…") : (en ? "Load more reports (up to 100)" : "報告書を追加で読み込む（最大100件）")}
+      </button>}
+      {reportReadError && <p role="alert">{en ? "Could not load reports. Try again later." : "報告書を読み込めませんでした。時間をおいて再試行してください。"} ({reportReadError})</p>}
+      {reportLinkError && <p role="alert">{en ? "Could not open the shared report." : "共有リンクの報告書を開けませんでした。"}</p>}
+    </aside>;
   }
 
   async function loadPlannedWorks() {
@@ -6191,7 +6261,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     }
     if (collectionName === "parts") loadParts();
     if (collectionName === "calendar") loadCalendar();
-    if (collectionName === "maintenanceReports") loadReports();
+    if (collectionName === "maintenanceReports") setReports((current) => current.filter((row) => row.id !== id));
     if (collectionName === "plannedWorks") loadPlannedWorks();
     if (collectionName === "dailyProductions") loadDailyProductions();
   }
@@ -16840,6 +16910,7 @@ return (
 
       {page !== "spare" && renderPageGuide()}
       {renderDashboardQueueBanner()}
+      {renderReportReadControls()}
       {renderCurrentPage()}
       <ReportPhotoPreview photo={reportPhotoPreview} onClose={() => setReportPhotoPreview(null)} />
       {renderAnalysisDrilldown()}
