@@ -682,6 +682,94 @@ function filterEquipmentCards(keys, query, group, line) {
   });
 }
 
+function buildRepairTransition(current, expected, next, actor, resolution, now) {
+  if (current.approvalStatus === "承認済み") throw new Error("repair-locked");
+  if ((current.repairStatus || "") !== (expected.repairStatus || "")) throw new Error("repair-conflict");
+  const status = current.repairStatus || "";
+  if (!status && next === "未対応") return {
+    repairStatus: next, repairTrackedAt: now, repairTrackedByUid: actor.uid
+  };
+  if (status === "未対応" && next === "対応中") return {
+    repairStatus: next, repairOwner: actor.name, repairOwnerUid: actor.uid,
+    repairStartedAt: now
+  };
+  if (status === "対応中" && next === "完了") {
+    if (current.repairOwnerUid !== actor.uid && !actor.isAdmin) throw new Error("repair-owner");
+    const action = String(resolution || "").trim();
+    if (!action) throw new Error("repair-action");
+    if ((current.action || "") !== (expected.action || "")) throw new Error("repair-conflict");
+    return {
+      repairStatus: next, repairResolution: action, action,
+      repairCompletedAt: now, repairCompletedBy: actor.name, repairCompletedByUid: actor.uid
+    };
+  }
+  throw new Error("repair-transition");
+}
+
+function RepairProgress({ report, actor, writable, dirty, saving, language, onSaved }) {
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [resolution, setResolution] = useState(report.repairResolution || report.action || "");
+  const [message, setMessage] = useState("");
+  const en = language === "en";
+  const status = report.repairStatus || "";
+  const labels = { "未対応": en ? "Awaiting repair" : "未対応", "対応中": en ? "In progress" : "対応中", "完了": en ? "Completed" : "完了" };
+  const locked = report.approvalStatus === "承認済み";
+  const canComplete = actor.uid === report.repairOwnerUid || actor.isAdmin;
+  async function transition(next) {
+    if (lock.current || !writable || dirty || saving || locked) return;
+    if (next === "完了" && (!canComplete || !resolution.trim())) return;
+    const question = next === "未対応" ? (en ? "Track this report as awaiting repair?" : "この報告書の修理対応を「未対応」として管理しますか？")
+      : next === "対応中" ? (en ? "Start this repair and assign it to yourself?" : "担当者を自分に設定し、対応を開始しますか？")
+      : (en ? "Complete this repair? The entered action will also be saved to the report." : "修理を完了しますか？入力した処置内容は報告書にも保存されます。");
+    if (!window.confirm(question)) return;
+    lock.current = true;
+    setBusy(true); setMessage("");
+    try {
+      const patch = await runTransaction(db, async (transaction) => {
+        const ref = doc(db, "maintenanceReports", report.id);
+        const snapshot = await transaction.get(ref);
+        if (!snapshot.exists()) throw new Error("repair-missing");
+        const patch = buildRepairTransition(snapshot.data(), report, next, actor, resolution, new Date().toISOString());
+        transaction.update(ref, patch);
+        return patch;
+      });
+      onSaved(report.id, patch);
+      setMessage(en ? "Repair progress saved." : "修理の対応状況を保存しました。");
+    } catch (error) {
+      const messages = {
+        "repair-locked": en ? "This report is approved and locked." : "承認済み報告書は変更できません。",
+        "repair-conflict": en ? "Another user changed this report. Reload before trying again." : "他の利用者が更新しました。再読み込みしてから確認してください。",
+        "repair-owner": en ? "Only the assigned technician or an administrator can complete this repair." : "担当者または管理者が完了を記録してください。",
+        "repair-action": en ? "Enter the action taken." : "処置内容を入力してください。",
+        "repair-missing": en ? "The report no longer exists." : "報告書が見つかりません。",
+      };
+      setMessage(messages[error.message] || (en ? "Could not save. Your input is retained. Check your connection and permissions." : "保存できませんでした。入力は保持しています。接続と権限を確認してください。"));
+    } finally { lock.current = false; setBusy(false); }
+  }
+  return <section data-no-translate="true" className="calendarEditCard" style={{ margin: "12px 0" }}>
+    <h3>{en ? "Repair progress" : "修理対応状況"}: {labels[status] || (en ? "Not tracked" : "未設定")}</h3>
+    <p style={{ fontSize: 13 }}>{en ? "Repair progress is separate from report inspection and approval." : "修理作業の進捗です。報告書の点検・承認とは別に管理します。"}</p>
+    {report.repairOwner && <p>{en ? "Assigned technician" : "担当者"}: <strong>{report.repairOwner}</strong></p>}
+    {report.repairStartedAt && <p>{en ? "Started" : "対応開始"}: {new Date(report.repairStartedAt).toLocaleString()}</p>}
+    {report.repairCompletedAt && <p>{en ? "Completed" : "対応完了"}: {new Date(report.repairCompletedAt).toLocaleString()}</p>}
+    {status === "完了" && <p style={{ whiteSpace: "pre-wrap" }}>{report.repairResolution || report.action || "—"}</p>}
+    {dirty && <p>{en ? "Save or discard report edits before changing repair progress." : "対応状況を変更する前に、報告書の編集内容を保存するか元に戻してください。"}</p>}
+    {locked && <p>{en ? "Approved report: editing is locked." : "承認済みのため編集できません。"}</p>}
+    {writable && !locked && !status && <button type="button" className="primaryButton" disabled={busy || dirty || saving} onClick={() => transition("未対応")}>{en ? "Track this repair" : "修理対応の管理を開始"}</button>}
+    {writable && !locked && status === "未対応" && <button type="button" className="primaryButton" disabled={busy || dirty || saving} onClick={() => transition("対応中")}>{en ? "Start repair — assign to me" : "対応開始・自分を担当にする"}</button>}
+    {writable && !locked && status === "対応中" && canComplete && <>
+      <label>{en ? "Action taken (also saved to the report)" : "処置内容（報告書にも保存）"}
+        <textarea value={resolution} rows={3} maxLength={6000} disabled={busy || dirty || saving} onChange={(e) => setResolution(e.target.value)} />
+      </label>
+      <button type="button" className="primaryButton" disabled={busy || dirty || saving || !resolution.trim()} onClick={() => transition("完了")}>{en ? "Complete repair" : "対応完了"}</button>
+    </>}
+    {status === "対応中" && !canComplete && <p>{en ? "Waiting for the assigned technician to record completion." : "担当者による完了記録をお待ちください。"}</p>}
+    {busy && <p role="status">{en ? "Saving…" : "保存中…"}</p>}
+    {message && <p role="status">{message}</p>}
+  </section>;
+}
+
 function ReportPhotoPreview({ photo, onClose }) {
   const dialogRef = useRef(null);
   useEffect(() => {
@@ -5692,6 +5780,13 @@ function MaintenanceApp({ currentUser, userProfile }) {
       setReportSavingId(reportId);
       const { id, ...plainDraft } = draft;
       const reportToSave = sanitizeReportDates(plainDraft);
+      // Operational progress is saved only through RepairProgress transactions.
+      // A report draft opened earlier must not overwrite another user's progress.
+      for (const field of ["repairStatus", "repairTrackedAt", "repairTrackedByUid",
+        "repairOwner", "repairOwnerUid", "repairStartedAt", "repairResolution",
+        "repairCompletedAt", "repairCompletedBy", "repairCompletedByUid"]) {
+        delete reportToSave[field];
+      }
       await updateDoc(doc(db, "maintenanceReports", reportId), reportToSave);
       setReports((current) =>
         current.map((item) =>
@@ -12134,6 +12229,20 @@ function renderHome() {
           </div>
         </div>
 
+        <RepairProgress
+          report={sourceRow}
+          actor={{ uid: currentUser.uid, name: currentUserName, isAdmin }}
+          writable={userProfile?.active === true && userProfile?.readOnly !== true &&
+            ["operator", "inspector", "approver", "admin"].includes(currentRole)}
+          dirty={isDirty}
+          saving={reportSavingId === sourceRow.id}
+          language={appLanguage}
+          onSaved={(id, patch) => {
+            setReports((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+            setReportDrafts((current) => ({ ...current, [id]: { ...(current[id] || sourceRow), ...patch } }));
+          }}
+        />
+
         <div className="reportHeaderPanel">
           <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
             <div>
@@ -16335,6 +16444,7 @@ Requirements:
         reportCreatedDate: todayText(),
         createdBy: currentUserName,
         phenomenon: symptom.trim(),
+        repairStatus: "未対応",
         note: `異常報告 / Incident report — 設備停止 / Machine stopped: ${stopText}`,
         beforeImage,
       });
@@ -16536,7 +16646,8 @@ Requirements:
           {!filteredHistory.length && <p>{en ? "No matching report in the loaded history." : "読み込み済みの履歴に該当する報告書がありません。"}</p>}
           {filteredHistory.slice(0, equipmentHistoryLimit).map((row) => (
             <article key={row.id} className="calendarEditCard" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
-              <small>{date(row) || (en ? "Date not recorded" : "日付未入力")} · {en ? "Approval" : "承認状況"}: {row.approvalStatus || "—"}</small>
+              <small>{date(row) || (en ? "Date not recorded" : "日付未入力")}</small>
+              {row.repairStatus && <p>{en ? "Repair progress" : "修理対応"}: <strong>{row.repairStatus}</strong>{row.repairOwner ? " · " + row.repairOwner : ""}</p>}
               <p style={{ whiteSpace: "pre-wrap", fontWeight: 700 }}>{row.phenomenon || row.troublePoint || "—"}</p>
               {row.action && <p style={{ whiteSpace: "pre-wrap" }}><strong>{en ? "Action" : "処置"}: </strong>{row.action}</p>}
               <button type="button" className="primaryButton" onClick={() => open(row)}>{en ? "Open full report" : "報告書の詳細を開く"}</button>
