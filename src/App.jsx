@@ -672,6 +672,16 @@ const PILOT_EQUIPMENT = [
   equipmentKey("5G", "NK"), equipmentKey("5G", "NL"),
 ];
 
+function filterEquipmentCards(keys, query, group, line) {
+  const terms = matchPilotEquipment(query).split(/\s+/).filter(Boolean);
+  return keys.filter((key) => {
+    const item = parseEquipmentKey(key);
+    const label = matchPilotEquipment(equipmentLabel(key));
+    return (!group || item.group === group) && (!line || item.line === line)
+      && terms.every((term) => label.includes(term));
+  });
+}
+
 function equipmentFromUrl() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -5154,6 +5164,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [equipmentIncidentSaving, setEquipmentIncidentSaving] = useState(false);
   const [equipmentPilot, setEquipmentPilot] = useState(() => equipmentFromUrl() || PILOT_EQUIPMENT[0]);
   const [equipmentHistoryLimit, setEquipmentHistoryLimit] = useState(10);
+  const [equipmentFind, setEquipmentFind] = useState("");
+  const [equipmentGroupFilter, setEquipmentGroupFilter] = useState("");
+  const [equipmentLineFilter, setEquipmentLineFilter] = useState("");
+
   const [reportSearch, setReportSearch] = useState("");
   const [dashboardQueue, setDashboardQueue] = useState("");
   const [reportPage, setReportPage] = useState(1);
@@ -16223,6 +16237,13 @@ Requirements:
 
   function renderEquipmentCards() {
     const en = appLanguage === "en";
+    const available = [...new Set([equipmentPilot, ...equipmentNames])]
+      .sort((a, b) => equipmentLabel(a).localeCompare(equipmentLabel(b), "ja", { numeric: true }));
+    const groups = [...new Set(available.map((key) => parseEquipmentKey(key).group).filter(Boolean))].sort();
+    const lines = [...new Set(available.map(parseEquipmentKey)
+      .filter((item) => !equipmentGroupFilter || item.group === equipmentGroupFilter)
+      .map((item) => item.line).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja", { numeric: true }));
+    const choices = filterEquipmentCards(available, equipmentFind, equipmentGroupFilter, equipmentLineFilter);
     const matches = (row) => equipmentNamesFromRecord(row).includes(equipmentPilot);
     const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
     const history = reports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
@@ -16243,13 +16264,40 @@ Requirements:
       <section className="tableWrap">
         <h1>🏭 {en ? "Equipment History" : "設備カルテ"}</h1>
         <p>{en ? "New machines appear automatically after their repair report is saved. Use the same equipment name to keep their history together." : "修理報告書を保存すると、設備名からカルテとQRコードを自動作成します。同じ設備は同じ名前で登録してください。"}</p>
-        <label>{en ? "Select machine" : "設備を選択"}
-          <select value={equipmentPilot} disabled={Boolean(equipmentIncident)} onChange={(e) => {
+        <div className="reportGrid">
+          <label>{en ? "Find equipment" : "設備を検索"}
+            <input value={equipmentFind} placeholder={en ? "Name, line or code" : "設備名・ライン・コード"}
+              onChange={(e) => setEquipmentFind(e.target.value)} />
+          </label>
+          <label>{en ? "Group" : "グループ"}
+            <select value={equipmentGroupFilter} onChange={(e) => { setEquipmentGroupFilter(e.target.value); setEquipmentLineFilter(""); }}>
+              <option value="">{en ? "All groups" : "すべてのグループ"}</option>
+              {groups.map((group) => <option key={group} value={group}>{group}</option>)}
+            </select>
+          </label>
+          <label>{en ? "Line" : "ライン"}
+            <select value={equipmentLineFilter} onChange={(e) => setEquipmentLineFilter(e.target.value)}>
+              <option value="">{en ? "All lines" : "すべてのライン"}</option>
+              {lines.map((line) => <option key={line} value={line}>{line}</option>)}
+            </select>
+          </label>
+        </div>
+        <div style={{ margin: "10px 0", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span role="status">{en ? "Matching cards" : "該当カルテ"}: {choices.length} / {available.length}</span>
+          <button type="button" className="primaryButton" onClick={() => { setEquipmentFind(""); setEquipmentGroupFilter(""); setEquipmentLineFilter(""); }}>
+            {en ? "Clear filters" : "絞り込みを解除"}
+          </button>
+        </div>
+        {choices.length ? <label>{en ? "Select equipment to open" : "開く設備を選択"}
+          <select value={choices.includes(equipmentPilot) ? equipmentPilot : ""} disabled={Boolean(equipmentIncident)} onChange={(e) => {
+            if (!e.target.value) return;
             setEquipmentPilot(e.target.value); setEquipmentHistoryLimit(10);
           }}>
-            {[...new Set([equipmentPilot, ...equipmentNames])].map((machine) => <option key={machine} value={machine}>{equipmentLabel(machine)}</option>)}
+            <option value="" disabled>{en ? "Select equipment" : "設備を選択してください"}</option>
+            {choices.map((machine) => <option key={machine} value={machine}>{equipmentLabel(machine)}</option>)}
           </select>
-        </label>
+        </label> : <p>{en ? "No matching card. Try a different name or clear the filters." : "該当するカルテがありません。検索語を変更するか、絞り込みを解除してください。"}</p>}
+        <p style={{ fontSize: 13 }}>{en ? "The open card below changes only when you select equipment." : "下のカルテは、設備を選択すると切り替わります。"}</p>
         <h2 style={{ marginTop: 20 }}>{equipmentLabel(equipmentPilot)}</h2>
         <EquipmentQr key={equipmentPilot} machine={equipmentPilot} language={appLanguage} />
         {equipmentIncident?.machine === equipmentPilot ? renderEquipmentIncident(en) : equipmentIncident ? (
