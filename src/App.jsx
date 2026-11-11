@@ -255,10 +255,21 @@ function createBlankPlannedWork(date = "") {
   };
 }
 
+function calendarEventOccursOn(event, day) {
+  if (!day || !event.date) return false;
+  return event.category === "出張" && event.endDate >= event.date
+    ? event.date <= day && day <= event.endDate
+    : event.date === day;
+}
+
 function createBlankCalendarEvent(date = "") {
   return {
     date: date || todayText(),
     time: "",
+    endTime: "",
+    endDate: "",
+    leavePeriod: "終日",
+    destination: "",
     title: "",
     detail: "",
     owner: "",
@@ -6709,6 +6720,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
     setNewCalendarEvent({
       date: event.date || selectedDate || todayText(),
       time: event.time || "",
+      endTime: event.endTime || "",
+      endDate: event.endDate || "",
+      leavePeriod: event.leavePeriod || "終日",
+      destination: event.destination || "",
       title: event.title || "",
       detail: event.detail || "",
       owner: event.owner || "",
@@ -6725,17 +6740,34 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   async function saveNewCalendarEvent() {
     if (!newCalendarEvent) return;
-    if (!newCalendarEvent.title) {
-      alert("予定タイトルを入力してください。");
-      return;
+    const draft = newCalendarEvent;
+    const category = draft.category || "定期保全";
+    const leave = category === "休暇";
+    const meeting = category === "会議";
+    const trip = category === "出張";
+    const en = appLanguage === "en";
+    const date = draft.date || selectedDate || todayText();
+    const owner = (draft.owner || "").trim();
+    const title = (draft.title || "").trim() || ((leave || trip) ? category : "");
+    if (!title) return alert(en ? "Enter a title." : "予定タイトルを入力してください。");
+    if ((leave || trip) && !owner) return alert(en ? "Enter the employee’s name." : "担当者を入力してください。");
+    if (meeting && (!draft.time || !draft.endTime || draft.endTime <= draft.time)) {
+      return alert(en ? "Enter a start time and a later end time." : "開始時刻と、それより後の終了時刻を入力してください。");
+    }
+    if (trip && (!draft.destination || !draft.endDate || draft.endDate < date)) {
+      return alert(en ? "Select a destination and an end date on or after the start date." : "出張先と、開始日以降の終了日を入力してください。");
     }
 
     const eventToSave = {
-      date: newCalendarEvent.date || selectedDate || todayText(),
-      time: newCalendarEvent.time || "",
-      title: newCalendarEvent.title || "",
+      date,
+      time: leave || trip ? "" : draft.time || "",
+      endTime: meeting ? draft.endTime : "",
+      endDate: trip ? draft.endDate : "",
+      leavePeriod: leave ? draft.leavePeriod || "終日" : "",
+      destination: trip ? draft.destination : "",
+      title,
       detail: newCalendarEvent.detail || "",
-      owner: newCalendarEvent.owner || "",
+      owner,
       importance: newCalendarEvent.importance || "通常",
       category: newCalendarEvent.category || "定期保全",
       image: newCalendarEvent.image || "",
@@ -11644,15 +11676,32 @@ function renderHome() {
 
           <div className="reportGrid">
             <label>📅 日付<input type="date" value={newCalendarEvent.date || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, date: e.target.value })} /></label>
-            <label>⏰ 時間<input type="time" value={newCalendarEvent.time || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, time: e.target.value })} /></label>
+            {!["休暇", "出張"].includes(newCalendarEvent.category) && <label>⏰ {newCalendarEvent.category === "会議" ? "開始時刻" : "時間"}<input type="time" value={newCalendarEvent.time || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, time: e.target.value })} /></label>}
             <label>🗂️ 区分
               <select value={newCalendarEvent.category || "定期保全"} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, category: e.target.value })}>
                 <option value="定期保全">定期保全</option>
                 <option value="計画工事">計画工事</option>
                 <option value="会議">会議</option>
+                <option value="休暇">休暇</option>
+                <option value="出張">出張</option>
                 <option value="緊急">緊急</option>
               </select>
             </label>
+            {newCalendarEvent.category === "会議" && <label>⏰ 終了時刻
+              <input type="time" value={newCalendarEvent.endTime || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, endTime: e.target.value })} />
+            </label>}
+            {newCalendarEvent.category === "休暇" && <label>休暇の時間帯
+              <select value={newCalendarEvent.leavePeriod || "終日"} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, leavePeriod: e.target.value })}>
+                <option value="終日">終日</option><option value="午前半休">午前半休</option><option value="午後半休">午後半休</option>
+              </select>
+            </label>}
+            {newCalendarEvent.category === "出張" && <>
+              <label>出張先<select value={newCalendarEvent.destination || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, destination: e.target.value })}>
+                <option value="">選択してください</option><option value="アメリカ工場">アメリカ工場</option>
+                <option value="タイ工場">タイ工場</option><option value="東日本">東日本</option>
+              </select></label>
+              <label>📅 終了日<input type="date" min={newCalendarEvent.date || undefined} value={newCalendarEvent.endDate || ""} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, endDate: e.target.value })} /></label>
+            </>}
             <label>🚨 重要度
               <select value={newCalendarEvent.importance || "通常"} onChange={(e) => setNewCalendarEvent({ ...newCalendarEvent, importance: e.target.value })}>
                 <option value="通常">通常</option>
@@ -11835,7 +11884,7 @@ function renderHome() {
       return Object.entries(summary).slice(0, 3);
     };
 
-    const selectedEvents = unifiedCalendarEvents.filter((event) => event.date === selectedDate);
+    const selectedEvents = unifiedCalendarEvents.filter((event) => calendarEventOccursOn(event, selectedDate));
 
     return (
       <div data-no-translate="true">
@@ -11867,7 +11916,7 @@ function renderHome() {
 
           <div className="calendarGrid">
             {getCalendarDays().map((date, index) => {
-              const dayEvents = date ? unifiedCalendarEvents.filter((event) => event.date === date) : [];
+              const dayEvents = date ? unifiedCalendarEvents.filter((event) => calendarEventOccursOn(event, date)) : [];
               const summaries = summarizeDayEvents(dayEvents);
               const firstImportant = dayEvents.find((event) => event.importance === "重要") || dayEvents[0];
 
@@ -11950,7 +11999,9 @@ function renderHome() {
                 </div>
 
                 <div className="eventMetaLine">
-                  {event.time && <span className="eventMetaBadge">⏰ {event.time}</span>}
+                  {event.time && <span className="eventMetaBadge">⏰ {event.time}{event.category === "会議" && event.endTime ? `–${event.endTime}` : ""}</span>}
+                  {event.category === "休暇" && <span className="eventMetaBadge">{event.leavePeriod || "終日"}</span>}
+                  {event.category === "出張" && <span className="eventMetaBadge">{[event.destination, event.endDate ? `${event.date} – ${event.endDate}` : event.date].filter(Boolean).join(" · ")}</span>}
                   <span className="eventMetaBadge">{calendarText.category}: {categoryLabel(event.category || "予定")}</span>
                   <span className="eventMetaBadge">{calendarText.owner}: {event.owner || "-"}</span>
                 </div>
