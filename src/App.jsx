@@ -16023,8 +16023,8 @@ Requirements:
   async function submitEquipmentIncident(event) {
     event.preventDefault();
     if (equipmentIncidentSaving || reportSaveInFlight.current || !equipmentIncident) return;
-    const { machine, symptom, stopped, photo } = equipmentIncident;
-    if (!symptom.trim() || !stopped) return;
+    const { machine, symptom, stopped, photo, occurredAt } = equipmentIncident;
+    if (!symptom.trim() || !stopped || !occurredAt) return;
     setEquipmentIncidentSaving(true);
     try {
       const beforeImage = photo ? await new Promise((resolve, reject) => {
@@ -16037,6 +16037,9 @@ Requirements:
       const saved = await saveNewReport(null, {
         ...createBlankReport(),
         equipment: machine,
+        troubleDateTime: occurredAt,
+        reportCreatedDate: todayText(),
+        createdBy: currentUserName,
         phenomenon: symptom.trim(),
         note: `異常報告 / Incident report — 設備停止 / Machine stopped: ${stopText}`,
         beforeImage,
@@ -16057,6 +16060,18 @@ Requirements:
         <h3>{en ? "Report an abnormality" : "異常報告"} · {draft.machine}</h3>
         <p>{en ? "This saves a report awaiting inspection." : "点検待ちの報告書として保存します。"}</p>
         <fieldset disabled={equipmentIncidentSaving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <div className="reportGrid">
+            <label>{en ? "Equipment" : "設備"}
+              <input readOnly value={draft.machine} />
+            </label>
+            <label>{en ? "Reported by" : "報告者"}
+              <input readOnly value={currentUserName || "—"} />
+            </label>
+            <label>{en ? "Occurred at" : "発生日時"}
+              <input required type="datetime-local" value={draft.occurredAt}
+                onChange={(e) => change("occurredAt", e.target.value)} />
+            </label>
+          </div>
           <label>{en ? "What happened?" : "異常内容"}
             <textarea required maxLength={2000} rows={3} value={draft.symptom}
               onChange={(e) => change("symptom", e.target.value)} />
@@ -16083,8 +16098,11 @@ Requirements:
           </label>
           {draft.photo && <small>{draft.photo.name}</small>}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            <button type="submit" className="primaryButton" disabled={!draft.symptom.trim() || !draft.stopped}>{en ? "Save report" : "報告を保存"}</button>
-            <button type="button" className="deleteButton" onClick={() => setEquipmentIncident(null)}>{en ? "Cancel" : "キャンセル"}</button>
+            <button type="submit" className="primaryButton" disabled={!draft.symptom.trim() || !draft.stopped || !draft.occurredAt}>{en ? "Save report" : "報告を保存"}</button>
+            <button type="button" className="deleteButton" onClick={() => {
+              if ((draft.symptom.trim() || draft.photo) && !window.confirm(en ? "Discard this unsaved report?" : "未保存の入力内容を破棄しますか？")) return;
+              setEquipmentIncident(null);
+            }}>{en ? "Cancel" : "キャンセル"}</button>
           </div>
         </fieldset>
         {equipmentIncidentSaving && <p role="status">{en ? "Saving…" : "保存中…"}</p>}
@@ -16134,7 +16152,7 @@ Requirements:
           </button>
         ) : (
           <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
-            onClick={() => setEquipmentIncident({ machine: equipmentPilot, symptom: "", stopped: "", photo: null })}>
+            onClick={() => setEquipmentIncident({ machine: equipmentPilot, symptom: "", stopped: "", photo: null, occurredAt: (() => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16); })() })}>
             ⚠️ {en ? "Report an abnormality" : "異常報告"}
           </button>
         )}
