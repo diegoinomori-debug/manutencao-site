@@ -7018,7 +7018,13 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
 
   const unifiedCalendarEvents = useMemo(() => {
+    // Keep the saved calendar entry, including any edits to its date or details.
+    // Planned-work entries are separate even when created from the same report.
+    const linkedCalendarReportIds = new Set(calendarEvents
+      .filter((event) => event.sourceReportId && !event.plannedWorkId)
+      .map((event) => event.sourceReportId));
     const reportEvents = reports
+      .filter((report) => !linkedCalendarReportIds.has(report.id))
       .filter((report) => report.createdAt || report.troubleDateTime || report.workStartDateTime)
       .map((report) => {
         const date = String(report.createdAt || report.troubleDateTime || report.workStartDateTime || "").slice(0, 10);
