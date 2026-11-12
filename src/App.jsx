@@ -255,6 +255,12 @@ function createBlankPlannedWork(date = "") {
   };
 }
 
+function matchesCalendarFilters(event, category, owner) {
+  const normalize = (text) => String(text || "").normalize("NFKC").toLowerCase().trim();
+  return (!category || (event.category || "予定") === category)
+    && normalize(event.owner).includes(normalize(owner));
+}
+
 function calendarEventOccursOn(event, day) {
   if (!day || !event.date) return false;
   return event.category === "出張" && event.endDate >= event.date
@@ -5583,6 +5589,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [newPlannedWork, setNewPlannedWork] = useState(null);
 
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [calendarCategoryFilter, setCalendarCategoryFilter] = useState("");
+  const [calendarOwnerFilter, setCalendarOwnerFilter] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayText());
 
   const [openSections, setOpenSections] = useState({
@@ -11884,10 +11892,27 @@ function renderHome() {
       return Object.entries(summary).slice(0, 3);
     };
 
-    const selectedEvents = unifiedCalendarEvents.filter((event) => calendarEventOccursOn(event, selectedDate));
+    const english = appLanguage === "en";
+    const categories = [...new Set(["会議", "休暇", "出張", ...unifiedCalendarEvents.map((event) => event.category || "予定")])];
+    const visibleCalendarEvents = unifiedCalendarEvents.filter((event) => matchesCalendarFilters(event, calendarCategoryFilter, calendarOwnerFilter));
+    const selectedEvents = visibleCalendarEvents.filter((event) => calendarEventOccursOn(event, selectedDate));
 
     return (
       <div data-no-translate="true">
+        <div className="reportGrid" style={{ marginBottom: 12 }}>
+          <label>{english ? "Event type" : "予定の区分"}
+            <select value={calendarCategoryFilter} onChange={(e) => setCalendarCategoryFilter(e.target.value)}>
+              <option value="">{english ? "All types" : "すべての区分"}</option>
+              {categories.map((category) => <option key={category} value={category}>{categoryLabel(category)}</option>)}
+            </select>
+          </label>
+          <label>{english ? "Find employee" : "担当者を検索"}
+            <input value={calendarOwnerFilter} onChange={(e) => setCalendarOwnerFilter(e.target.value)} />
+          </label>
+          <div style={{ alignSelf: "end" }}>
+            <button type="button" className="primaryButton" onClick={() => { setCalendarCategoryFilter(""); setCalendarOwnerFilter(""); }}>{english ? "Clear filters" : "絞り込みを解除"}</button>
+          </div>
+        </div>
         <div className="header">
           <div>
             <h2>📅 {calendarText.title}</h2>
@@ -11916,7 +11941,7 @@ function renderHome() {
 
           <div className="calendarGrid">
             {getCalendarDays().map((date, index) => {
-              const dayEvents = date ? unifiedCalendarEvents.filter((event) => calendarEventOccursOn(event, date)) : [];
+              const dayEvents = date ? visibleCalendarEvents.filter((event) => calendarEventOccursOn(event, date)) : [];
               const summaries = summarizeDayEvents(dayEvents);
               const firstImportant = dayEvents.find((event) => event.importance === "重要") || dayEvents[0];
 
