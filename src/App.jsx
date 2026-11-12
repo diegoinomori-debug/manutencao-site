@@ -11868,12 +11868,18 @@ function renderHome() {
       return `${year}年 ${month + 1}月`;
     };
 
+    const staffEventStyles = new Map([
+      ["会議", { icon: "👥", en: "Meeting", es: "Reunión", th: "ประชุม", background: "#e0efff", color: "#123e76" }],
+      ["休暇", { icon: "🌿", en: "Leave", es: "Permiso", th: "วันลา", background: "#dcf5e6", color: "#155534" }],
+      ["出張", { icon: "✈️", en: "Business trip", es: "Viaje de trabajo", th: "เดินทางไปทำงาน", background: "#eee6ff", color: "#512490" }],
+    ]);
     const categoryLabel = (category = "") => {
       const raw = String(category || "予定");
-      return calendarText.categories[raw] || raw;
+      return staffEventStyles.get(raw)?.[lang] || calendarText.categories[raw] || raw;
     };
 
     const getCategoryIcon = (category = "") => {
+      if (staffEventStyles.has(category)) return staffEventStyles.get(category).icon;
       if (category.includes("計画工事")) return "🏗️";
       if (category.includes("保全報告") || category.includes("保全修理報告")) return "📝";
       if (category.includes("定期保全")) return "🔧";
@@ -11971,6 +11977,7 @@ function renderHome() {
                             <span
                               key={category}
                               className={`calendarSummaryPill ${dayEvents.some((e) => e.category === category && e.importance === "重要") ? "urgentPill" : ""}`}
+                              style={staffEventStyles.has(category) ? { background: staffEventStyles.get(category).background, color: staffEventStyles.get(category).color } : undefined}
                               title={`${categoryLabel(category)}: ${lang === "ja" ? `${count}件` : `${count} ${calendarText.items}`}`}
                             >
                               {getCategoryIcon(category)} {count}
@@ -11989,6 +11996,14 @@ function renderHome() {
                 </div>
               );
             })}
+          </div>
+
+          <div aria-label={english ? "Event legend" : "予定の凡例"} style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "12px 0" }}>
+            {[...staffEventStyles].map(([category, style]) => (
+              <span key={category} className="eventMetaBadge" style={{ background: style.background, color: style.color }}>
+                {style.icon} {categoryLabel(category)}
+              </span>
+            ))}
           </div>
 
           <div className="selectedEventsHeader">
@@ -12027,7 +12042,7 @@ function renderHome() {
                   {event.time && <span className="eventMetaBadge">⏰ {event.time}{event.category === "会議" && event.endTime ? `–${event.endTime}` : ""}</span>}
                   {event.category === "休暇" && <span className="eventMetaBadge">{event.leavePeriod || "終日"}</span>}
                   {event.category === "出張" && <span className="eventMetaBadge">{[event.destination, event.endDate ? `${event.date} – ${event.endDate}` : event.date].filter(Boolean).join(" · ")}</span>}
-                  <span className="eventMetaBadge">{calendarText.category}: {categoryLabel(event.category || "予定")}</span>
+                  <span className="eventMetaBadge" style={staffEventStyles.has(event.category) ? { background: staffEventStyles.get(event.category).background, color: staffEventStyles.get(event.category).color } : undefined}>{calendarText.category}: {categoryLabel(event.category || "予定")}</span>
                   <span className="eventMetaBadge">{calendarText.owner}: {event.owner || "-"}</span>
                 </div>
 
