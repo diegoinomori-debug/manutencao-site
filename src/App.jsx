@@ -5554,6 +5554,72 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [approvedReportTo, setApprovedReportTo] = useState("");
   const [approvedReportPage, setApprovedReportPage] = useState(1);
   const [approvedReportId, setApprovedReportId] = useState(null);
+  const [approvedRows, setApprovedRows] = useState([]);
+  const [approvedHasMore, setApprovedHasMore] = useState(false);
+  const [approvedLoading, setApprovedLoading] = useState(true);
+  const [approvedError, setApprovedError] = useState(false);
+  const [approvedDetail, setApprovedDetail] = useState(null);
+  const [approvedDetailRetry, setApprovedDetailRetry] = useState(0);
+  const approvedCursor = useRef(null);
+  const approvedRequest = useRef(0);
+
+  async function loadApprovedReports(append = false) {
+    const request = ++approvedRequest.current;
+    const cursor = append ? approvedCursor.current : null;
+    setApprovedLoading(true);
+    setApprovedError(false);
+    if (!append) {
+      setApprovedRows([]);
+      setApprovedReportPage(1);
+      setApprovedHasMore(false);
+      approvedCursor.current = null;
+    }
+    try {
+      const size = 25;
+      const snapshot = await getDocs(query(collection(db, "maintenanceReports"),
+        where("approvalStatus", "==", "承認済み"), orderBy(documentId()),
+        ...(cursor ? [startAfter(cursor)] : []), limit(size)));
+      if (request !== approvedRequest.current) return;
+      const rows = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+      approvedCursor.current = snapshot.docs.at(-1) || cursor;
+      setApprovedRows(current => [...new Map([...current, ...rows].map(row => [row.id, row])).values()]);
+      setApprovedHasMore(snapshot.size === size);
+    } catch (error) {
+      if (request === approvedRequest.current) {
+        console.error("Could not load approved reports:", error);
+        setApprovedError(true);
+      }
+    } finally {
+      if (request === approvedRequest.current) setApprovedLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (page !== "approvedReports") return;
+    loadApprovedReports();
+    return () => { approvedRequest.current += 1; };
+  }, [page]);
+
+  useEffect(() => {
+    if (page !== "approvedReports" || !approvedReportId) return;
+    let active = true;
+    const id = approvedReportId;
+    setApprovedDetail({ id, status: "loading" });
+    getDoc(doc(db, "maintenanceReports", id)).then(snapshot => {
+      if (!active) return;
+      if (snapshot.exists() && snapshot.data().approvalStatus === "承認済み") {
+        setApprovedDetail({ id, status: "ready", row: sanitizeReportDates({ ...snapshot.data(), id }) });
+      } else {
+        setApprovedRows(current => current.filter(row => row.id !== id));
+        setApprovedDetail({ id, status: "missing" });
+      }
+    }).catch(error => {
+      if (!active) return;
+      console.error("Could not open approved report:", error);
+      setApprovedDetail({ id, status: "error" });
+    });
+    return () => { active = false; };
+  }, [page, approvedReportId, approvedDetailRetry]);
   const reportLinkHandled = useRef(false);
   useEffect(() => {
     const id = reportFromUrl();
@@ -12627,6 +12693,8 @@ function renderHome() {
           [sourceRow.id]: { ...(current[sourceRow.id] || row), ...patch },
         }));
         setReportDirty((current) => ({ ...current, [sourceRow.id]: false }));
+        setApprovedRows(current => current.filter(item => item.id !== sourceRow.id));
+        if (approvedReportId === sourceRow.id) setApprovedReportId(null);
         alert("↩️ 報告書を差戻しました。再編集できます。");
       } catch (error) {
         console.error("return report error:", error);
@@ -13353,7 +13421,9 @@ function renderHome() {
   }
 
   function openApprovedReport(id) {
+    setApprovedDetail({ id, status: "loading" });
     setApprovedReportId(id);
+    setApprovedDetailRetry(current => current + 1);
     setOpenSections((current) => ({ ...current, basic: true, time: true, trouble: true,
       why: true, prevention: true, cost: true, approval: true, other: true }));
     setPage("approvedReports");
@@ -13363,23 +13433,28 @@ function renderHome() {
     const en = appLanguage === "en";
     const label = (ja, english) => en ? english : ja;
     const invalidDates = !!(approvedReportFrom && approvedReportTo && approvedReportFrom > approvedReportTo);
-    const rows = invalidDates ? [] : filterApprovedMaintenanceReports(reports, approvedReportSearch, approvedReportFrom, approvedReportTo);
+    const rows = invalidDates ? [] : filterApprovedMaintenanceReports(approvedRows, approvedReportSearch, approvedReportFrom, approvedReportTo);
     const pages = Math.max(1, Math.ceil(rows.length / REPORTS_PER_PAGE));
     const current = Math.min(approvedReportPage, pages);
     const visible = rows.slice((current - 1) * REPORTS_PER_PAGE, current * REPORTS_PER_PAGE);
-    const selected = reports.find((row) => row.id === approvedReportId && row.approvalStatus === "承認済み");
+    const detail = approvedDetail?.id === approvedReportId ? approvedDetail : null;
     return <>
       <div className="header"><div>
         <h2>✅ {label("保全報告書承認済み", "Approved Maintenance Reports")}</h2>
         <p>{label("承認済みの報告書を検索できます。行を選択すると報告書全体が開きます。", "Search approved reports. Select a report to open the complete document.")}</p>
       </div></div>
-      {selected ? <>
+      {approvedReportId ? <>
         <button type="button" className="primaryButton" onClick={() => setApprovedReportId(null)}>
           ← {label("検索結果に戻る", "Back to search results")}
         </button>
-        {ReportViewCard({ row: selected, fullReport: true })}
+        {detail?.status === "ready" && ReportViewCard({ row: detail.row, fullReport: true })}
+        {(!detail || detail.status === "loading") && <p role="status">{label("報告書を読み込み中…", "Loading report…")}</p>}
+        {detail?.status === "missing" && <p role="status">{label("承認済み報告書が見つかりません。", "The approved report was not found.")}</p>}
+        {detail?.status === "error" && <p role="alert">{label("報告書を読み込めませんでした。", "Could not load the report.")}{" "}
+          <button type="button" onClick={() => setApprovedDetailRetry(current => current + 1)}>{label("再試行", "Retry")}</button>
+        </p>}
       </> : <>
-        {approvedReportId && <p role="status">{label("この報告書は承認済みではありません。報告書タブで確認してください。", "This report is no longer approved. Check the Reports tab.")}</p>}
+
         <div className="tableWrap">
           <div className="reportGrid">
             <label>{label("検索", "Search")}
@@ -13398,8 +13473,17 @@ function renderHome() {
             {label("条件をクリア", "Clear filters")}
           </button>
           {invalidDates && <p role="alert">{label("終了日は開始日以降を指定してください。", "The end date must be on or after the start date.")}</p>}
-          <p role="status">{label("検索結果", "Results")}: {rows.length}</p>
-          {rows.length === 0 && !invalidDates && <p>{label("該当する承認済み報告書はありません。", "No approved reports match these filters.")}</p>}
+          <p>{label("検索と日付の絞り込みは読み込み済みのページが対象です。", "Search and date filters apply to loaded pages.")}</p>
+          {approvedLoading && <p role="status">{label("承認済み報告書を読み込み中…", "Loading approved reports…")}</p>}
+          {approvedError && <p role="alert">{label("承認済み報告書を読み込めませんでした。", "Could not load approved reports.")}{" "}
+            <button type="button" onClick={() => loadApprovedReports(Boolean(approvedCursor.current))}>{label("再試行", "Retry")}</button>
+          </p>}
+          {!invalidDates && (approvedRows.length > 0 || (!approvedLoading && !approvedError)) &&
+            <p role="status">{label("読み込み済みの検索結果", "Matches in loaded pages")}: {rows.length} / {approvedRows.length}</p>}
+          {!approvedLoading && !approvedError && !invalidDates && rows.length === 0 &&
+            <p>{label("読み込み済みのページに該当する承認済み報告書はありません。", "No approved reports match in the loaded pages.")}</p>}
+          {approvedHasMore && <button type="button" className="primaryButton" disabled={approvedLoading}
+            onClick={() => loadApprovedReports(true)}>{label("次の承認済み報告書を読み込む", "Load more approved reports")}</button>}
           <div style={{ overflowX: "auto" }}><table style={{ width: "100%" }}>
             <thead><tr>{[label("作成日", "Created date"), label("ライン", "Line"), label("設備", "Equipment"), label("不具合概要", "Failure summary"), label("承認者", "Approver"), label("詳細", "Details")].map((text) => <th key={text}>{text}</th>)}</tr></thead>
             <tbody>{visible.map((row) => <tr key={row.id} onClick={() => openApprovedReport(row.id)} style={{ cursor: "pointer" }}>
@@ -17580,7 +17664,7 @@ return (
 
       {page !== "spare" && renderPageGuide()}
       {renderDashboardQueueBanner()}
-      {page !== "analytics" && page !== "equipmentCards" && renderReportReadControls()}
+      {page !== "analytics" && page !== "equipmentCards" && page !== "approvedReports" && renderReportReadControls()}
       {renderCurrentPage()}
       <ReportPhotoPreview photo={reportPhotoPreview} onClose={() => setReportPhotoPreview(null)} />
       {renderAnalysisDrilldown()}
