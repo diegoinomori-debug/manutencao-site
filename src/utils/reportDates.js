@@ -154,3 +154,7 @@ export function normalizeDateOnly(value) {
 export function reportPeriodDate(row) {
   return normalizeDateOnly(row.createdAt || row.troubleDateTime || row.reportCreatedDate || row.workStartDateTime);
 }
+
+export function equipmentHistoryDate(row) {
+  return normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt);
+}

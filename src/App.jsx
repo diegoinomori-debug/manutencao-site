@@ -1,5 +1,5 @@
 import { calculateReport } from "./utils/reportCalculations";
-import { toLocalDateText, parseLocalDate, normalizeDateTime, normalizeDateOnly, reportPeriodDate } from "./utils/reportDates";
+import { toLocalDateText, parseLocalDate, normalizeDateTime, normalizeDateOnly, reportPeriodDate, equipmentHistoryDate } from "./utils/reportDates";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 // V14: 日本語IME対応、設備選択、日付入力補正、次回実施日・残り日数の即時計算を安定化。
 import * as XLSX from "xlsx";
@@ -48,7 +48,6 @@ import {
   getDocs,
   query,
   where,
-  or,
   getCountFromServer,
   orderBy,
   documentId,
@@ -73,6 +72,7 @@ async function reportLookupFields(row) {
   return {
     equipmentHistoryKeys: equipmentNamesFromRecord(row),
     analyticsDate: reportPeriodDate(row),
+    equipmentHistoryDate: equipmentHistoryDate(row),
     reportDuplicateHash: await reportDuplicateHash(makeMaintenanceReportDuplicateKey(row)),
   };
 }
@@ -813,14 +813,10 @@ function findEquipmentRecurrences(history, symptom, component = "") {
   }).slice(0, 5);
 }
 
-function filterEquipmentReportHistory(rows, filters, getDate) {
+function filterEquipmentReportHistory(rows, search) {
   const normalize = (value) => String(value ?? "").normalize("NFKC").toLowerCase();
-  const terms = normalize(filters.query).trim().split(/\s+/).filter(Boolean);
-  if (filters.from && filters.to && filters.from > filters.to) return [];
+  const terms = normalize(search).trim().split(/\s+/).filter(Boolean);
   return rows.filter((row) => {
-    const date = getDate(row);
-    if (filters.from && (!date || date < filters.from)) return false;
-    if (filters.to && (!date || date > filters.to)) return false;
     const text = normalize([row.phenomenon, row.troublePoint, row.failureCauseCategory,
       row.failureCauseDetail, row.why1, row.why2, row.why3, row.action,
       row.recurrencePrevention, row.worker, row.createdBy, row.note].filter(Boolean).join(" "));
@@ -5391,6 +5387,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [equipmentPageBusy, setEquipmentPageBusy] = useState(false);
   const [equipmentPageError, setEquipmentPageError] = useState("");
   const equipmentPageRequest = useRef(0);
+  const equipmentPending = useRef(false);
   const [equipmentHistoryFilter, setEquipmentHistoryFilter] = useState({ machine: "", query: "", from: "", to: "" });
 
   const [equipmentFind, setEquipmentFind] = useState("");
@@ -6004,49 +6001,55 @@ function MaintenanceApp({ currentUser, userProfile }) {
     if (page === "home") loadOnDemand("latestReports", loadLatestReports, true);
   }, [page]);
 
-  async function loadEquipmentReportPage(machine, previous = null) {
+  async function loadEquipmentReportPage(machine, range, previous = null) {
+    if (equipmentPending.current) return;
+    equipmentPending.current = true;
     const request = ++equipmentPageRequest.current;
-    const size = 25;
     setEquipmentPageBusy(true);
     setEquipmentPageError("");
+    if (!previous) setEquipmentPage(null);
     try {
-      const identity = parseEquipmentKey(machine);
-      const clauses = [where("equipmentHistoryKeys", "array-contains", machine)];
-      if (identity.line) {
-        const lineAliases = /^(76|78)-060$/.test(identity.line)
-          ? [identity.line, identity.line.replace("-060", "-60")] : [identity.line];
-        clauses.push(where("lineName", "in", lineAliases), where("equipment", "in", lineAliases));
-      } else if (identity.equipment) {
-        for (const field of ["equipment", "machine", "machineName", "equipmentName"]) {
-          clauses.push(where(field, "==", identity.equipment));
-        }
-      }
       const snapshot = await measureFirestoreRead("reports:equipment-page", () => getDocs(query(
-        collection(db, "maintenanceReports"), or(...clauses), orderBy(documentId()),
-        ...(previous?.cursor ? [startAfter(previous.cursor)] : []), limit(size)
+        collection(db, "maintenanceReports"),
+        where("equipmentHistoryKeys", "array-contains", machine),
+        ...(range.from ? [where("equipmentHistoryDate", ">=", range.from)] : []),
+        ...(range.to ? [where("equipmentHistoryDate", "<=", range.to)] : []),
+        orderBy("equipmentHistoryDate", "desc"),
+        ...(previous?.cursor ? [startAfter(previous.cursor)] : []),
+        limit(25)
       )));
       if (request !== equipmentPageRequest.current) return;
-      const rows = snapshot.docs.map(d => ({ ...d.data(), id: d.id }))
-        .filter(row => equipmentNamesFromRecord(row).includes(machine));
+      const rows = new Map((previous?.rows || []).map(row => [row.id, row]));
+      for (const d of snapshot.docs) rows.set(d.id, { ...d.data(), id: d.id });
       setEquipmentPage({
-        machine, rows: [...(previous?.rows || []), ...rows],
+        machine, range, rows: [...rows.values()],
         cursor: snapshot.docs.at(-1) || previous?.cursor || null,
-        hasMore: snapshot.size === size,
+        hasMore: snapshot.size === 25,
       });
     } catch (error) {
-      if (request === equipmentPageRequest.current) setEquipmentPageError(error?.code || "error");
+      if (request === equipmentPageRequest.current) {
+        setEquipmentPageError(error?.code === "resource-exhausted"
+          ? "読み取り上限に達しました。時間をおいて再試行してください。"
+          : "修理履歴を読み込めませんでした。");
+      }
     } finally {
-      if (request === equipmentPageRequest.current) setEquipmentPageBusy(false);
+      if (request === equipmentPageRequest.current) {
+        equipmentPending.current = false;
+        setEquipmentPageBusy(false);
+      }
     }
   }
 
   useEffect(() => {
     if (page !== "equipmentCards") return;
     setEquipmentPage(null);
-    loadEquipmentReportPage(equipmentPilot);
-    return () => { equipmentPageRequest.current += 1; };
+    setEquipmentPageError("");
+    setEquipmentPageBusy(false);
+    return () => {
+      equipmentPageRequest.current += 1;
+      equipmentPending.current = false;
+    };
   }, [page, equipmentPilot]);
-
 
   function openHistoryReport(row) {
     setReports(current => current.some(report => report.id === row.id)
@@ -17225,13 +17228,15 @@ Requirements:
       .map((item) => item.line).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja", { numeric: true }));
     const choices = filterEquipmentCards(available, equipmentFind, equipmentGroupFilter, equipmentLineFilter);
     const matches = (row) => equipmentNamesFromRecord(row).includes(equipmentPilot);
-    const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
+    const date = equipmentHistoryDate;
     const currentPage = equipmentPage?.machine === equipmentPilot ? equipmentPage : null;
     const history = [...(currentPage?.rows || [])].sort((a, b) => date(b).localeCompare(date(a)));
     const latest = history[0];
     const filters = equipmentHistoryFilter.machine === equipmentPilot
       ? equipmentHistoryFilter : { machine: equipmentPilot, query: "", from: "", to: "" };
-    const filteredHistory = filterEquipmentReportHistory(history, filters, date);
+    const filteredHistory = filterEquipmentReportHistory(history, filters.query);
+    const datesChanged = currentPage && (currentPage.range.from !== filters.from || currentPage.range.to !== filters.to);
+    const invalidDates = Boolean(filters.from && filters.to && filters.from > filters.to);
     const setHistoryFilter = (field, value) => {
       setEquipmentHistoryFilter({ ...filters, [field]: value });
 
@@ -17294,9 +17299,6 @@ Requirements:
             ⚠️ {en ? "Report an abnormality" : "異常報告"}
           </button>
         ))}
-        {equipmentPageBusy && <p role="status">修理履歴を読み込み中…</p>}
-        {equipmentPageError && <p role="alert">修理履歴を読み込めませんでした。 <button type="button"
-          onClick={() => loadEquipmentReportPage(equipmentPilot, currentPage)}>再試行</button></p>}
         <div className="calendarEditCard" style={{ overflowWrap: "anywhere" }}>
           <h3>{en ? "Latest incident in loaded pages" : "読み込み済みの最新不具合"}</h3>
           {!currentPage ? null : latest ? <>
@@ -17315,6 +17317,7 @@ Requirements:
         </div>
         <details style={{ marginTop: 16 }} data-no-translate="true">
           <summary>{en ? "Search repair history" : "修理履歴を検索"} ({history.length})</summary>
+          <p>{en ? "Text search covers loaded pages only." : "文字検索は読み込み済みのページが対象です。"}</p>
           <div className="reportGrid" style={{ marginTop: 12 }}>
             <label>{en ? "Symptom, cause, action or technician" : "現象・原因・処置・作業者"}
               <input value={filters.query} onChange={(e) => setHistoryFilter("query", e.target.value)}
@@ -17328,6 +17331,10 @@ Requirements:
             </label>
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
+            <button type="button" className="primaryButton" disabled={equipmentPageBusy || invalidDates}
+              onClick={() => loadEquipmentReportPage(equipmentPilot, { from: filters.from, to: filters.to })}>
+              {en ? "Search" : "検索"}
+            </button>
             <span role="status">{en ? "Matches in loaded history" : "読み込み済み履歴の検索結果"}: {filteredHistory.length} / {history.length}</span>
             <button type="button" className="primaryButton" onClick={() => {
               setEquipmentHistoryFilter({ machine: equipmentPilot, query: "", from: "", to: "" });
@@ -17335,7 +17342,10 @@ Requirements:
             }}>{en ? "Clear history filters" : "履歴の絞り込みを解除"}</button>
           </div>
           {filters.from && filters.to && filters.from > filters.to && <p role="alert">{en ? "Start date must be before the end date." : "開始日は終了日以前にしてください。"}</p>}
-          {!filteredHistory.length && <p>{en ? "No matching report in the loaded history." : "読み込み済みの履歴に該当する報告書がありません。"}</p>}
+          {equipmentPageBusy && <p role="status">修理履歴を読み込み中…</p>}
+          {equipmentPageError && <p role="alert">{equipmentPageError}</p>}
+          {datesChanged && <p>{en ? "Press Search to apply the selected dates." : "日付を適用するには検索を押してください。"}</p>}
+          {currentPage && !equipmentPageBusy && !equipmentPageError && !filteredHistory.length && <p>{en ? "No matching report in the loaded history." : "読み込み済みの履歴に該当する報告書がありません。"}</p>}
           {filteredHistory.map((row) => (
             <article key={row.id} className="calendarEditCard" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
               <small>{date(row) || (en ? "Date not recorded" : "日付未入力")}</small>
@@ -17345,8 +17355,8 @@ Requirements:
               <button type="button" className="primaryButton" onClick={() => open(row)}>{en ? "Open full report" : "報告書の詳細を開く"}</button>
             </article>
           ))}
-          {currentPage?.hasMore && <button type="button" className="primaryButton" disabled={equipmentPageBusy}
-            onClick={() => loadEquipmentReportPage(equipmentPilot, currentPage)}>{en ? "Load next history page" : "修理履歴をさらに読み込む"}</button>}
+          {currentPage?.hasMore && <button type="button" className="primaryButton" disabled={equipmentPageBusy || datesChanged}
+            onClick={() => loadEquipmentReportPage(equipmentPilot, currentPage.range, currentPage)}>{en ? "Load next history page" : "修理履歴をさらに読み込む"}</button>}
         </details>
       </section>
     );
