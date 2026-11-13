@@ -62,10 +62,14 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 
-async function createUniqueImport(collectionName, data, duplicateKey) {
+async function importDocumentReference(collectionName, duplicateKey) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(duplicateKey));
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-  const reference = doc(db, collectionName, `import_${hash}`);
+  return doc(db, collectionName, `import_${hash}`);
+}
+
+async function createUniqueImport(collectionName, data, duplicateKey) {
+  const reference = await importDocumentReference(collectionName, duplicateKey);
   return runTransaction(db, async transaction => {
     const existing = await transaction.get(reference);
     if (existing.exists()) return false;
@@ -4756,10 +4760,10 @@ function ReportStockWithdrawal({ reportId, parts, language, locked, writable, di
     inFlight.current = true; setBusy(true); setMessage("");
     try {
       const data = await reportStockRequest({ action: "withdraw", reportId, partId, quantity: count, operationId: pending.current.operationId });
-      if (data.partId !== partId || !Number.isSafeInteger(data.stockQty) || data.stockQty < 0 || !data.entry?.id) {
+      if (data.partId !== partId || !data.entry?.id || data.entry.reportId !== reportId || data.entry.partId !== partId || data.entry.quantity !== count) {
         throw new Error(en ? "Incomplete stock response." : "出庫結果を確認できません。");
       }
-      onStockChange(data.partId, data.stockQty);
+      if (Number.isSafeInteger(data.stockQty) && data.stockQty >= 0) onStockChange(data.partId, data.stockQty);
       setEntries(current => [data.entry, ...current.filter(entry => entry.id !== data.entry.id)].slice(0,100));
       setQuantity("1"); setPartId(""); pending.current = null;
       try { sessionStorage.removeItem(key); } catch { /* Optional recovery storage. */ }
@@ -5358,6 +5362,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [calendarEvents, setCalendarEvents] = useState([]);
   const pendingCalendarReads = useRef(new Set());
   const [reports, setReports] = useState([]);
+  const [historyReports, setHistoryReports] = useState(null);
+  const [historyError, setHistoryError] = useState("");
+  const [latestReports, setLatestReports] = useState(null);
+  const [latestReportsError, setLatestReportsError] = useState(false);
   const [reportQueueCounts, setReportQueueCounts] = useState(null);
   const [reportQueueResult, setReportQueueResult] = useState(null);
   const [reportQueueError, setReportQueueError] = useState("");
@@ -5679,10 +5687,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   const automaticReadCache = useRef(new Map());
 
-  function loadOnDemand(key, loader) {
+  function loadOnDemand(key, loader, refresh = false) {
     const cached = automaticReadCache.current.get(key);
     if (cached?.pending) return cached.pending;
-    if (cached?.at && Date.now() - cached.at < 120000) return;
+    if (!refresh && cached?.at && Date.now() - cached.at < 120000) return;
     const pending = Promise.resolve().then(loader).then((result) => {
       if (result === false) automaticReadCache.current.delete(key);
       else automaticReadCache.current.set(key, { at: Date.now() });
@@ -5702,7 +5710,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   useEffect(() => {
     if (["calendar", "ai", "miyamaAi"].includes(page)) loadOnDemand("calendar", loadCalendar);
-    if (["work", "calendar", "ai", "miyamaAi", "analytics"].includes(page)) loadOnDemand("works", loadPlannedWorks);
+    if (["work", "calendar", "ai", "miyamaAi"].includes(page)) loadOnDemand("works", loadPlannedWorks);
     if (page === "newEquipment") loadOnDemand("equipment", loadNewEquipmentProjects);
     if (["home", "dailyProduction", "maintenance", "calendar", "ai", "miyamaAi"].includes(page))
       loadOnDemand("dailyProduction", loadDailyProductions);
@@ -5906,7 +5914,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     const additions = new Map();
     pendingCalendarReads.current.add(additions);
     try {
-      const snap = await getDocs(collection(db, "calendar"));
+      const snap = await measureFirestoreRead("search:calendar", () => getDocs(collection(db, "calendar")));
       const rows = new Map(snap.docs.map((d) => [d.id, { ...d.data(), id: d.id }]));
       for (const [id, event] of additions) {
         if (!rows.has(id)) rows.set(id, event);
@@ -5915,6 +5923,79 @@ function MaintenanceApp({ currentUser, userProfile }) {
     } finally {
       pendingCalendarReads.current.delete(additions);
     }
+  }
+
+  async function measureFirestoreRead(label, read) {
+    const started = performance.now();
+    try {
+      const snapshots = await read();
+      const documents = (Array.isArray(snapshots) ? snapshots : [snapshots])
+        .reduce((total, snapshot) => total + (snapshot.size ?? Number(snapshot.exists())), 0);
+      console.info(`[Firestore] ${label}: ${documents} documents in ${Math.round(performance.now() - started)} ms`);
+      return snapshots;
+    } catch (error) {
+      console.warn("[Firestore]", label, Math.round(performance.now() - started), "ms", error?.code);
+      throw error;
+    }
+  }
+
+  async function loadCompleteReportHistory() {
+    setHistoryError("");
+    setHistoryReports(null);
+    try {
+      const snapshot = await measureFirestoreRead("reports:history", () => getDocs(collection(db, "maintenanceReports")));
+      setHistoryReports(snapshot.docs.map(d => sanitizeReportDates({ ...d.data(), id: d.id })));
+      return true;
+    } catch (error) {
+      setHistoryError(String(error?.code || "error"));
+      return false;
+    }
+  }
+
+  async function loadLatestReports() {
+    setLatestReportsError(false);
+    try {
+      const ref = collection(db, "maintenanceReports");
+      const snapshots = await measureFirestoreRead("reports:recent", () => Promise.all(
+        ["createdAt", "troubleDateTime"].map(field => getDocs(query(ref, orderBy(field, "desc"), limit(3))))
+      ));
+      const rows = new Map();
+      for (const snapshot of snapshots) {
+        for (const d of snapshot.docs) rows.set(d.id, { ...d.data(), id: d.id });
+      }
+      setLatestReports([...rows.values()]);
+      return true;
+    } catch {
+      setLatestReportsError(true);
+      return false;
+    }
+  }
+
+  useEffect(() => {
+    if (page === "analytics" || page === "equipmentCards") loadOnDemand("reportHistory", loadCompleteReportHistory, true);
+    if (page === "home") loadOnDemand("latestReports", loadLatestReports, true);
+  }, [page]);
+
+  function renderReportHistoryStatus() {
+    const en = appLanguage === "en";
+    return <section className="tableWrap">
+      {historyError
+        ? <><p role="alert">{en ? "Could not load report history." : "報告書の履歴を読み込めませんでした。"} ({historyError})</p>
+          <button type="button" className="primaryButton" onClick={() => loadOnDemand("reportHistory", loadCompleteReportHistory)}>
+            {en ? "Retry" : "再試行"}
+          </button></>
+        : <p role="status">{en ? "Loading report history…" : "報告書の履歴を読み込み中…"}</p>}
+    </section>;
+  }
+
+  function openHistoryReport(row) {
+    setReports(current => current.some(report => report.id === row.id)
+      ? current : [...current, sanitizeReportDates(row)]);
+    if (row.approvalStatus === "承認済み") return openApprovedReport(row.id);
+    setDashboardQueue("");
+    setReportSearch(row.id);
+    setReportPage(1);
+    setPage("report");
   }
 
   async function loadReports() {
@@ -5984,7 +6065,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   async function loadPlannedWorks() {
     try {
-      const snap = await getDocs(collection(db, "plannedWorks"));
+      const snap = await measureFirestoreRead("search:planned-work", () => getDocs(collection(db, "plannedWorks")));
       setPlannedWorks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error("plannedWorks load error:", err);
@@ -8292,8 +8373,7 @@ const handleBulkReportExcelUpload = async (e) => {
   let success = 0;
   let failed = 0;
   let duplicated = 0;
-  const existingSnap = await getDocs(collection(db, "maintenanceReports"));
-  const existingReportKeys = new Set(existingSnap.docs.map((d) => makeMaintenanceReportDuplicateKey(d.data())));
+  let existingReportKeys;
 
   for (const file of files) {
     try {
@@ -8315,6 +8395,16 @@ const handleBulkReportExcelUpload = async (e) => {
       report.createdAtAudit = new Date().toISOString();
 
       const duplicateKey = makeMaintenanceReportDuplicateKey(report);
+      if (!existingReportKeys) {
+        const reference = await importDocumentReference("maintenanceReports", duplicateKey);
+        if ((await measureFirestoreRead("imports:known-report", () => getDoc(reference))).exists()) {
+          duplicated += 1;
+          continue;
+        }
+        const snapshot = await measureFirestoreRead("imports:legacy-report-duplicates",
+          () => getDocs(collection(db, "maintenanceReports")));
+        existingReportKeys = new Set(snapshot.docs.map(d => makeMaintenanceReportDuplicateKey(d.data())));
+      }
       if (existingReportKeys.has(duplicateKey)) {
         duplicated += 1;
         continue;
@@ -9549,8 +9639,10 @@ Rules:
   }
 
 function renderHome() {
-  const recentReports = [...reports]
-    .sort((a, b) => String(b.createdAt || b.troubleDateTime || "").localeCompare(String(a.createdAt || a.troubleDateTime || "")))
+  const recentDate = row => [normalizeDateTime(row.createdAt), normalizeDateTime(row.troubleDateTime)]
+    .reduce((latest, date) => date > latest ? date : latest, "");
+  const recentReports = [...(latestReports || [])]
+    .sort((a, b) => recentDate(b).localeCompare(recentDate(a)))
     .slice(0, 3);
 
   const pendingCards = [
@@ -9674,16 +9766,25 @@ function renderHome() {
             <span>状態</span>
           </div>
 
-          {recentReports.length === 0 ? (
+          {latestReportsError ? (
+            <div className="miyamaEmpty" role="alert">
+              {appLanguage === "en" ? "Could not load recent repairs." : "最近の修理報告を読み込めませんでした。"}
+              <button type="button" onClick={() => loadOnDemand("latestReports", loadLatestReports)}>
+                {appLanguage === "en" ? "Retry" : "再試行"}
+              </button>
+            </div>
+          ) : latestReports === null ? (
+            <div className="miyamaEmpty" role="status">{appLanguage === "en" ? "Loading recent repairs…" : "最近の修理報告を読み込み中…"}</div>
+          ) : recentReports.length === 0 ? (
             <div className="miyamaEmpty">まだ修理報告がありません。</div>
           ) : recentReports.map((r) => (
             <button
               type="button"
               key={r.id || `${r.createdAt}-${r.equipment}-${r.phenomenon}`}
               className="miyamaRecentRow"
-              onClick={() => setPage("report")}
+              onClick={() => openHistoryReport(r)}
             >
-              <span>{normalizeDateOnly(r.createdAt || r.troubleDateTime) || "-"}</span>
+              <span>{normalizeDateOnly(recentDate(r)) || "-"}</span>
               <span>{r.equipment || r.lineName || "設備未設定"}</span>
               <span>
                 {appLanguage === "ja"
@@ -13554,6 +13655,7 @@ function renderHome() {
 
 
   function renderMaintenanceAnalysis() {
+    if (historyReports === null) return renderReportHistoryStatus();
     const formatHours = (value) => `${Number(value || 0).toFixed(1)}H`;
     const formatMoney = (value) => `¥${Number(value || 0).toLocaleString()}`;
     const getReportDate = (row) => normalizeDateOnly(row.createdAt || row.troubleDateTime || row.reportCreatedDate || row.workStartDateTime);
@@ -13578,7 +13680,7 @@ function renderHome() {
 
     const periodStartDate = getPeriodStartDate();
 
-    const filtered = reports.filter((row) => {
+    const filtered = historyReports.filter((row) => {
       const keyword = productionSearch.toLowerCase().trim();
       const machineKeyword = productionMachineName.toLowerCase().trim();
       const lineKeyword = productionLineName.toLowerCase().trim();
@@ -13981,7 +14083,7 @@ function renderHome() {
             <label>🔍 検索<input value={productionSearch} onChange={(e) => setProductionSearch(e.target.value)} placeholder="例：76-060 センサー リベット 停止" /></label>
             <label>🏭 設備名<input value={productionMachineName} onChange={(e) => setProductionMachineName(e.target.value)} placeholder="必要な場合だけ入力" /></label>
             <label>🏗 ライン<input value={productionLineName} onChange={(e) => setProductionLineName(e.target.value)} placeholder="必要な場合だけ入力" /></label>
-            <button className="primaryButton" onClick={loadReports}>🔄 再読込</button>
+            <button className="primaryButton" onClick={() => loadOnDemand("reportHistory", loadCompleteReportHistory, true)}>🔄 再読込</button>
             <button type="button" className="miyamaSecondaryButton" onClick={() => { setProductionSearch(""); setProductionMachineName(""); setProductionLineName(""); setAnalyticsPeriod("all"); }}>✕ 絞り込み解除</button>
           </div>
         </div>
@@ -16697,7 +16799,9 @@ Requirements:
     const stopTotal = !isCsv ? rows.reduce((sum, row) => sum + toNumber(calculateReport(row).stopTimeHours, 0), 0) : 0;
     const close = () => setAnalysisDrilldown(null);
     const openReport = (row) => {
-      close(); if (row?.approvalStatus === "承認済み") { openApprovedReport(row.id); return; } setPage("report"); setReportSearch(String(row?.id || row?.equipment || row?.phenomenon || ""));
+      close();
+      if (!row?.id) return;
+      openHistoryReport(row);
       if (row?.id) window.setTimeout(() => document.getElementById(`maintenance-report-${row.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
     };
     return (
@@ -16811,8 +16915,9 @@ Requirements:
   }
 
   function renderEquipmentCards() {
+    if (historyReports === null) return renderReportHistoryStatus();
     const en = appLanguage === "en";
-    const available = [...new Set([equipmentPilot, ...equipmentNames])]
+    const available = [...new Set([equipmentPilot, ...equipmentNames, ...historyReports.flatMap(equipmentNamesFromRecord)])]
       .sort((a, b) => equipmentLabel(a).localeCompare(equipmentLabel(b), "ja", { numeric: true }));
     const groups = [...new Set(available.map((key) => parseEquipmentKey(key).group).filter(Boolean))].sort();
     const lines = [...new Set(available.map(parseEquipmentKey)
@@ -16821,7 +16926,7 @@ Requirements:
     const choices = filterEquipmentCards(available, equipmentFind, equipmentGroupFilter, equipmentLineFilter);
     const matches = (row) => equipmentNamesFromRecord(row).includes(equipmentPilot);
     const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
-    const history = reports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
+    const history = historyReports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
     const latest = history[0];
     const filters = equipmentHistoryFilter.machine === equipmentPilot
       ? equipmentHistoryFilter : { machine: equipmentPilot, query: "", from: "", to: "" };
@@ -16835,13 +16940,7 @@ Requirements:
       .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
     const next = scheduled.find((row) => row.nextDate >= todayText());
     const overdue = scheduled.filter((row) => row.nextDate < todayText()).length;
-    const open = (row) => {
-      if (row.approvalStatus === "承認済み") return openApprovedReport(row.id);
-      setDashboardQueue("");
-      setReportSearch(row.id);
-      setReportPage(1);
-      setPage("report");
-    };
+    const open = openHistoryReport;
 
     return (
       <section className="tableWrap">
@@ -17119,7 +17218,7 @@ return (
 
       {page !== "spare" && renderPageGuide()}
       {renderDashboardQueueBanner()}
-      {renderReportReadControls()}
+      {page !== "analytics" && page !== "equipmentCards" && renderReportReadControls()}
       {renderCurrentPage()}
       <ReportPhotoPreview photo={reportPhotoPreview} onClose={() => setReportPhotoPreview(null)} />
       {renderAnalysisDrilldown()}
