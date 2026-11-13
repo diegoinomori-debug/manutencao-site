@@ -1,4 +1,5 @@
 import { calculateReport } from "./utils/reportCalculations";
+import { toLocalDateText, parseLocalDate, normalizeDateTime, normalizeDateOnly, reportPeriodDate } from "./utils/reportDates";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 // V14: 日本語IME対応、設備選択、日付入力補正、次回実施日・残り日数の即時計算を安定化。
 import * as XLSX from "xlsx";
@@ -71,6 +72,7 @@ async function reportDuplicateHash(key) {
 async function reportLookupFields(row) {
   return {
     equipmentHistoryKeys: equipmentNamesFromRecord(row),
+    analyticsDate: reportPeriodDate(row),
     reportDuplicateHash: await reportDuplicateHash(makeMaintenanceReportDuplicateKey(row)),
   };
 }
@@ -88,44 +90,6 @@ async function createUniqueImport(collectionName, data, duplicateKey) {
     transaction.set(reference, { ...data, duplicateKey });
     return reference.id;
   });
-}
-
-function toLocalDateText(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  if (Number.isNaN(d.getTime())) return "";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function parseLocalDate(dateString) {
-  if (!dateString) return null;
-  if (dateString instanceof Date && !Number.isNaN(dateString.getTime())) {
-    const d = new Date(dateString);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-
-  const text = String(dateString).trim().replace(/\//g, "-");
-  const match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (!match) return null;
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const d = new Date(year, month - 1, day);
-  d.setHours(0, 0, 0, 0);
-
-  if (
-    d.getFullYear() !== year ||
-    d.getMonth() !== month - 1 ||
-    d.getDate() !== day
-  ) {
-    return null;
-  }
-
-  return d;
 }
 
 function getTodayLocalDate() {
@@ -338,72 +302,6 @@ function sanitizeReportDates(report = {}) {
   return { ...cleaned, ...calculateReport(cleaned) };
 }
 
-function normalizeDateTime(value) {
-  if (value === undefined || value === null || value === "" || value === 0) return "";
-
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    if (value.getFullYear() <= 1900) return "";
-    const yyyy = value.getFullYear();
-    const mm = String(value.getMonth() + 1).padStart(2, "0");
-    const dd = String(value.getDate()).padStart(2, "0");
-    const hh = String(value.getHours()).padStart(2, "0");
-    const mi = String(value.getMinutes()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-  }
-
-  // Excel serial date/time number support.
-  // Example: 46189.354166 -> 2026-06-16T08:30
-  if (typeof value === "number") {
-    if (value <= 0) return "";
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (!parsed || parsed.y <= 1900) return "";
-    const yyyy = parsed.y;
-    const mm = String(parsed.m).padStart(2, "0");
-    const dd = String(parsed.d).padStart(2, "0");
-    const hh = String(parsed.H || 0).padStart(2, "0");
-    const mi = String(parsed.M || 0).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-  }
-
-  const text = String(value).trim();
-  if (!text || text === "0") return "";
-  if (/^(1899|1900)[\/\-.年]/.test(text)) return "";
-
-  // Excel may return strings like 2026/06/16 8:30, 2026-06-16 08:30, 2026年6月16日 8:30
-  const normalized = text
-    .replace(/年/g, "-")
-    .replace(/月/g, "-")
-    .replace(/日/g, "")
-    .replace(/\./g, "-")
-    .replace(/\//g, "-")
-    .replace(/[時]/g, ":")
-    .replace(/[分]/g, "")
-    .replace(/\s+/g, " ");
-
-  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2})(?::(\d{1,2}))?)?/);
-  if (match) {
-    const yyyy = match[1];
-    const mm = String(match[2]).padStart(2, "0");
-    const dd = String(match[3]).padStart(2, "0");
-    const hh = String(match[4] || "0").padStart(2, "0");
-    const mi = String(match[5] || "0").padStart(2, "0");
-
-    const validDate = parseLocalDate(`${yyyy}-${mm}-${dd}`);
-    const hourNumber = Number(hh);
-    const minuteNumber = Number(mi);
-    if (!validDate || hourNumber > 23 || minuteNumber > 59) return "";
-
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-  }
-
-  const parsed = new Date(normalized.replace(" ", "T"));
-  if (!Number.isNaN(parsed.getTime())) {
-    return normalizeDateTime(parsed);
-  }
-
-  return normalized.replace(" ", "T").slice(0, 16);
-}
-
 function getValidDatePart(value) {
   const dt = normalizeDateTime(value);
   if (!dt) return "";
@@ -479,53 +377,6 @@ function excelDateTime(value, baseValue = "") {
   }
 
   return dt;
-}
-
-function normalizeDateOnly(value) {
-  if (value === undefined || value === null || value === "") return "";
-
-  const raw = String(value).trim();
-  if (!raw) return "";
-
-  // Normalize Japanese/manual separators first.
-  const separated = raw
-    .replace(/年/g, "-")
-    .replace(/月/g, "-")
-    .replace(/日/g, "")
-    .replace(/[./]/g, "-")
-    .replace(/\s+/g, "")
-    .replace(/-+/g, "-");
-
-  // Correct accidental six-digit year produced by some browsers/IME inputs.
-  // Example: 202605-05-29 or 202605/05/29 -> 2026-05-29.
-  const duplicatedMonth = separated.match(/^(\d{4})(\d{2})-(\d{1,2})-(\d{1,2})$/);
-  if (duplicatedMonth && duplicatedMonth[2] === String(duplicatedMonth[3]).padStart(2, "0")) {
-    const candidate = `${duplicatedMonth[1]}-${String(duplicatedMonth[3]).padStart(2, "0")}-${String(duplicatedMonth[4]).padStart(2, "0")}`;
-    const parsed = parseLocalDate(candidate);
-    if (parsed && toLocalDateText(parsed) === candidate) return candidate;
-  }
-
-  // Accept compact manual entry: 20260529.
-  const compact = separated.replace(/[^0-9]/g, "");
-  if (/^\d{8}$/.test(compact)) {
-    const candidate = `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
-    const parsed = parseLocalDate(candidate);
-    if (parsed && toLocalDateText(parsed) === candidate) return candidate;
-  }
-
-  // Standard YYYY-M-D / YYYY-MM-DD.
-  const standard = separated.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (standard) {
-    const candidate = `${standard[1]}-${String(standard[2]).padStart(2, "0")}-${String(standard[3]).padStart(2, "0")}`;
-    const parsed = parseLocalDate(candidate);
-    if (parsed && toLocalDateText(parsed) === candidate) return candidate;
-  }
-
-  const dt = normalizeDateTime(value);
-  if (!dt) return "";
-  const candidate = dt.slice(0, 10);
-  const parsed = parseLocalDate(candidate);
-  return parsed && toLocalDateText(parsed) === candidate ? candidate : "";
 }
 
 function normalizeMaintenanceDateInput(value) {
@@ -5448,8 +5299,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const excelInFlight = useRef(false);
   const [reports, setReports] = useState([]);
   const [timingReviewLimit, setTimingReviewLimit] = useState(20);
-  const [historyReports, setHistoryReports] = useState(null);
-  const [historyError, setHistoryError] = useState("");
+  const [analyticsResult, setAnalyticsResult] = useState(null);
+  const [analyticsRefresh, setAnalyticsRefresh] = useState(0);
   const [latestReports, setLatestReports] = useState(null);
   const [latestReportsError, setLatestReportsError] = useState(false);
   const [reportQueueCounts, setReportQueueCounts] = useState(null);
@@ -5752,7 +5603,16 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [autoReportAiError, setAutoReportAiError] = useState("");
   const [autoReportHistoryMessage, setAutoReportHistoryMessage] = useState("");
   const [analyticsPeriod, setAnalyticsPeriod] = useState("all");
-  const [analyticsBaseDate, setAnalyticsBaseDate] = useState(todayText());
+  const [reportPeriod, setReportPeriod] = useState("currentMonth");
+  const today = todayText();
+  const [reportMonth, setReportMonth] = useState(() => todayText().slice(0, 7));
+  const rollingDays = { "1m": 30, "3m": 90, "6m": 180, "1y": 365 }[reportPeriod];
+  const month = reportPeriod === "currentMonth" ? today.slice(0, 7) : reportMonth;
+  const monthStart = month + "-01";
+  const monthEnd = toLocalDateText(new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0));
+  const rangeStart = rollingDays ? addDays(today, -rollingDays) : monthStart;
+  const rangeEnd = rollingDays ? today : monthEnd;
+  const analyticsKey = JSON.stringify([reportPeriod, rangeStart, rangeEnd, analyticsRefresh]);
   // V30 UX: one consistent details panel for analytics screens.
   // Uses data already loaded in memory, so opening details creates ZERO extra Firestore reads.
   const [analysisDrilldown, setAnalysisDrilldown] = useState(null);
@@ -6100,18 +5960,26 @@ function MaintenanceApp({ currentUser, userProfile }) {
     }
   }
 
-  async function loadCompleteReportHistory() {
-    setHistoryError("");
-    setHistoryReports(null);
-    try {
-      const snapshot = await measureFirestoreRead("reports:history", () => getDocs(collection(db, "maintenanceReports")));
-      setHistoryReports(snapshot.docs.map(d => ({ ...d.data(), id: d.id })));
-      return true;
-    } catch (error) {
-      setHistoryError(String(error?.code || "error"));
-      return false;
-    }
-  }
+  useEffect(() => {
+    if (page !== "analytics") return;
+    let active = true;
+    setAnalyticsResult(null);
+    const ref = collection(db, "maintenanceReports");
+    const request = reportPeriod === "all"
+      ? query(ref, orderBy(documentId()))
+      : reportPeriod === "undated"
+        ? query(ref, where("analyticsDate", "==", ""))
+        : query(ref, where("analyticsDate", ">=", rangeStart), where("analyticsDate", "<=", rangeEnd));
+    measureFirestoreRead("reports:analytics", () => getDocs(request)).then(snapshot => {
+      if (!active) return;
+      const rows = snapshot.docs.map(d => ({ ...d.data(), id: d.id }))
+        .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      setAnalyticsResult({ key: analyticsKey, rows });
+    }).catch(error => {
+      if (active) setAnalyticsResult({ key: analyticsKey, error: String(error?.code || "error") });
+    });
+    return () => { active = false; };
+  }, [page, reportPeriod, rangeStart, rangeEnd, analyticsKey]);
 
   async function loadLatestReports() {
     setLatestReportsError(false);
@@ -6133,7 +6001,6 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   useEffect(() => {
-    if (page === "analytics") loadOnDemand("reportHistory", loadCompleteReportHistory, true);
     if (page === "home") loadOnDemand("latestReports", loadLatestReports, true);
   }, [page]);
 
@@ -6180,18 +6047,6 @@ function MaintenanceApp({ currentUser, userProfile }) {
     return () => { equipmentPageRequest.current += 1; };
   }, [page, equipmentPilot]);
 
-
-  function renderReportHistoryStatus() {
-    const en = appLanguage === "en";
-    return <section className="tableWrap">
-      {historyError
-        ? <><p role="alert">{en ? "Could not load report history." : "報告書の履歴を読み込めませんでした。"} ({historyError})</p>
-          <button type="button" className="primaryButton" onClick={() => loadOnDemand("reportHistory", loadCompleteReportHistory)}>
-            {en ? "Retry" : "再試行"}
-          </button></>
-        : <p role="status">{en ? "Loading report history…" : "報告書の履歴を読み込み中…"}</p>}
-    </section>;
-  }
 
   function openHistoryReport(row) {
     setReports(current => current.some(report => report.id === row.id)
@@ -8768,7 +8623,7 @@ const handleReportExcelUpload = async (e) => {
     const currentPointKey = normalizeElite(newReport.troublePoint);
     const currentPhenomenonWords = eliteKeywords(newReport.phenomenon);
 
-    const eliteHistoryMatches = (historyReports || reports)
+    const eliteHistoryMatches = reports
       .filter(history => currentEquipmentKey && normalizeElite(history.equipment) === currentEquipmentKey &&
         (!currentLineKey || normalizeElite(history.lineName) === currentLineKey) &&
         (!newReport.groupName || normalizeElite(history.groupName) === normalizeElite(newReport.groupName)))
@@ -14013,39 +13868,66 @@ function renderHome() {
 
 
   function renderMaintenanceAnalysis() {
-    if (historyReports === null) return renderReportHistoryStatus();
     const formatHours = (value) => `${Number(value || 0).toFixed(1)}H`;
     const formatMoney = (value) => `¥${Number(value || 0).toLocaleString()}`;
-    const getReportDate = (row) => normalizeDateOnly(row.createdAt || row.troubleDateTime || row.reportCreatedDate || row.workStartDateTime);
+    const getReportDate = reportPeriodDate;
     const getReportMachine = (row) => getEquipmentNameFromRecord(row) || row.equipment || row.lineName || "設備名なし";
     const getReportReason = (row) => String(row.phenomenon || row.troublePoint || row.why1 || row.action || "未入力").trim() || "未入力";
 
     const periodOptions = [
-      { key: "all", label: "全期間" },
+      { key: "currentMonth", label: "今月" },
+      { key: "month", label: "月指定" },
       { key: "1m", label: "1ヶ月" },
       { key: "3m", label: "3ヶ月" },
       { key: "6m", label: "6ヶ月" },
       { key: "1y", label: "1年" },
+      { key: "all", label: "全期間" },
+      { key: "undated", label: "日付なし" },
     ];
+    const result = analyticsResult?.key === analyticsKey ? analyticsResult : null;
+    const reload = () => setAnalyticsRefresh(value => value + 1);
+    const controls = (
+      <div className="tableWrap productionHero">
+        <h2>📈 保全分析センター</h2>
+        <div className="productionTrendToolbar">
+          {periodOptions.map(option => (
+            <button key={option.key} type="button" aria-pressed={reportPeriod === option.key}
+              className={reportPeriod === option.key ? "active" : ""}
+              onClick={() => setReportPeriod(option.key)}>{option.label}</button>
+          ))}
+          {reportPeriod === "month" && (
+            <input type="month" aria-label="対象月" value={reportMonth} min="1901-01" max="9999-12"
+              onChange={event => {
+                const value = event.target.value;
+                if (/^(19[0-9]{2}|[2-9][0-9]{3})-(0[1-9]|1[0-2])$/.test(value)) setReportMonth(value);
+              }} />
+          )}
+        </div>
+        <p>対象期間：{reportPeriod === "all" ? "全期間" : reportPeriod === "undated" ? "日付なし" : rangeStart + " ～ " + rangeEnd}</p>
+        <div className="productionControlGrid">
+          <label>🔍 検索<input value={productionSearch} onChange={e => setProductionSearch(e.target.value)} placeholder="例：76-060 センサー リベット 停止" /></label>
+          <label>🏭 設備名<input value={productionMachineName} onChange={e => setProductionMachineName(e.target.value)} /></label>
+          <label>🏗 ライン<input value={productionLineName} onChange={e => setProductionLineName(e.target.value)} /></label>
+          <button type="button" className="primaryButton" onClick={reload}>🔄 再読込</button>
+          <button type="button" className="miyamaSecondaryButton" onClick={() => {
+            setProductionSearch("");
+            setProductionMachineName("");
+            setProductionLineName("");
+            setReportPeriod("currentMonth");
+          }}>✕ 絞り込み解除</button>
+        </div>
+      </div>
+    );
+    if (!result?.rows) return <>{controls}<section className="tableWrap">
+      {result?.error
+        ? <p role="alert">報告書を読み込めませんでした。 ({result.error})</p>
+        : <p role="status">報告書を読み込み中…</p>}
+    </section></>;
 
-    const getPeriodStartDate = () => {
-      if (analyticsPeriod === "1m") return addDays(todayText(), -30);
-      if (analyticsPeriod === "3m") return addDays(todayText(), -90);
-      if (analyticsPeriod === "6m") return addDays(todayText(), -180);
-      if (analyticsPeriod === "1y") return addDays(todayText(), -365);
-      return "";
-    };
-
-    const periodStartDate = getPeriodStartDate();
-
-    const filtered = historyReports.filter((row) => {
+    const filtered = result.rows.filter((row) => {
       const keyword = productionSearch.toLowerCase().trim();
       const machineKeyword = productionMachineName.toLowerCase().trim();
       const lineKeyword = productionLineName.toLowerCase().trim();
-      const reportDate = getReportDate(row);
-
-      if (periodStartDate && (!reportDate || reportDate < periodStartDate || reportDate > todayText())) return false;
-
       const text = [row.equipment, row.lineName, row.phenomenon, row.troublePoint, row.why1, row.why2, row.why3, row.action, row.replacedPart, row.worker].join(" ").toLowerCase();
       const machineText = [getReportMachine(row), row.equipment, row.lineName].join(" ").toLowerCase();
       const lineText = [row.lineName, row.groupName, row.equipment].join(" ").toLowerCase();
@@ -14248,6 +14130,8 @@ function renderHome() {
 
     return (
       <>
+        {controls}
+        {filtered.length === 0 && <p role="status">該当する保全報告書はありません。</p>}
         <section className="miyamaEliteAnalyticsHero">
           <div>
             <span className="miyamaElitePhaseBadge">
@@ -14449,32 +14333,6 @@ function renderHome() {
             : appLanguage === "en"
               ? "Reference MTBF uses 16 operating hours/day because the system does not yet receive actual PLC runtime. When real machine runtime is integrated, this can become true MTBF."
               : "参考MTBFは現在の2直16H/日を基準にした参考値です。PLCから実稼働時間を取得できるようになれば、実MTBFへ切り替えます。"}
-        </div>
-
-        <div className="tableWrap productionHero">
-          <h1>📈 保全分析センター</h1>
-          <p>この画面は <b>保全修理報告書だけ</b> を使って、停止時間・MTTR・費用・設備ランキングを計算します。CSVアラームはここでは使いません。</p>
-          <div className="miyamaSimpleHowTo"><b>👀 見方は3ステップ：</b><span>① 赤い棒を見る</span><span>② 気になる項目をクリック</span><span>③ 設備・場所・現象・原因・処置まで確認</span></div>
-          <div className="productionTrendToolbar" style={{ marginTop: "16px" }}>
-            {periodOptions.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                className={analyticsPeriod === option.key ? "active" : ""}
-                onClick={() => setAnalyticsPeriod(option.key)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <p style={{ marginTop: "-6px" }}>対象期間：{periodStartDate ? `${periodStartDate} ～ ${todayText()}` : "全期間"}</p>
-          <div className="productionControlGrid">
-            <label>🔍 検索<input value={productionSearch} onChange={(e) => setProductionSearch(e.target.value)} placeholder="例：76-060 センサー リベット 停止" /></label>
-            <label>🏭 設備名<input value={productionMachineName} onChange={(e) => setProductionMachineName(e.target.value)} placeholder="必要な場合だけ入力" /></label>
-            <label>🏗 ライン<input value={productionLineName} onChange={(e) => setProductionLineName(e.target.value)} placeholder="必要な場合だけ入力" /></label>
-            <button className="primaryButton" onClick={() => loadOnDemand("reportHistory", loadCompleteReportHistory, true)}>🔄 再読込</button>
-            <button type="button" className="miyamaSecondaryButton" onClick={() => { setProductionSearch(""); setProductionMachineName(""); setProductionLineName(""); setAnalyticsPeriod("all"); }}>✕ 絞り込み解除</button>
-          </div>
         </div>
 
         <div className="productionKpiGrid">
