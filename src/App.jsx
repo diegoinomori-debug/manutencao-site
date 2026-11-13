@@ -46,6 +46,8 @@ import {
   addDoc,
   getDocs,
   query,
+  where,
+  getCountFromServer,
   orderBy,
   documentId,
   startAfter,
@@ -68,7 +70,7 @@ async function createUniqueImport(collectionName, data, duplicateKey) {
     const existing = await transaction.get(reference);
     if (existing.exists()) return false;
     transaction.set(reference, { ...data, duplicateKey });
-    return true;
+    return reference.id;
   });
 }
 
@@ -4754,6 +4756,9 @@ function ReportStockWithdrawal({ reportId, parts, language, locked, writable, di
     inFlight.current = true; setBusy(true); setMessage("");
     try {
       const data = await reportStockRequest({ action: "withdraw", reportId, partId, quantity: count, operationId: pending.current.operationId });
+      if (data.partId !== partId || !Number.isSafeInteger(data.stockQty) || data.stockQty < 0 || !data.entry?.id) {
+        throw new Error(en ? "Incomplete stock response." : "出庫結果を確認できません。");
+      }
       onStockChange(data.partId, data.stockQty);
       setEntries(current => [data.entry, ...current.filter(entry => entry.id !== data.entry.id)].slice(0,100));
       setQuantity("1"); setPartId(""); pending.current = null;
@@ -4934,6 +4939,12 @@ function buildPartDeliveryEvents(parts, language = "ja", today = todayText()) {
 }
 
 // Shared predicates keep home counters and destination lists consistent.
+const REPORT_QUEUE_STATUS = { inspection: "点検待ち", approval: "承認待ち" };
+
+function reportQueueQuery(queue) {
+  return query(collection(db, "maintenanceReports"), where("approvalStatus", "==", REPORT_QUEUE_STATUS[queue]));
+}
+
 function dashboardQueueRows(rows, queue) {
   return rows.filter((row) => {
     if (queue === "inspection") return row.approvalStatus === "点検待ち";
@@ -5347,6 +5358,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const [calendarEvents, setCalendarEvents] = useState([]);
   const pendingCalendarReads = useRef(new Set());
   const [reports, setReports] = useState([]);
+  const [reportQueueCounts, setReportQueueCounts] = useState(null);
+  const [reportQueueResult, setReportQueueResult] = useState(null);
+  const [reportQueueError, setReportQueueError] = useState("");
+  const [reportQueueRefresh, setReportQueueRefresh] = useState(0);
+
   const reportCursor = useRef(null);
   const reportPageLock = useRef(false);
   const [reportReadBusy, setReportReadBusy] = useState(false);
@@ -5678,7 +5694,6 @@ function MaintenanceApp({ currentUser, userProfile }) {
     return pending;
   }
 
-  const hasGlobalSearch = Boolean(globalSearch.trim());
 
   useEffect(() => {
     loadOnDemand("parts", loadParts);
@@ -5686,13 +5701,49 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }, []);
 
   useEffect(() => {
-    if (hasGlobalSearch || ["calendar", "ai", "miyamaAi"].includes(page)) loadOnDemand("calendar", loadCalendar);
-    if (hasGlobalSearch || ["work", "calendar", "ai", "miyamaAi", "analytics"].includes(page)) loadOnDemand("works", loadPlannedWorks);
+    if (["calendar", "ai", "miyamaAi"].includes(page)) loadOnDemand("calendar", loadCalendar);
+    if (["work", "calendar", "ai", "miyamaAi", "analytics"].includes(page)) loadOnDemand("works", loadPlannedWorks);
     if (page === "newEquipment") loadOnDemand("equipment", loadNewEquipmentProjects);
     if (["home", "dailyProduction", "maintenance", "calendar", "ai", "miyamaAi"].includes(page))
       loadOnDemand("dailyProduction", loadDailyProductions);
     if (page === "csvAnalytics" || page === "production") loadOnDemand("productionLogs", loadProductionLogs);
-  }, [page, hasGlobalSearch]);
+  }, [page]);
+
+  useEffect(() => {
+    if (page !== "home") return;
+    let active = true;
+    setReportQueueCounts(null);
+    Promise.allSettled(Object.keys(REPORT_QUEUE_STATUS).map(async (key) => {
+      const snapshot = await getCountFromServer(reportQueueQuery(key));
+      return [key, snapshot.data().count];
+    })).then((results) => {
+      if (!active) return;
+      setReportQueueCounts(Object.fromEntries(results.filter((item) => item.status === "fulfilled").map((item) => item.value)));
+    });
+    return () => { active = false; };
+  }, [page, reportQueueRefresh]);
+
+  useEffect(() => {
+    if (page !== "report" || !Object.hasOwn(REPORT_QUEUE_STATUS, dashboardQueue)) return;
+    let active = true;
+    setReportQueueResult(null);
+    setReportQueueError("");
+    Promise.resolve(automaticReadCache.current.get("reports")?.pending).then(() =>
+      active ? getDocs(reportQueueQuery(dashboardQueue)) : null
+    ).then((snapshot) => {
+      if (!active || !snapshot) return;
+      const rows = snapshot.docs.map((d) => sanitizeReportDates({ ...d.data(), id: d.id }));
+      setReports((current) => {
+        const merged = new Map(current.map((row) => [row.id, row]));
+        rows.forEach((row) => merged.set(row.id, row));
+        return [...merged.values()];
+      });
+      setReportQueueResult({ queue: dashboardQueue, ids: new Set(rows.map((row) => row.id)) });
+    }).catch((error) => {
+      if (active) setReportQueueError(String(error?.code || "error"));
+    });
+    return () => { active = false; };
+  }, [page, dashboardQueue, reportQueueRefresh]);
 
   useEffect(() => {
     const target = ["inspection", "approval"].includes(dashboardQueue) ? "report" :
@@ -7165,7 +7216,10 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   const filteredReports = useMemo(() => {
     const keyword = reportSearch.toLowerCase().trim();
-    const sorted = dashboardQueueRows(reports, ["inspection", "approval"].includes(dashboardQueue) ? dashboardQueue : "").filter((row) => row.approvalStatus !== "承認済み").sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const pendingQueue = Object.hasOwn(REPORT_QUEUE_STATUS, dashboardQueue);
+    const source = pendingQueue ? (reportQueueResult?.queue === dashboardQueue
+      ? reports.filter((row) => reportQueueResult.ids.has(row.id)) : []) : reports;
+    const sorted = dashboardQueueRows(source, pendingQueue ? dashboardQueue : "").filter((row) => row.approvalStatus !== "承認済み").sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     if (!keyword) return sorted;
 
     const keywords = keyword.split(/\s+/);
@@ -7196,7 +7250,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
         keywords
       )
     );
-  }, [reports, reportSearch, dashboardQueue]);
+  }, [reports, reportSearch, dashboardQueue, reportQueueResult]);
 
   const equipmentNames = useMemo(() => [...new Set([
     ...PILOT_EQUIPMENT,
@@ -7742,7 +7796,11 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
     return (
       <div className="tableWrap" style={{ marginBottom: "18px" }}>
         <h2>🔍 AI統合検索</h2>
-        <p>保全報告書・定期保全・予備品管理・カレンダー・計画工事をまとめて検索できます。</p>
+        <p>{appLanguage === "en" ? "Search loaded records. Load calendar and planned work to include them." : "読み込み済みデータを検索します。予定・工事も検索するには下のボタンで読み込んでください。"}</p>
+        <button type="button" className="primaryButton" onClick={() => {
+          loadOnDemand("calendar", loadCalendar);
+          loadOnDemand("works", loadPlannedWorks);
+        }}>{appLanguage === "en" ? "Include calendar and planned work" : "予定・工事も読み込む"}</button>
 
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <input
@@ -8230,6 +8288,7 @@ const handleBulkReportExcelUpload = async (e) => {
   const files = Array.from(e.target.files || []);
   if (files.length === 0) return;
 
+  const imported = [];
   let success = 0;
   let failed = 0;
   let duplicated = 0;
@@ -8260,10 +8319,12 @@ const handleBulkReportExcelUpload = async (e) => {
         duplicated += 1;
         continue;
       }
-      if (!await createUniqueImport("maintenanceReports", report, duplicateKey)) {
+      const id = await createUniqueImport("maintenanceReports", report, duplicateKey);
+      if (!id) {
         duplicated += 1;
         continue;
       }
+      imported.push(sanitizeReportDates({ ...report, duplicateKey, id }));
       existingReportKeys.add(duplicateKey);
       success += 1;
     } catch (error) {
@@ -8272,7 +8333,11 @@ const handleBulkReportExcelUpload = async (e) => {
     }
   }
 
-  await loadReports();
+  if (imported.length) setReports((current) => {
+    const merged = new Map(current.map((row) => [row.id, row]));
+    imported.forEach((row) => merged.set(row.id, row));
+    return [...merged.values()];
+  });
 
   alert(`一括取込完了
 成功：${success}件
@@ -9468,6 +9533,15 @@ Rules:
     if (!dashboardQueue || !["report", "maintenance", "spare"].includes(page)) return null;
     return <div className="tableWrap" style={{ display: "flex", gap: "12px", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", border: "2px solid #2563eb" }}>
       <strong>📌 {dashboardQueueLabel(dashboardQueue)}</strong>
+      {Object.hasOwn(REPORT_QUEUE_STATUS, dashboardQueue) && (
+        <span role="status">{reportQueueError
+          ? (appLanguage === "en" ? "Could not load pending reports: " : "報告書の読込エラー：") + reportQueueError
+          : reportQueueResult?.queue !== dashboardQueue
+            ? (appLanguage === "en" ? "Loading pending reports…" : "対象の報告書を読み込み中…") : ""}
+        </span>
+      )}
+      {reportQueueError && Object.hasOwn(REPORT_QUEUE_STATUS, dashboardQueue) && <button type="button" className="primaryButton" onClick={() => setReportQueueRefresh((n) => n + 1)}>{appLanguage === "en" ? "Retry" : "再試行"}</button>}
+
       <button type="button" className="primaryButton" onClick={() => setDashboardQueue("")}>
         {appLanguage === "en" ? "Clear pending filter / show all" : "絞り込み解除・すべて表示"}
       </button>
@@ -9480,8 +9554,8 @@ function renderHome() {
     .slice(0, 3);
 
   const pendingCards = [
-    { queue: "inspection", icon: "🔎", count: dashboardQueueRows(reports, "inspection").length, color: "#1d4ed8" },
-    { queue: "approval", icon: "✅", count: dashboardQueueRows(reports, "approval").length, color: "#7c3aed" },
+    { queue: "inspection", icon: "🔎", count: reportQueueCounts?.inspection ?? "—", color: "#1d4ed8" },
+    { queue: "approval", icon: "✅", count: reportQueueCounts?.approval ?? "—", color: "#7c3aed" },
     { queue: "overdue", icon: "🚨", count: dashboardQueueRows(maintenanceRows, "overdue").length, color: "#b91c1c" },
     { queue: "upcoming", icon: "🔧", count: dashboardQueueRows(maintenanceRows, "upcoming").length, color: "#92400e" },
     { queue: "stock", icon: "📦", count: dashboardQueueRows(spareRows, "stock").length, color: "#b45309" },
@@ -9538,6 +9612,8 @@ function renderHome() {
       <section className="miyamaHomePanel" aria-label={appLanguage === "en" ? "Pending actions" : "対応が必要な項目"} style={{ margin: "20px 0" }}>
         <div className="miyamaPanelTitle"><h3>📌 {appLanguage === "en" ? "Pending actions" : "対応が必要な項目"}</h3></div>
         <p>{appLanguage === "en" ? "Select a card to see the items that need attention." : "カードを押すと、対応が必要な項目だけを表示します。"}</p>
+        <button type="button" className="primaryButton" onClick={() => setReportQueueRefresh((n) => n + 1)}>{appLanguage === "en" ? "Refresh report counts" : "報告書の件数を更新"}</button>
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))", gap: "12px" }}>
           {pendingCards.map((card) => <button key={card.queue} type="button" className="miyamaQuickCard"
             style={{ textAlign: "left", borderTop: `4px solid ${card.color}` }} onClick={() => openDashboardQueue(card.queue)}>
@@ -12123,6 +12199,11 @@ function renderHome() {
     };
 
     const requestInspection = async () => {
+      if (isDirty || reportSavingId === sourceRow.id) {
+        alert(appLanguage === "en" ? "Save your report changes before continuing." : "先に報告書の変更を保存してください。");
+        return;
+      }
+
       if (row.approvalStatus === "承認済み") {
         alert("承認済み報告書は点検依頼できません。");
         return;
@@ -12210,6 +12291,11 @@ function renderHome() {
     };
 
     const inspectSavedReport = async () => {
+      if (isDirty || reportSavingId === sourceRow.id) {
+        alert(appLanguage === "en" ? "Save your report changes before continuing." : "先に報告書の変更を保存してください。");
+        return;
+      }
+
       if (!canInspect) {
         alert(approvalPermissionMessage("inspect"));
         return;
@@ -12265,6 +12351,11 @@ function renderHome() {
     };
 
     const approveSavedReport = async () => {
+      if (isDirty || reportSavingId === sourceRow.id) {
+        alert(appLanguage === "en" ? "Save your report changes before continuing." : "先に報告書の変更を保存してください。");
+        return;
+      }
+
       if (!canApprove) {
         alert(approvalPermissionMessage("approve"));
         return;
