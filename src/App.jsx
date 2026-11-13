@@ -47,6 +47,7 @@ import {
   getDocs,
   query,
   where,
+  or,
   getCountFromServer,
   orderBy,
   documentId,
@@ -62,9 +63,20 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 
+async function reportDuplicateHash(key) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function reportLookupFields(row) {
+  return {
+    equipmentHistoryKeys: equipmentNamesFromRecord(row),
+    reportDuplicateHash: await reportDuplicateHash(makeMaintenanceReportDuplicateKey(row)),
+  };
+}
+
 async function importDocumentReference(collectionName, duplicateKey) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(duplicateKey));
-  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  const hash = await reportDuplicateHash(duplicateKey);
   return doc(db, collectionName, `import_${hash}`);
 }
 
@@ -312,10 +324,10 @@ function pickDateTime(value, fallback = "") {
 }
 
 function sanitizeReportDates(report = {}) {
-  const workStart = pickDateTime(report.workStartDateTime);
-  const workEnd = pickDateTime(report.workEndDateTime);
-  const productionStart = pickDateTime(report.productionStartDateTime, workEnd);
-  const trouble = pickDateTime(report.troubleDateTime, workStart);
+  const workStart = recordedReportTime(report.workStartDateTime);
+  const workEnd = recordedReportTime(report.workEndDateTime);
+  const productionStart = recordedReportTime(report.productionStartDateTime);
+  const trouble = recordedReportTime(report.troubleDateTime);
   const cleaned = {
     ...report,
     troubleDateTime: trouble,
@@ -691,6 +703,17 @@ function equipmentNamesFromRecord(row = {}) {
     const exact = candidates.find((item) => norm(item.equipment) === norm(equipment));
     return [...new Set([equipmentKey(g, l), equipmentKey(g, l, exact?.equipment || equipment)])];
   }
+  // A known line remains identifiable even when the component is absent from the catalog.
+  if (line) {
+    const matchingLines = [...new Set(EQUIPMENT_CATALOG.filter(item =>
+      norm(item.line) === norm(line) && (!group || norm(item.group) === norm(group)))
+      .map(item => equipmentKey(item.group, item.line)))];
+    if (matchingLines.length === 1) {
+      const [canonicalLineKey] = matchingLines;
+      const identity = parseEquipmentKey(canonicalLineKey);
+      return [...new Set([canonicalLineKey, equipmentKey(identity.group, identity.line, equipment)])];
+    }
+  }
   // Do not infer a line for ambiguous equipment names such as プレス.
   return [equipmentKey(group, line, equipment)];
 }
@@ -878,6 +901,65 @@ async function prepareIncidentPhoto(file) {
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+const REPORT_TIME_FIELDS = ["troubleDateTime", "workStartDateTime", "workEndDateTime", "productionStartDateTime"];
+
+function recordedReportTime(value) {
+  if (typeof value === "string" && !/(?:T|\s|日)\s*\d{1,2}(?::|時)/.test(value.trim())) return "";
+  const normalized = pickDateTime(value);
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized) ? normalized : "";
+}
+
+function updateReportTimingField(field, value) {
+  if (!REPORT_TIME_FIELDS.includes(field)) return {};
+  return field === "productionStartDateTime"
+    ? { timingReviewed: false, productionReturnRecorded: Boolean(recordedReportTime(value)) }
+    : { timingReviewed: false };
+}
+
+function reportTiming(row, now = normalizeDateTime(new Date())) {
+  const [incident, start, end, storedReturn] = REPORT_TIME_FIELDS.map(field => recordedReportTime(row[field]));
+  // Earlier versions copied the end of repair into an empty production return field.
+  const returned = row.productionReturnRecorded === false ||
+    (row.productionReturnRecorded !== true && storedReturn && storedReturn === end) ? "" : storedReturn;
+  const duration = (from, to) => from && to ? (Date.parse(to + "Z") - Date.parse(from + "Z")) / 3600000 : null;
+  const repair = duration(start, end);
+  const downtime = duration(incident, returned);
+  const suspect = (hours, from, to) => hours !== null && (hours < 0 || hours > 24 || from > now || to > now);
+  const repairSuspect = suspect(repair, start, end);
+  const downtimeSuspect = suspect(downtime, incident, returned);
+  return {
+    repair, downtime, returnMissing: !returned,
+    repairSuspect, downtimeSuspect,
+    repairReview: repairSuspect && (repair < 0 || start > now || end > now || row.timingReviewed !== true),
+    downtimeReview: downtimeSuspect && (downtime < 0 || incident > now || returned > now || row.timingReviewed !== true),
+  };
+}
+
+function reportDataWarnings(row, timing = reportTiming(row)) {
+  const warnings = [];
+  if (timing.repair === null) warnings.push("作業開始・終了日時を確認");
+  if (timing.returnMissing) warnings.push("生産復帰日時：não informado");
+  else if (timing.downtime === null) warnings.push("発生日時を確認");
+  if (timing.repairSuspect || timing.downtimeSuspect) warnings.push("長時間・逆転・未来の日時を確認");
+  return warnings;
+}
+
+function equipmentIncidentDraftKey(uid, machine) {
+  return "miyamaIncidentDraft:" + JSON.stringify([uid, machine]);
+}
+
+function findEquipmentRecurrences(history, symptom, component = "") {
+  const normalize = value => String(value || "").normalize("NFKC").toLowerCase().trim();
+  const terms = normalize(symptom).split(/[\s、。,.]+/).filter(term => term.length >= 2);
+  if (!terms.length) return [];
+  return history.filter(row => {
+    if (component && normalize(row.equipment) !== normalize(component)) return false;
+    const description = normalize([row.phenomenon, row.troublePoint].filter(Boolean).join(" "));
+    return terms.some(term => description.includes(term)) ||
+      (description.length >= 2 && normalize(symptom).includes(description));
+  }).slice(0, 5);
 }
 
 function filterEquipmentReportHistory(rows, filters, getDate) {
@@ -5361,7 +5443,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const dailyProductionRowsRef = useRef(null);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const pendingCalendarReads = useRef(new Set());
+  const [excelPreview, setExcelPreview] = useState([]);
+  const [excelBusy, setExcelBusy] = useState(false);
+  const excelInFlight = useRef(false);
   const [reports, setReports] = useState([]);
+  const [timingReviewLimit, setTimingReviewLimit] = useState(20);
   const [historyReports, setHistoryReports] = useState(null);
   const [historyError, setHistoryError] = useState("");
   const [latestReports, setLatestReports] = useState(null);
@@ -5444,9 +5530,16 @@ function MaintenanceApp({ currentUser, userProfile }) {
     src, label, closeLabel: appLanguage === "en" ? "Close" : "閉じる"
   });
 
+  const [incidentDraftMessage, setIncidentDraftMessage] = useState("");
+  const incidentActionInFlight = useRef(false);
+  const canWriteReports = userProfile?.active === true && userProfile?.readOnly !== true
+    && ["operator", "inspector", "approver", "admin"].includes(currentRole);
   const [equipmentIncidentSaving, setEquipmentIncidentSaving] = useState(false);
   const [equipmentPilot, setEquipmentPilot] = useState(() => equipmentFromUrl() || PILOT_EQUIPMENT[0]);
-  const [equipmentHistoryLimit, setEquipmentHistoryLimit] = useState(10);
+  const [equipmentPage, setEquipmentPage] = useState(null);
+  const [equipmentPageBusy, setEquipmentPageBusy] = useState(false);
+  const [equipmentPageError, setEquipmentPageError] = useState("");
+  const equipmentPageRequest = useRef(0);
   const [equipmentHistoryFilter, setEquipmentHistoryFilter] = useState({ machine: "", query: "", from: "", to: "" });
 
   const [equipmentFind, setEquipmentFind] = useState("");
@@ -5855,7 +5948,8 @@ function MaintenanceApp({ currentUser, userProfile }) {
   function setReportDraftField(reportId, field, value) {
     setReportDrafts((current) => ({
       ...current,
-      [reportId]: { ...(current[reportId] || reports.find((r) => r.id === reportId) || {}), [field]: value },
+      [reportId]: { ...(current[reportId] || reports.find((r) => r.id === reportId) || {}),
+        ...updateReportTimingField(field, value), [field]: value },
     }));
     setReportDirty((current) => ({ ...current, [reportId]: true }));
   }
@@ -5880,6 +5974,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       setReportSavingId(reportId);
       const { id, ...plainDraft } = draft;
       const reportToSave = sanitizeReportDates(plainDraft);
+      Object.assign(reportToSave, await reportLookupFields(reportToSave));
       // Operational progress is saved only through RepairProgress transactions.
       // A report draft opened earlier must not overwrite another user's progress.
       for (const field of ["repairStatus", "repairTrackedAt", "repairTrackedByUid",
@@ -5944,7 +6039,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
     setHistoryReports(null);
     try {
       const snapshot = await measureFirestoreRead("reports:history", () => getDocs(collection(db, "maintenanceReports")));
-      setHistoryReports(snapshot.docs.map(d => sanitizeReportDates({ ...d.data(), id: d.id })));
+      setHistoryReports(snapshot.docs.map(d => ({ ...d.data(), id: d.id })));
       return true;
     } catch (error) {
       setHistoryError(String(error?.code || "error"));
@@ -5972,9 +6067,53 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   useEffect(() => {
-    if (page === "analytics" || page === "equipmentCards") loadOnDemand("reportHistory", loadCompleteReportHistory, true);
+    if (page === "analytics") loadOnDemand("reportHistory", loadCompleteReportHistory, true);
     if (page === "home") loadOnDemand("latestReports", loadLatestReports, true);
   }, [page]);
+
+  async function loadEquipmentReportPage(machine, previous = null) {
+    const request = ++equipmentPageRequest.current;
+    const size = 25;
+    setEquipmentPageBusy(true);
+    setEquipmentPageError("");
+    try {
+      const identity = parseEquipmentKey(machine);
+      const clauses = [where("equipmentHistoryKeys", "array-contains", machine)];
+      if (identity.line) {
+        const lineAliases = /^(76|78)-060$/.test(identity.line)
+          ? [identity.line, identity.line.replace("-060", "-60")] : [identity.line];
+        clauses.push(where("lineName", "in", lineAliases), where("equipment", "in", lineAliases));
+      } else if (identity.equipment) {
+        for (const field of ["equipment", "machine", "machineName", "equipmentName"]) {
+          clauses.push(where(field, "==", identity.equipment));
+        }
+      }
+      const snapshot = await measureFirestoreRead("reports:equipment-page", () => getDocs(query(
+        collection(db, "maintenanceReports"), or(...clauses), orderBy(documentId()),
+        ...(previous?.cursor ? [startAfter(previous.cursor)] : []), limit(size)
+      )));
+      if (request !== equipmentPageRequest.current) return;
+      const rows = snapshot.docs.map(d => ({ ...d.data(), id: d.id }))
+        .filter(row => equipmentNamesFromRecord(row).includes(machine));
+      setEquipmentPage({
+        machine, rows: [...(previous?.rows || []), ...rows],
+        cursor: snapshot.docs.at(-1) || previous?.cursor || null,
+        hasMore: snapshot.size === size,
+      });
+    } catch (error) {
+      if (request === equipmentPageRequest.current) setEquipmentPageError(error?.code || "error");
+    } finally {
+      if (request === equipmentPageRequest.current) setEquipmentPageBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (page !== "equipmentCards") return;
+    setEquipmentPage(null);
+    loadEquipmentReportPage(equipmentPilot);
+    return () => { equipmentPageRequest.current += 1; };
+  }, [page, equipmentPilot]);
+
 
   function renderReportHistoryStatus() {
     const en = appLanguage === "en";
@@ -6635,6 +6774,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
       eliteDiagnosisAt: newReport.eliteDiagnosisAt || createdNow,
     };
 
+    Object.assign(reportToSave, await reportLookupFields(reportToSave));
     if (new TextEncoder().encode(JSON.stringify(reportToSave)).length > 800000) {
       throw new Error("Report images are too large; reduce their size before saving.");
     }
@@ -6926,6 +7066,22 @@ function MaintenanceApp({ currentUser, userProfile }) {
     await loadCalendar();
   }
 
+  function startRecurrenceFollowUp(row, symptom = "") {
+    if (!canWriteReports) return;
+    if (newPlannedWork && !window.confirm("入力中の計画工事を置き換えますか？")) return;
+    setNewPlannedWork({
+      ...createBlankPlannedWork(),
+      title: "再発防止：" + (row.equipment || row.lineName || ""),
+      equipment: row.equipment || row.lineName || "",
+      purpose: symptom.trim() || row.phenomenon || row.troublePoint || "",
+      detail: row.recurrencePrevention || "",
+      sourceReportId: row.id,
+      verificationPlan: "",
+      verificationResult: "",
+    });
+    setPage("work");
+  }
+
   function startNewPlannedWork() {
     setNewPlannedWork(createBlankPlannedWork());
   }
@@ -6936,6 +7092,11 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   async function saveNewPlannedWork() {
     if (!newPlannedWork) return;
+    if (newPlannedWork.verificationPlan !== undefined && (!newPlannedWork.owner.trim() || !newPlannedWork.endDate ||
+      newPlannedWork.endDate < newPlannedWork.date || !newPlannedWork.verificationPlan.trim())) {
+      alert("担当者、開始日以降の完了予定日、効果確認方法を入力してください。");
+      return;
+    }
     if (!newPlannedWork.title) {
       alert("工事件名を入力してください。");
       return;
@@ -7905,7 +8066,7 @@ Do not recommend bypassing guards, interlocks, lockout/tagout, or electrical pro
             {equipmentMatches.slice(0, 12).map((equipmentMatch) => (
               <button key={equipmentMatch} type="button" className="primaryButton" onClick={() => {
                 setEquipmentPilot(equipmentMatch);
-                setEquipmentHistoryLimit(10);
+
                 setGlobalSearch("");
                 setPage("equipmentCards");
               }}>
@@ -8293,10 +8454,11 @@ const buildReportFromExcelRow = (row = [], fileName = "", workbook = null) => {
     approvedBy: "",
     inspectedBy: "",
     maintenanceType: excelText(sheet.maintenanceType, row?.[2]) || "CM",
-    troubleDateTime: pickDateTime(sheet.troubleDateTime || rowTrouble, sheet.workStartDateTime || rowStart),
+    troubleDateTime: pickDateTime(sheet.troubleDateTime || rowTrouble),
     workStartDateTime: pickDateTime(sheet.workStartDateTime || rowStart),
     workEndDateTime: pickDateTime(sheet.workEndDateTime || rowEnd),
-    productionStartDateTime: pickDateTime(sheet.productionStartDateTime || rowProduction, sheet.workEndDateTime || rowEnd),
+    productionStartDateTime: recordedReportTime(sheet.productionStartDateTime || rowProduction),
+    productionReturnRecorded: Boolean(recordedReportTime(sheet.productionStartDateTime || rowProduction)),
     stopExclusionHours: sheet.stopExclusionHours ?? numberCell(row?.[7], 0),
     functionDownRate: rawRate <= 1 ? rawRate * 100 : rawRate,
     createdAt: sheet.createdAt || normalizeDateOnly(sheet.workStartDateTime || rowStart) || normalizeDateOnly(sheet.troubleDateTime || rowTrouble) || todayText(),
@@ -8365,81 +8527,157 @@ const handleReportExcelUpload = async (e) => {
   reader.readAsBinaryString(file);
 };
 
-const handleBulkReportExcelUpload = async (e) => {
-  const files = Array.from(e.target.files || []);
-  if (files.length === 0) return;
+  async function findReportDuplicate(key) {
+    const ref = collection(db, "maintenanceReports");
+    const id = await importDocumentReference("maintenanceReports", key);
+    const hash = id.id.slice("import_".length);
+    const [direct, indexed, legacyIndexed] = await measureFirestoreRead("imports:duplicate-key", () => Promise.all([
+      getDoc(id),
+      getDocs(query(ref, where("reportDuplicateHash", "==", hash), limit(1))),
+      ...(new TextEncoder().encode(key).length <= 1500
+        ? [getDocs(query(ref, where("duplicateKey", "==", key), limit(1)))] : []),
+    ]));
+    return direct.exists() || !indexed.empty || (legacyIndexed && !legacyIndexed.empty);
+  }
 
-  const imported = [];
-  let success = 0;
-  let failed = 0;
-  let duplicated = 0;
-  let existingReportKeys;
-
-  for (const file of files) {
+  async function handleBulkReportExcelUpload(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!canWriteReports || !files.length || excelInFlight.current) return;
+    excelInFlight.current = true;
+    setExcelBusy(true);
+    setExcelPreview([]);
+    const items = [];
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { cellDates: true });
-      const row = getReportRowFromWorkbook(workbook);
-
-      if (!row) {
-        failed += 1;
-        continue;
-      }
-
-      const report = buildReportFromExcelRow(row, file.name, workbook);
-      report.note = `Excel一括取込ファイル：${file.name}`;
-      report.importedCreatedBy = report.createdBy || "";
-      report.createdBy = currentUserName;
-      report.createdByUid = currentUser.uid;
-      report.createdByEmail = currentUser.email || "";
-      report.createdAtAudit = new Date().toISOString();
-
-      const duplicateKey = makeMaintenanceReportDuplicateKey(report);
-      if (!existingReportKeys) {
-        const reference = await importDocumentReference("maintenanceReports", duplicateKey);
-        if ((await measureFirestoreRead("imports:known-report", () => getDoc(reference))).exists()) {
-          duplicated += 1;
-          continue;
+      for (const [index, file] of files.entries()) {
+        try {
+          const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+          const row = getReportRowFromWorkbook(workbook);
+          const report = buildReportFromExcelRow(row, file.name, workbook);
+          if (!report.equipment && !report.phenomenon && !report.troublePoint) throw new Error("設備名と異常内容を確認");
+          const warnings = reportDataWarnings(report);
+          const normalized = value => String(value || "").normalize("NFKC").trim().toLowerCase();
+          const knownEquipment = report.equipment && EQUIPMENT_CATALOG.some(entry =>
+            normalized(entry.equipment) === normalized(report.equipment) &&
+            (!report.lineName || normalized(entry.line) === normalized(report.lineName)) &&
+            (!report.groupName || normalized(entry.group) === normalized(report.groupName)));
+          if (!knownEquipment) warnings.push("設備マスターに一致なし");
+          items.push({ index, filename: file.name, report, warnings, key: makeMaintenanceReportDuplicateKey(report) });
+        } catch (error) {
+          items.push({ index, filename: file.name, error: error.message || "読込エラー" });
         }
-        const snapshot = await measureFirestoreRead("imports:legacy-report-duplicates",
-          () => getDocs(collection(db, "maintenanceReports")));
-        existingReportKeys = new Set(snapshot.docs.map(d => makeMaintenanceReportDuplicateKey(d.data())));
       }
-      if (existingReportKeys.has(duplicateKey)) {
-        duplicated += 1;
-        continue;
+      const existingKeys = new Set();
+      for (const key of new Set(items.filter(item => item.report).map(item => item.key))) {
+        if (await findReportDuplicate(key)) existingKeys.add(key);
       }
-      const id = await createUniqueImport("maintenanceReports", report, duplicateKey);
-      if (!id) {
-        duplicated += 1;
-        continue;
-      }
-      imported.push(sanitizeReportDates({ ...report, duplicateKey, id }));
-      existingReportKeys.add(duplicateKey);
-      success += 1;
+      const batchKeys = new Set();
+      setExcelPreview(items.map(item => {
+        if (!item.report) return item;
+        const duplicate = existingKeys.has(item.key);
+        const repeated = batchKeys.has(item.key);
+        batchKeys.add(item.key);
+        return { ...item, duplicate, repeated, selected: !duplicate && !repeated && !item.warnings.length };
+      }));
     } catch (error) {
-      console.error("Import error:", file.name, error);
-      failed += 1;
+      console.error("Excel preview failed:", error);
+      alert("重複確認に失敗しました。接続と権限を確認し、ファイルを選び直してください。");
+    } finally {
+      excelInFlight.current = false;
+      setExcelBusy(false);
     }
   }
 
-  if (imported.length) setReports((current) => {
-    const merged = new Map(current.map((row) => [row.id, row]));
-    imported.forEach((row) => merged.set(row.id, row));
-    return [...merged.values()];
-  });
+  async function confirmExcelImport() {
+    const selected = excelPreview.filter(item => item.selected && !item.duplicate);
+    if (!canWriteReports || !selected.length || excelInFlight.current) return;
+    if (new Set(selected.map(item => item.key)).size !== selected.length) {
+      alert("同じ内容のファイルは1件だけ選択してください。");
+      return;
+    }
+    excelInFlight.current = true;
+    setExcelBusy(true);
+    let imported = 0;
+    let duplicates = 0;
+    let failed = 0;
+    try {
+      for (const item of selected) {
+        try {
+          const report = {
+            ...item.report,
+            note: "Excel一括取込ファイル：" + item.filename,
+            importedCreatedBy: item.report.createdBy || "",
+            createdBy: currentUserName,
+            createdByUid: currentUser.uid,
+            createdByEmail: currentUser.email || "",
+            createdAtAudit: new Date().toISOString(),
+          };
+          if (await findReportDuplicate(item.key)) {
+            duplicates++;
+            setExcelPreview(current => current.map(row => row.key === item.key
+              ? { ...row, duplicate: true, selected: false } : row));
+            continue;
+          }
+          const fields = await reportLookupFields(report);
+          const id = await createUniqueImport("maintenanceReports", { ...report, ...fields }, item.key);
+          if (id) {
+            imported++;
+            setReports(current => [sanitizeReportDates({ ...report, id, duplicateKey: item.key }),
+              ...current.filter(row => row.id !== id)]);
+          } else {
+            duplicates++;
+          }
+          setExcelPreview(current => current.map(row => row.key === item.key
+            ? { ...row, duplicate: true, selected: false, imported: row.index === item.index && Boolean(id) }
+            : row));
+        } catch (error) {
+          console.error("Excel import failed:", item.filename, error);
+          failed++;
+        }
+      }
+      alert("登録 " + imported + "件 / 重複 " + duplicates + "件 / 失敗 " + failed + "件");
+    } finally {
+      excelInFlight.current = false;
+      setExcelBusy(false);
+    }
+  }
 
-  alert(`一括取込完了
-成功：${success}件
-重複スキップ：${duplicated}件
-失敗：${failed}件`);
-};
+  function renderExcelPreview() {
+    return <>
+      {excelBusy && <p role="status">Excelを処理しています…</p>}
+      {excelPreview.length > 0 && <fieldset className="calendarEditCard" disabled={excelBusy}>
+        <legend>Excel取込プレビュー</legend>
+        <p>旧報告書は照合キーの登録後に重複確認の対象になります。</p>
+        <p>警告のあるファイルは、Excelを修正して選び直すか、内容を確認して選択してください。</p>
+        {excelPreview.map(item => <div key={item.index} className="calendarEditCard">
+          <label>
+            <input type="checkbox" disabled={Boolean(item.error || item.duplicate)} checked={Boolean(item.selected)}
+              onChange={event => {
+                const selected = event.target.checked;
+                setExcelPreview(current => current.map(row => row.index === item.index ? { ...row, selected } : row));
+              }} />
+            {item.filename}
+          </label>
+          {item.report && <p>{item.report.lineName} · {item.report.equipment} · {item.report.phenomenon}</p>}
+          {item.report && item.warnings.length > 0 && <p>
+            発生 {item.report.troubleDateTime || "—"} · 作業 {item.report.workStartDateTime || "—"}
+            {" → "}{item.report.workEndDateTime || "—"} · 復帰 {item.report.productionStartDateTime || "—"}
+          </p>}
+          <p>{item.error || (item.imported ? "登録済み" : item.duplicate ? "既存の重複" :
+            [item.repeated ? "同じ取込内に重複あり" : "", ...item.warnings].filter(Boolean).join(" · "))}</p>
+        </div>)}
+        <button type="button" className="primaryButton" disabled={!excelPreview.some(item => item.selected)}
+          onClick={confirmExcelImport}>選択した報告書を登録</button>
+        <button type="button" onClick={() => setExcelPreview([])}>プレビューを閉じる</button>
+      </fieldset>}
+    </>;
+  }
 
   function ReportDraftForm() {
     if (!newReport) return null;
 
     const calc = calculateReport(newReport);
-    const setReport = (field, value) => setNewReport((current) => ({ ...current, [field]: value }));
+    const setReport = (field, value) => setNewReport((current) => ({ ...current, ...updateReportTimingField(field, value), [field]: value }));
 
     // =====================================================
     // MIYAMA ELITE - PHASE 3
@@ -8464,7 +8702,10 @@ const handleBulkReportExcelUpload = async (e) => {
     const currentPointKey = normalizeElite(newReport.troublePoint);
     const currentPhenomenonWords = eliteKeywords(newReport.phenomenon);
 
-    const eliteHistoryMatches = reports
+    const eliteHistoryMatches = (historyReports || reports)
+      .filter(history => currentEquipmentKey && normalizeElite(history.equipment) === currentEquipmentKey &&
+        (!currentLineKey || normalizeElite(history.lineName) === currentLineKey) &&
+        (!newReport.groupName || normalizeElite(history.groupName) === normalizeElite(newReport.groupName)))
       .map((history) => {
         let score = 0;
         const equipmentKey = normalizeElite(history.equipment);
@@ -8483,9 +8724,10 @@ const handleBulkReportExcelUpload = async (e) => {
         const keywordHits = currentPhenomenonWords.filter((word) => historyText.includes(normalizeElite(word))).length;
         score += Math.min(3, keywordHits);
 
-        return { ...history, eliteScore: score };
+        return { ...history, eliteScore: score, similar: keywordHits > 0 ||
+          (currentPointKey && pointKey === currentPointKey) || (currentCauseKey && causeKey === currentCauseKey) };
       })
-      .filter((history) => history.eliteScore >= 5)
+      .filter(history => history.similar)
       .sort((a, b) => b.eliteScore - a.eliteScore || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 
     const eliteHistoryCount = eliteHistoryMatches.length;
@@ -8877,7 +9119,8 @@ Rules:
           <input type="file" accept=".xlsx,.xls,.xlsm" onChange={handleReportExcelUpload} />
 
           <p style={{ margin: "12px 0 4px", fontWeight: "bold" }}>複数Excel一括取込</p>
-          <input type="file" accept=".xlsx,.xls,.xlsm" multiple onChange={handleBulkReportExcelUpload} />
+          <input type="file" accept=".xlsx,.xls,.xlsm" multiple disabled={excelBusy} onChange={handleBulkReportExcelUpload} />
+          {renderExcelPreview()}
         </div>
 
         <Section openSections={openSections} toggleSection={toggleSection} sectionKey="basic" title="📌 基本情報・設備情報">
@@ -9234,7 +9477,9 @@ Rules:
                     <span>{history.createdAt || history.reportCreatedDate || "-"}</span>
                     <strong>{history.equipment || history.lineName || "-"}</strong>
                     <span>{history.phenomenon || history.troublePoint || "-"}</span>
-                    <em>Score {history.eliteScore}</em>
+                    <span>{history.action || history.recurrencePrevention || "—"}</span>
+                    {canWriteReports && <button type="button" onClick={() =>
+                      startRecurrenceFollowUp(history, newReport.phenomenon || "")}>再発防止工事を作成</button>}
                   </div>
                 ))}
               </div>
@@ -12723,7 +12968,21 @@ function renderHome() {
               <label>{appLanguage === "en" ? "🚨 ① Failure Occurred At" : "🚨 ①不具合発生日時"}<input type="datetime-local" value={dateTimeInputValue(row.troubleDateTime)} onChange={(e) => setRow("troubleDateTime", e.target.value)} /></label>
               <label>{appLanguage === "en" ? "🛠️ ② Maintenance Started At" : "🛠️ ②保全作業開始日時"}<input type="datetime-local" value={dateTimeInputValue(row.workStartDateTime)} onChange={(e) => setRow("workStartDateTime", e.target.value)} /></label>
               <label>{appLanguage === "en" ? "✅ ③ Maintenance Completed At" : "✅ ③保全作業完了日時"}<input type="datetime-local" value={dateTimeInputValue(row.workEndDateTime)} onChange={(e) => setRow("workEndDateTime", e.target.value)} /></label>
-              <label>{appLanguage === "en" ? "▶️ ④ Production Resumed At" : "▶️ ④生産開始日時"}<input type="datetime-local" value={dateTimeInputValue(row.productionStartDateTime)} onChange={(e) => setRow("productionStartDateTime", e.target.value)} /></label>
+              <label>{appLanguage === "en" ? "▶️ ④ Production Resumed At" : "▶️ ④生産開始日時"}<input type="datetime-local" value={reportTiming(row).returnMissing ? "" : dateTimeInputValue(row.productionStartDateTime)}
+                onChange={(e) => setRow("productionStartDateTime", e.target.value)} />
+                {reportTiming(row).returnMissing && <small>não informado</small>}
+              </label>
+              {canWriteReports && !isApprovedLocked && reportTiming(row).returnMissing
+                && row.productionReturnRecorded == null && recordedReportTime(row.productionStartDateTime) &&
+                <button type="button" onClick={() => setRow("productionStartDateTime", row.productionStartDateTime)}>
+                  {appLanguage === "en" ? "Confirm stored production return time" : "保存済みの生産復帰日時を確認"}
+                  {" "}{recordedReportTime(row.productionStartDateTime)}
+                </button>}
+              {canWriteReports && !isApprovedLocked && <label>
+                <input type="checkbox" checked={row.timingReviewed === true}
+                  onChange={e => setRow("timingReviewed", e.target.checked)} />
+                {appLanguage === "en" ? "I verified the recorded times" : "記録された日時を確認済み"}
+              </label>}
               <label>{appLanguage === "en" ? "⏸️ ⑤ Excluded Downtime (h)" : "⏸️ ⑤停止除外時間H"}<input type="number" min="0" step="0.1" value={Math.max(0, toNumber(row.stopExclusionHours, 0))} onChange={(e) => setRow("stopExclusionHours", e.target.value)} /></label>
               <label>{appLanguage === "en" ? "📉 ⑥ Functional Loss (%)" : "📉 ⑥機能低下(%)"}<input type="number" min="0" step="1" value={Math.max(0, toNumber(row.functionDownRate, 100))} onChange={(e) => setRow("functionDownRate", e.target.value)} /></label>
               <label>{appLanguage === "en" ? "⏱️ ⑦ Downtime (h)" : "⏱️ ⑦停止時間H"}<input className="readOnlyCalc" readOnly value={calc.stopTimeHours} /></label>
@@ -13360,6 +13619,10 @@ function renderHome() {
               </label>
             </div>
 
+            {newPlannedWork.verificationPlan !== undefined && <label>効果確認方法
+              <textarea value={newPlannedWork.verificationPlan} onChange={e =>
+                setNewPlannedWork({ ...newPlannedWork, verificationPlan: e.target.value })} />
+            </label>}
             <h3>📋 内容</h3>
             <textarea value={newPlannedWork.detail || ""} onChange={(e) => setNewPlannedWork({ ...newPlannedWork, detail: e.target.value })} />
 
@@ -13412,6 +13675,17 @@ function renderHome() {
                 </div>
               </div>
 
+              {row.verificationPlan && <div className="calendarEditCard">
+                <p>効果確認方法 {row.verificationPlan}</p>
+                <label>効果確認結果
+                  <ImeSafeTextarea value={row.verificationResult || ""}
+                    readOnly={!canWriteReports} onCommit={value =>
+                      updateField("plannedWorks", row.id, "verificationResult", value).catch(error => {
+                        console.error(error);
+                        alert("効果確認結果を保存できませんでした。");
+                      })} />
+                </label>
+              </div>}
               <div className="reportGrid" style={{ marginTop: "20px" }}>
                 <label>📅 開始日
                   <input type="date" value={row.date || ""} onChange={(e) => updateField("plannedWorks", row.id, "date", e.target.value)} />
@@ -13702,7 +13976,14 @@ function renderHome() {
     const totalStopHours = filtered.reduce((sum, row) => sum + toNumber(calculateReport(row).stopTimeHours, 0), 0);
     const totalRepairHours = filtered.reduce((sum, row) => sum + toNumber(row.laborHours ?? calculateReport(row).laborHours, 0), 0);
     const totalCost = filtered.reduce((sum, row) => sum + toNumber(row.totalCost ?? calculateReport(row).totalCost, 0), 0);
-    const mttr = totalReports > 0 ? totalStopHours / totalReports : 0;
+    const timing = filtered.map(row => ({ row, ...reportTiming(row) }));
+    const repairSamples = timing.filter(item => item.repair !== null && !item.repairReview);
+    const downtimeSamples = timing.filter(item => item.downtime !== null && !item.downtimeReview);
+    const average = (samples, field) => samples.length
+      ? formatHours(samples.reduce((sum, item) => sum + item[field], 0) / samples.length) : "—";
+    const topDowntime = [...timing].sort((a, b) => (b.downtime ?? -1) - (a.downtime ?? -1));
+    const reviewRows = [...new Set([...topDowntime.filter(item => item.repairReview || item.downtimeReview || item.repair === null || item.downtime === null),
+      ...topDowntime.filter(item => item.downtime > 0).slice(0, 10)])];
     const emergencyCount = filtered.filter((row) => {
       const strategy = getMaintenanceStrategyCompatible(row);
       return strategy === "CM" || (!strategy && String(row.reportTitle || "").includes("修理"));
@@ -13949,9 +14230,15 @@ function renderHome() {
 
           <div className="miyamaEliteKpi">
             <span>⏱️</span>
-            <small>MTTR</small>
-            <strong>{mttr.toFixed(1)}H</strong>
-            <p>{appLanguage === "es" ? "promedio por falla" : appLanguage === "en" ? "average per failure" : "1件平均停止時間"}</p>
+            <small>{appLanguage === "en" ? "Average repair duration" : "平均修理時間"}</small>
+            <strong>{average(repairSamples, "repair")}</strong>
+            <p>{repairSamples.length} / {totalReports}</p>
+          </div>
+          <div className="miyamaEliteKpi">
+            <span>🏭</span>
+            <small>{appLanguage === "en" ? "Average time to production restart" : "平均生産復帰時間"}</small>
+            <strong>{average(downtimeSamples, "downtime")}</strong>
+            <p>{downtimeSamples.length} / {totalReports}</p>
           </div>
 
           <div className="miyamaEliteKpi">
@@ -13962,6 +14249,24 @@ function renderHome() {
           </div>
         </section>
 
+        <section className="tableWrap">
+          <h2>{appLanguage === "en" ? "Review downtime and dates" : "長時間停止・日時の確認"}</h2>
+          <p>{appLanguage === "en" ? "Durations use elapsed clock time. Missing or invalid times and unverified suspicious durations are excluded from the corresponding average." : "経過時間で集計し、日時が未入力・無効、または要確認で未確認の記録は該当する平均の対象外です。"}</p>
+          <p>{appLanguage === "en" ? "Reports to review" : "確認対象"} {reviewRows.length}</p>
+          {reviewRows.slice(0, timingReviewLimit).map(({ row, repair, downtime, returnMissing, repairReview, downtimeReview }) => (
+            <div key={row.id} className="calendarEditCard">
+              <strong>{row.equipment || row.lineName || "—"} · {getReportDate(row) || "—"}</strong>
+              <p>{row.phenomenon || row.troublePoint || "—"}</p>
+              <p>修理 {repair === null ? "—" : formatHours(repair)} {repairReview && "（平均の対象外）"} · 生産復帰 {returnMissing ? "não informado" : downtime === null ? "—" : formatHours(downtime)} {downtimeReview && "（平均の対象外）"}</p>
+              <p>発生 {recordedReportTime(row.troubleDateTime) || "—"} · 作業 {recordedReportTime(row.workStartDateTime) || "—"}
+                {" → "}{recordedReportTime(row.workEndDateTime) || "—"} · 復帰 {returnMissing ? "não informado" : recordedReportTime(row.productionStartDateTime)}</p>
+              <p>{reportDataWarnings(row).join(" · ")}</p>
+              <button type="button" onClick={() => openHistoryReport(row)}>元の修理報告を開く</button>
+            </div>
+          ))}
+          {reviewRows.length > timingReviewLimit && <button type="button" onClick={() =>
+            setTimingReviewLimit(current => current + 20)}>さらに20件表示</button>}
+        </section>
         <section className="miyamaEliteAnalyticsGrid">
           <div className="miyamaElitePanel">
             <div className="miyamaElitePanelTitle">
@@ -14091,7 +14396,8 @@ function renderHome() {
         <div className="productionKpiGrid">
           <div className="productionKpi"><span>📝 保全報告書件数</span><strong>{totalReports.toLocaleString()}件</strong><small>保全修理報告書のみ</small></div>
           <div className="productionKpi"><span>⏰ 停止時間合計</span><strong>{formatHours(totalStopHours)}</strong><small>生産停止に直結する時間</small></div>
-          <div className="productionKpi"><span>🛠 MTTR</span><strong>{formatHours(mttr)}</strong><small>1件あたり平均停止時間</small></div>
+          <div className="productionKpi"><span>🛠 平均修理時間</span><strong>{average(repairSamples, "repair")}</strong></div>
+          <div className="productionKpi"><span>🏭 平均生産復帰時間</span><strong>{average(downtimeSamples, "downtime")}</strong></div>
           <div className="productionKpi"><span>💴 保全費用合計</span><strong>{formatMoney(totalCost)}</strong><small>工数費 + 部品費</small></div>
           <div className="productionKpi"><span>🔥 突発保全</span><strong>{emergencyCount.toLocaleString()}件</strong><small>CM/修理系</small></div>
           <div className="productionKpi"><span>📅 計画保全</span><strong>{plannedCount.toLocaleString()}件</strong><small>報告書分類から集計</small></div>
@@ -16818,15 +17124,48 @@ Requirements:
     );
   }
 
+  function startEquipmentIncident(machine) {
+    setIncidentDraftMessage("");
+    const now = new Date();
+    const blank = { machine, component: "", symptom: "", stopped: "", photo: null, savedPhoto: "",
+      occurredAt: new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16) };
+    try {
+      const saved = JSON.parse(localStorage.getItem(equipmentIncidentDraftKey(currentUser.uid, machine)) || "null");
+      if (saved?.machine === machine) {
+        setEquipmentIncident({ ...blank, ...saved, photo: null });
+        return;
+      }
+    } catch { setIncidentDraftMessage("下書きを読み込めませんでした。"); }
+    setEquipmentIncident(blank);
+  }
+
+  async function saveEquipmentIncidentLocally() {
+    if (!canWriteReports || !equipmentIncident || incidentActionInFlight.current) return;
+    incidentActionInFlight.current = true;
+    setEquipmentIncidentSaving(true);
+    const { photo, ...draft } = equipmentIncident;
+    try {
+      if (photo) draft.savedPhoto = await prepareIncidentPhoto(photo);
+      localStorage.setItem(equipmentIncidentDraftKey(currentUser.uid, draft.machine), JSON.stringify(draft));
+      setIncidentDraftMessage("この端末に下書きを保存しました。 / Draft saved on this device.");
+    } catch {
+      setIncidentDraftMessage("この端末に下書きを保存できませんでした。 / Could not save the local draft.");
+    } finally {
+      incidentActionInFlight.current = false;
+      setEquipmentIncidentSaving(false);
+    }
+  }
+
   async function submitEquipmentIncident(event) {
     event.preventDefault();
-    if (equipmentIncidentSaving || reportSaveInFlight.current || !equipmentIncident) return;
-    const { machine, symptom, stopped, photo, occurredAt, component } = equipmentIncident;
+    if (!canWriteReports || incidentActionInFlight.current || reportSaveInFlight.current || !equipmentIncident) return;
+    const { machine, symptom, stopped, photo, savedPhoto, occurredAt, component } = equipmentIncident;
     const identity = parseEquipmentKey(machine);
     if (!symptom.trim() || !stopped || !occurredAt || (!identity.equipment && !component.trim())) return;
+    incidentActionInFlight.current = true;
     setEquipmentIncidentSaving(true);
     try {
-      const beforeImage = await prepareIncidentPhoto(photo);
+      const beforeImage = photo ? await prepareIncidentPhoto(photo) : savedPhoto || "";
       const stopText = { yes: "あり / Yes", no: "なし / No", unknown: "不明 / Unknown" }[stopped];
       const saved = await saveNewReport(null, {
         ...createBlankReport(),
@@ -16837,21 +17176,28 @@ Requirements:
         reportCreatedDate: todayText(),
         createdBy: currentUserName,
         phenomenon: symptom.trim(),
+        incidentMachineStopped: stopped,
         repairStatus: "未対応",
         note: `異常報告 / Incident report — 設備停止 / Machine stopped: ${stopText}`,
         beforeImage,
       });
-      if (saved) setEquipmentIncident(null);
+      if (saved) {
+        try { localStorage.removeItem(equipmentIncidentDraftKey(currentUser.uid, machine)); }
+        catch { /* The report has already been committed. */ }
+        setEquipmentIncident(null);
+      }
     } catch {
       alert(appLanguage === "en" ? "Could not read the photo. Please select it again." : "写真を読み込めませんでした。もう一度選択してください。");
     } finally {
+      incidentActionInFlight.current = false;
       setEquipmentIncidentSaving(false);
     }
   }
 
-  function renderEquipmentIncident(en) {
+  function renderEquipmentIncident(en, history) {
     const draft = equipmentIncident;
     const identity = parseEquipmentKey(draft.machine);
+    const matches = findEquipmentRecurrences(history, draft.symptom, identity.equipment ? "" : draft.component);
     const components = EQUIPMENT_CATALOG.filter((item) => item.group === identity.group && item.line === identity.line);
     const change = (key, value) => setEquipmentIncident((current) => ({ ...current, [key]: value }));
     return (
@@ -16896,12 +17242,24 @@ Requirements:
                 alert(en ? "Select JPG, PNG or WebP up to 20 MB. For HEIC, export as JPG first." : "20MB以下のJPG・PNG・WebPを選択してください。HEICはJPGに変換してください。");
                 return;
               }
-              change("photo", file || null);
+              if (file) setEquipmentIncident(current => ({ ...current, photo: file, savedPhoto: "" }));
             }} />
           </label>
           <p style={{ fontSize: 13 }}>{en ? "Photos are reduced automatically in this browser when you save. The original file stays unchanged." : "保存時にこのブラウザ内で写真を自動縮小します。元の写真は変更しません。"}</p>
+          {draft.savedPhoto && <button type="button" onClick={() => change("savedPhoto", "")}>保存済みの写真を外す</button>}
+          {matches.length > 0 && <section>
+            <h4>{en ? "Similar incidents on this equipment" : "同じ設備の類似事例"}</h4>
+            {matches.map(row => <div className="calendarEditCard" key={row.id}>
+              <p>{row.phenomenon || row.troublePoint}</p>
+              <p>{row.action || row.recurrencePrevention || "—"}</p>
+              <button type="button" onClick={() => openHistoryReport(row)}>元の報告</button>
+              <button type="button" onClick={() => startRecurrenceFollowUp(row, draft.symptom)}>再発防止工事を作成</button>
+            </div>)}
+          </section>}
+          {incidentDraftMessage && <p role="status">{incidentDraftMessage}</p>}
           {draft.photo && <small>{draft.photo.name} · {Math.round(draft.photo.size / 1024)} KB</small>}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <button type="button" onClick={saveEquipmentIncidentLocally}>{en ? "Save draft on this device" : "この端末に下書きを保存"}</button>
             <button type="submit" className="primaryButton" disabled={!draft.symptom.trim() || !draft.stopped || !draft.occurredAt || (!identity.equipment && !draft.component.trim())}>{en ? "Save report" : "報告を保存"}</button>
             <button type="button" className="deleteButton" onClick={() => {
               if ((draft.symptom.trim() || draft.photo) && !window.confirm(en ? "Discard this unsaved report?" : "未保存の入力内容を破棄しますか？")) return;
@@ -16915,9 +17273,9 @@ Requirements:
   }
 
   function renderEquipmentCards() {
-    if (historyReports === null) return renderReportHistoryStatus();
     const en = appLanguage === "en";
-    const available = [...new Set([equipmentPilot, ...equipmentNames, ...historyReports.flatMap(equipmentNamesFromRecord)])]
+    const available = [...new Set([equipmentPilot, ...equipmentNames, ...EQUIPMENT_CATALOG.flatMap(item =>
+      [equipmentKey(item.group, item.line), equipmentKey(item.group, item.line, item.equipment)])])]
       .sort((a, b) => equipmentLabel(a).localeCompare(equipmentLabel(b), "ja", { numeric: true }));
     const groups = [...new Set(available.map((key) => parseEquipmentKey(key).group).filter(Boolean))].sort();
     const lines = [...new Set(available.map(parseEquipmentKey)
@@ -16926,14 +17284,15 @@ Requirements:
     const choices = filterEquipmentCards(available, equipmentFind, equipmentGroupFilter, equipmentLineFilter);
     const matches = (row) => equipmentNamesFromRecord(row).includes(equipmentPilot);
     const date = (row) => normalizeDateOnly(row.troubleDateTime || row.reportCreatedDate || row.createdAt) || "";
-    const history = historyReports.filter(matches).sort((a, b) => date(b).localeCompare(date(a)));
+    const currentPage = equipmentPage?.machine === equipmentPilot ? equipmentPage : null;
+    const history = [...(currentPage?.rows || [])].sort((a, b) => date(b).localeCompare(date(a)));
     const latest = history[0];
     const filters = equipmentHistoryFilter.machine === equipmentPilot
       ? equipmentHistoryFilter : { machine: equipmentPilot, query: "", from: "", to: "" };
     const filteredHistory = filterEquipmentReportHistory(history, filters, date);
     const setHistoryFilter = (field, value) => {
       setEquipmentHistoryFilter({ ...filters, [field]: value });
-      setEquipmentHistoryLimit(10);
+
     };
 
     const scheduled = maintenanceRows.filter((row) => matches(row) && row.nextDate)
@@ -16973,7 +17332,7 @@ Requirements:
         {choices.length ? <label>{en ? "Select equipment to open" : "開く設備を選択"}
           <select value={choices.includes(equipmentPilot) ? equipmentPilot : ""} disabled={Boolean(equipmentIncident)} onChange={(e) => {
             if (!e.target.value) return;
-            setEquipmentPilot(e.target.value); setEquipmentHistoryLimit(10);
+            setEquipmentPilot(e.target.value);
           }}>
             <option value="" disabled>{en ? "Select equipment" : "設備を選択してください"}</option>
             {choices.map((machine) => <option key={machine} value={machine}>{equipmentLabel(machine)}</option>)}
@@ -16982,20 +17341,23 @@ Requirements:
         <p style={{ fontSize: 13 }}>{en ? "The open card below changes only when you select equipment." : "下のカルテは、設備を選択すると切り替わります。"}</p>
         <h2 style={{ marginTop: 20 }}>{equipmentLabel(equipmentPilot)}</h2>
         <EquipmentQr machine={equipmentPilot} language={appLanguage} />
-        {equipmentIncident?.machine === equipmentPilot ? renderEquipmentIncident(en) : equipmentIncident ? (
+        {canWriteReports && (equipmentIncident?.machine === equipmentPilot ? renderEquipmentIncident(en, history) : equipmentIncident ? (
           <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
-            onClick={() => { setEquipmentPilot(equipmentIncident.machine); setEquipmentHistoryLimit(10); }}>
+            onClick={() => { setEquipmentPilot(equipmentIncident.machine); }}>
             {en ? "Resume incident report" : "入力中の異常報告に戻る"} · {equipmentLabel(equipmentIncident.machine)}
           </button>
         ) : (
           <button type="button" className="primaryButton" style={{ marginBottom: 12 }}
-            onClick={() => setEquipmentIncident({ machine: equipmentPilot, component: "", symptom: "", stopped: "", photo: null, occurredAt: (() => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16); })() })}>
+            onClick={() => startEquipmentIncident(equipmentPilot)}>
             ⚠️ {en ? "Report an abnormality" : "異常報告"}
           </button>
-        )}
+        ))}
+        {equipmentPageBusy && <p role="status">修理履歴を読み込み中…</p>}
+        {equipmentPageError && <p role="alert">修理履歴を読み込めませんでした。 <button type="button"
+          onClick={() => loadEquipmentReportPage(equipmentPilot, currentPage)}>再試行</button></p>}
         <div className="calendarEditCard" style={{ overflowWrap: "anywhere" }}>
-          <h3>{en ? "Latest recorded incident" : "直近の不具合"}</h3>
-          {latest ? <>
+          <h3>{en ? "Latest incident in loaded pages" : "読み込み済みの最新不具合"}</h3>
+          {!currentPage ? null : latest ? <>
             <small>{date(latest) || "—"}</small>
             <p style={{ whiteSpace: "pre-wrap", fontWeight: 700 }}>{latest.phenomenon || latest.troublePoint || "—"}</p>
             <strong>{en ? "Action taken" : "処置内容"}</strong>
@@ -17027,12 +17389,12 @@ Requirements:
             <span role="status">{en ? "Matches in loaded history" : "読み込み済み履歴の検索結果"}: {filteredHistory.length} / {history.length}</span>
             <button type="button" className="primaryButton" onClick={() => {
               setEquipmentHistoryFilter({ machine: equipmentPilot, query: "", from: "", to: "" });
-              setEquipmentHistoryLimit(10);
+
             }}>{en ? "Clear history filters" : "履歴の絞り込みを解除"}</button>
           </div>
           {filters.from && filters.to && filters.from > filters.to && <p role="alert">{en ? "Start date must be before the end date." : "開始日は終了日以前にしてください。"}</p>}
           {!filteredHistory.length && <p>{en ? "No matching report in the loaded history." : "読み込み済みの履歴に該当する報告書がありません。"}</p>}
-          {filteredHistory.slice(0, equipmentHistoryLimit).map((row) => (
+          {filteredHistory.map((row) => (
             <article key={row.id} className="calendarEditCard" style={{ marginTop: 8, overflowWrap: "anywhere" }}>
               <small>{date(row) || (en ? "Date not recorded" : "日付未入力")}</small>
               {row.repairStatus && <p>{en ? "Repair progress" : "修理対応"}: <strong>{row.repairStatus}</strong>{row.repairOwner ? " · " + row.repairOwner : ""}</p>}
@@ -17041,8 +17403,8 @@ Requirements:
               <button type="button" className="primaryButton" onClick={() => open(row)}>{en ? "Open full report" : "報告書の詳細を開く"}</button>
             </article>
           ))}
-          {filteredHistory.length > equipmentHistoryLimit && <button type="button" className="primaryButton"
-            onClick={() => setEquipmentHistoryLimit((limit) => limit + 10)}>{en ? "Show 10 more" : "さらに10件表示"}</button>}
+          {currentPage?.hasMore && <button type="button" className="primaryButton" disabled={equipmentPageBusy}
+            onClick={() => loadEquipmentReportPage(equipmentPilot, currentPage)}>{en ? "Load next history page" : "修理履歴をさらに読み込む"}</button>}
         </details>
       </section>
     );
