@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
 import "./PublicMachineCard.css";
 
-const empty = "Não cadastrado";
-const situation = { overdue: "Vencida", due: "Vence hoje", scheduled: "Programada" };
-const formatUpdatedAt = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tokyo" });
+const empty = "未登録";
+const situation = { overdue: "期限超過", due: "本日期限", scheduled: "予定" };
+const states = {
+  "Aguardando reparo": "未対応", "Reparo em andamento": "対応中", "Reparo concluído": "対応完了",
+  "Troca programada registrada": "定期交換の記録あり", "Manutenção preventiva registrada": "定期保全の記録あり",
+  "Troca programada concluída": "定期交換完了", "Manutenção preventiva concluída": "定期保全完了",
+  "Manutenção corretiva registrada": "修理の記録あり",
+};
+const formatUpdatedAt = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tokyo" });
 
 function Field({ label, value }) {
   return <div><dt>{label}</dt><dd>{value ?? empty}</dd></div>;
@@ -24,43 +30,43 @@ export default function PublicMachineCard({ machine, onLogin }) {
   }, [machine]);
 
   const { card, loading, missing, error } = result;
-  return <main className="miyamaPublicPage" lang="pt-BR">
+  return <main className="miyamaPublicPage" lang="ja">
     <header className="miyamaPublicHeader">
       <span>MIYAMA Maintenance</span>
-      <button type="button" onClick={onLogin}>Entrar</button>
+      <button type="button" onClick={onLogin}>ログイン</button>
     </header>
-    {loading && <p role="status">Carregando ficha…</p>}
-    {missing && <h1>Máquina não cadastrada</h1>}
-    {error && <p role="alert">Não foi possível carregar a ficha. Recarregue a página para tentar novamente.</p>}
+    {loading && <p role="status">設備カルテを読み込み中…</p>}
+    {missing && <h1>設備が登録されていません</h1>}
+    {error && <p role="alert">設備カルテを読み込めませんでした。ページを再読み込みしてください。</p>}
     {card && <>
       <h1>{card.name}</h1>
       <dl className="miyamaPublicFields">
-        <Field label="Código da máquina" value={card.code} />
-        <Field label="Estado registrado" value={card.state} />
-        <Field label="Última atualização (Japão)" value={card.updatedAt ? formatUpdatedAt.format(new Date(card.updatedAt)) : null} />
+        <Field label="設備コード" value={card.code} />
+        <Field label="登録状態" value={states[card.state]} />
+        <Field label="最終更新日時（日本時間）" value={card.updatedAt ? formatUpdatedAt.format(new Date(card.updatedAt)) : null} />
       </dl>
       <section aria-labelledby="public-preventive">
         <h2 id="public-preventive" lang="ja">定期保全</h2>
-        <p>Trocas programadas</p>
-        {card.replacements.length === 0 && <p>Plano de troca: {empty}</p>}
+        <p>交換予定部品</p>
+        {card.replacements.length === 0 && <p>交換計画： {empty}</p>}
         {card.replacements.map((part, index) => <article key={index} className="miyamaPublicPart" data-overdue={part.status === "overdue"}>
           <h3>{part.name ?? empty}</h3>
           {part.status && <strong className="miyamaPublicBadge">{situation[part.status]}</strong>}
           <dl className="miyamaPublicFields">
-            <Field label="Código da peça" value={part.code} />
-            <Field label="Quantidade prevista" value={part.plannedQuantity} />
-            <Field label="Frequência de troca" value={part.frequency ? `${part.frequency.value.toLocaleString("pt-BR")} ${part.frequency.unit === "days" ? "dias" : "unidades"}` : null} />
-            <Field label="Última troca" value={part.lastDate} />
-            <Field label="Próximo vencimento" value={part.nextDate} />
-            <Field label="Situação" value={situation[part.status]} />
+            <Field label="部品コード" value={part.code} />
+            <Field label="交換予定数量" value={part.plannedQuantity} />
+            <Field label="交換周期" value={part.frequency ? `${part.frequency.value.toLocaleString("ja-JP")} ${part.frequency.unit === "days" ? "日" : "個"}` : null} />
+            <Field label="前回交換日" value={part.lastDate} />
+            <Field label="次回期限" value={part.nextDate} />
+            <Field label="状況" value={situation[part.status]} />
           </dl>
         </article>)}
       </section>
       <section aria-labelledby="public-last">
-        <h2 id="public-last">Última manutenção</h2>
+        <h2 id="public-last">前回の保全</h2>
         <dl className="miyamaPublicFields">
-          <Field label="Data" value={card.lastMaintenance?.date} />
-          <Field label="Resumo" value={card.lastMaintenance?.summary} />
+          <Field label="日付" value={card.lastMaintenance?.date} />
+          <Field label="概要" value={states[card.lastMaintenance?.summary]} />
         </dl>
       </section>
     </>}
