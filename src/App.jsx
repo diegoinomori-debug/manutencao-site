@@ -17448,12 +17448,27 @@ Requirements:
     ...(isAdmin ? [{ key: "users", label: topMenuLabels.users, icon: <Users size={16} /> }] : []),
   ];
 
+const mobilePageLabel = { ja: "ページを選択", en: "Select page", es: "Seleccionar página", th: "เลือกหน้า" }[appLanguage] || "ページを選択";
+const mobilePageValue = menuItems.some(item => item.key === page) ? page : "";
+
 return (
   <div className="page">
     <style>{PROFESSIONAL_RESPONSIVE_CSS}</style>
     <div className="container">
 
       <div className="tabs miyamaTopNav">
+        <select
+          className="miyamaMobilePageSelect"
+          data-no-translate="true"
+          aria-label={mobilePageLabel}
+          value={mobilePageValue}
+          onChange={event => setPage(event.target.value)}
+        >
+          {!mobilePageValue && <option value="" disabled>
+            {mobilePageLabel}
+          </option>}
+          {menuItems.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+        </select>
         <button
           type="button"
           className="miyamaNavArrow"

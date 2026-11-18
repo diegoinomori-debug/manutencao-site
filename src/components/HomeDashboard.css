@@ -426,8 +426,7 @@
 }
 
 @media (max-width: 700px) {
-  .miyamaTopNav { position: static; }
-  .miyamaFixedControls { display: none; }
+
   .miyamaQuickGrid { grid-template-columns: repeat(2,1fr); }
   .miyamaHomeHero { padding: 30px 22px; }
   .miyamaRecentHeader { display: none !important; }
@@ -1995,4 +1994,61 @@
 .page[data-language="th"] .miyamaTranslatedInputWrap input,
 .page[data-language="th"] .miyamaTranslatedTextareaWrap textarea {
   background: #fbfdff;
+}
+
+.miyamaTopNav .miyamaMobilePageSelect { display: none !important; }
+
+@media (max-width: 760px) {
+  .tabs.miyamaTopNav {
+    position: static;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tabs.miyamaTopNav :is(.miyamaNavArrow, .miyamaTopMenuViewport) {
+    display: none !important;
+  }
+
+  .tabs.miyamaTopNav .miyamaMobilePageSelect {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px;
+    padding: 8px 12px !important;
+    border: 1px solid #dbe4f0 !important;
+    background: #fff !important;
+    color: #14213d !important;
+    font-size: 16px !important;
+  }
+
+  .tabs.miyamaTopNav .miyamaFixedControls {
+    display: grid;
+    grid-template-columns: minmax(0, 7rem) minmax(0, 1fr);
+    min-width: 0;
+    max-width: none;
+  }
+
+  .tabs.miyamaTopNav .miyamaLanguageSelect {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    padding: 0 6px !important;
+    border: 1px solid #dbe4f0 !important;
+    background: #fff !important;
+    color: #14213d !important;
+  }
+
+  .tabs.miyamaTopNav .miyamaUserBox {
+    min-width: 0;
+    max-width: none;
+    min-height: 44px;
+    padding: 3px 6px;
+  }
+
+  .tabs.miyamaTopNav .miyamaUserAvatar { display: none; }
+  .tabs.miyamaTopNav .miyamaLogout {
+    min-height: 36px;
+    background: #fff0f1 !important;
+    color: #a51d29 !important;
+  }
 }
