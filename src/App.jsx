@@ -17092,7 +17092,14 @@ Requirements:
     try {
       if (photo) draft.savedPhoto = await prepareIncidentPhoto(photo);
       localStorage.setItem(equipmentIncidentDraftKey(currentUser.uid, draft.machine), JSON.stringify(draft));
-      setIncidentDraftMessage("この端末に下書きを保存しました。 / Draft saved on this device.");
+      if (photo && draft.savedPhoto) {
+        setEquipmentIncident(current => current?.machine === draft.machine && current.photo === photo
+          ? { ...current, photo: null, savedPhoto: draft.savedPhoto }
+          : current);
+      }
+      setIncidentDraftMessage(draft.savedPhoto
+        ? "この端末に写真付きの下書きを保存しました。 / Draft saved with photo on this device."
+        : "この端末に下書きを保存しました（写真なし）。 / Draft saved without a photo on this device.");
     } catch {
       setIncidentDraftMessage("この端末に下書きを保存できませんでした。 / Could not save the local draft.");
     } finally {
@@ -17179,7 +17186,7 @@ Requirements:
             </select>
           </label>
           <label>{en ? "Optional photo (JPG/PNG/WebP, up to 20 MB)" : "写真（任意・JPG/PNG/WebP・20MB以下）"}
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
+            <input key={draft.savedPhoto ? "saved-photo" : "new-photo"} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
               const file = e.target.files?.[0];
               if (file && (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 20 * 1024 * 1024)) {
                 e.target.value = "";
@@ -17191,7 +17198,19 @@ Requirements:
             }} />
           </label>
           <p style={{ fontSize: 13 }}>{en ? "Photos are reduced automatically in this browser when you save. The original file stays unchanged." : "保存時にこのブラウザ内で写真を自動縮小します。元の写真は変更しません。"}</p>
-          {draft.savedPhoto && <button type="button" onClick={() => change("savedPhoto", "")}>保存済みの写真を外す</button>}
+          {draft.savedPhoto && <div>
+            <details>
+              <summary>{en ? "View saved photo" : "保存済みの写真を表示"}</summary>
+              <img
+                src={draft.savedPhoto}
+                alt={en ? "Photo saved with this draft" : "下書きに保存した写真"}
+                style={{ display: "block", maxWidth: "100%", maxHeight: 480, height: "auto", objectFit: "contain", marginTop: 8 }}
+              />
+            </details>
+            <button type="button" onClick={() => change("savedPhoto", "")}>
+              {en ? "Remove saved photo" : "保存済みの写真を外す"}
+            </button>
+          </div>}
           {matches.length > 0 && <section>
             <h4>{en ? "Similar incidents on this equipment" : "同じ設備の類似事例"}</h4>
             {matches.map(row => <div className="calendarEditCard" key={row.id}>
