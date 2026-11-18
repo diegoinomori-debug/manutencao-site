@@ -51,6 +51,7 @@ export default function PublicMachineCard({ machine, onLogin }) {
         {card.replacements.length === 0 && <p>交換計画： {empty}</p>}
         {card.replacements.map((part, index) => <article key={index} className="miyamaPublicPart" data-overdue={part.status === "overdue"}>
           <h3>{part.name ?? empty}</h3>
+          {part.equipment && <p>{part.equipment}</p>}
           {part.status && <strong className="miyamaPublicBadge">{situation[part.status]}</strong>}
           <dl className="miyamaPublicFields">
             <Field label="部品コード" value={part.code} />
@@ -62,6 +63,19 @@ export default function PublicMachineCard({ machine, onLogin }) {
           </dl>
         </article>)}
       </section>
+      {Array.isArray(card.recentIncidents) && <section aria-labelledby="public-incidents">
+        <h2 id="public-incidents">直近の停止・故障</h2>
+        {!card.recentIncidents.length && <p>停止・故障の記録はありません。</p>}
+        {card.recentIncidents.map((event, index) => <article key={index} className="miyamaPublicPart">
+          <h3>{event.date} · {event.type === "stop" ? "設備停止" : "不具合"}</h3>
+          {event.equipment && <p>{event.equipment}</p>}
+          <dl className="miyamaPublicFields">
+            <Field label="停止時間" value={event.downtimeHours ? `${event.downtimeHours} 時間` : null} />
+            <Field label="対応内容" value={event.action} />
+            <Field label="対応状況" value={states[event.state]} />
+          </dl>
+        </article>)}
+      </section>}
       <section aria-labelledby="public-last">
         <h2 id="public-last">前回の保全</h2>
         <dl className="miyamaPublicFields">
