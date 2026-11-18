@@ -7,6 +7,10 @@ export function preventiveDate(timestamp) {
   return timestamp?.toDate ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(timestamp.toDate()) : "";
 }
 
+export function lastPreventiveDate(task) {
+  return preventiveDate(task.lastCompletedAt) || task.referenceDate || "";
+}
+
 export function nextPreventiveDate(task) {
   const lastDate = preventiveDate(task.lastCompletedAt);
   if (!lastDate) return task.firstDue;
@@ -15,22 +19,29 @@ export function nextPreventiveDate(task) {
   return toLocalDateText(next);
 }
 
-export function createPreventiveTask(db, { machine, title, firstDue, intervalDays, replacementPartName = "", replacementPartCode = "", plannedReplacementQty = null }) {
+export function preventiveTaskData({ machine, title, firstDue, intervalDays, replacementPartName = "", replacementPartCode = "", plannedReplacementQty = null, referenceDate = "" }) {
   const date = parseLocalDate(firstDue);
+  const reference = referenceDate && parseLocalDate(referenceDate);
   const partName = replacementPartName.trim();
   const partCode = replacementPartCode.trim();
   if (!title.trim() || title.trim().length > 120 || !date || toLocalDateText(date) !== firstDue ||
       !Number.isSafeInteger(intervalDays) || intervalDays < 1 || intervalDays > 3650 ||
+      (referenceDate && (!reference || toLocalDateText(reference) !== referenceDate)) ||
       partName.length > 120 || partCode.length > 80 ||
       (plannedReplacementQty !== null && ((!partName && !partCode) || !Number.isSafeInteger(plannedReplacementQty) || plannedReplacementQty < 1))) {
     throw new Error("invalid-task");
   }
-  return addDoc(collection(db, preventiveCollection), {
+  return {
     machine, title: title.trim(), firstDue, intervalDays, revision: 0, createdAt: serverTimestamp(),
+    ...(reference && { referenceDate }),
     ...(partName && { replacementPartName: partName }),
     ...(partCode && { replacementPartCode: partCode }),
     ...(plannedReplacementQty !== null && { plannedReplacementQty }),
-  });
+  };
+}
+
+export function createPreventiveTask(db, input) {
+  return addDoc(collection(db, preventiveCollection), preventiveTaskData(input));
 }
 
 export async function completePreventiveTask(db, task, actor) {

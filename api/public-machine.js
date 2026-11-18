@@ -1,7 +1,7 @@
 import { endpoint, HttpError, services } from "../lib/miyama-server.js";
 import { EQUIPMENT_CATALOG, equipmentKey, equipmentLabel, equipmentNamesFromRecord, parseEquipmentKey } from "../src/utils/equipmentIdentity.js";
 import { calculateReport } from "../src/utils/reportCalculations.js";
-import { nextPreventiveDate, preventiveCollection, preventiveDate } from "../src/utils/machinePreventive.js";
+import { lastPreventiveDate, nextPreventiveDate, preventiveCollection } from "../src/utils/machinePreventive.js";
 import { normalizeDateOnly, parseLocalDate, toLocalDateText } from "../src/utils/reportDates.js";
 
 const catalogKeys = new Set(EQUIPMENT_CATALOG.flatMap(({ group, line, equipment }) =>
@@ -141,7 +141,7 @@ export async function loadPublicMachine(db, key, today = new Intl.DateTimeFormat
         "action", "troubleDateTime", "workStartDateTime", "workEndDateTime", "productionStartDateTime",
         "stopExclusionHours", "stopExclusionTime", "functionDownRate").get(),
     preventiveTasks(db, machine, identity)
-      .select("machine", "firstDue", "intervalDays", "lastCompletedAt", "replacementPartName", "replacementPartCode", "plannedReplacementQty").get(),
+      .select("machine", "firstDue", "intervalDays", "lastCompletedAt", "referenceDate", "replacementPartName", "replacementPartCode", "plannedReplacementQty").get(),
     machineParts(db, machine, identity),
   ]);
   if (!catalogKeys.has(machine) && reports.empty && taskSnapshot.empty && parts.length === 0)
@@ -160,9 +160,14 @@ export async function loadPublicMachine(db, key, today = new Intl.DateTimeFormat
   }
   for (const doc of taskSnapshot.docs) {
     const task = doc.data();
-    const lastDate = preventiveDate(task.lastCompletedAt);
+    const lastDate = lastPreventiveDate(task);
     const isReplacement = Boolean(label(task.replacementPartName) || label(task.replacementPartCode));
-    if (lastDate) maintenance.push({ date: lastDate, summary: isReplacement ? "Troca programada concluída" : "Manutenção preventiva concluída" });
+    if (lastDate) {
+      const summary = task.lastCompletedAt
+        ? (isReplacement ? "Troca programada concluída" : "Manutenção preventiva concluída")
+        : (isReplacement ? "Troca programada registrada" : "Manutenção preventiva registrada");
+      maintenance.push({ date: lastDate, summary });
+    }
     if (isReplacement) scheduled.push({ ...replacement({
       name: task.replacementPartName, code: task.replacementPartCode, planned: task.plannedReplacementQty,
       days: quantity(task.intervalDays), lastDate, nextDate: nextPreventiveDate(task),

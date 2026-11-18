@@ -42,6 +42,7 @@ import { searchHistory } from "./services/historySearch";
 import SimilarProblems from "./components/SimilarProblems";
 import LoginScreen from "./components/LoginScreen";
 import MachineCard from "./components/MachineCard";
+import MachinePlanImport from "./components/MachinePlanImport";
 import PublicMachineCard from "./components/PublicMachineCard";
 import { EQUIPMENT_CATALOG, equipmentKey, equipmentLabel, equipmentNamesFromRecord, matchPilotEquipment, parseEquipmentKey } from "./utils/equipmentIdentity";
 
@@ -16818,6 +16819,10 @@ Requirements:
         </div>
 
         {userAdminMessage && <div className="miyamaUserAdminMessage">{userAdminMessage}</div>}
+
+        {canWriteReports && <MachinePlanImport knownMachines={[...equipmentNames, ...EQUIPMENT_CATALOG.flatMap(item => [
+          equipmentKey(item.group, item.line), equipmentKey(item.group, item.line, item.equipment),
+        ])]} hashKey={reportDuplicateHash} />}
 
         <div className="miyamaUserCreateCard">
           <div className="miyamaUserCreateTitle">

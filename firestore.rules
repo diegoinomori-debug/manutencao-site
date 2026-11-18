@@ -224,12 +224,15 @@ service cloud.firestore {
 
       allow read: if activeUser();
       allow create: if isAdmin()
-        && request.resource.data.keys().hasOnly(['machine', 'title', 'firstDue', 'intervalDays', 'revision', 'createdAt',
+        && request.resource.data.keys().hasOnly(['machine', 'title', 'firstDue', 'intervalDays', 'revision', 'createdAt', 'referenceDate',
           'replacementPartName', 'replacementPartCode', 'plannedReplacementQty'])
         && request.resource.data.machine is string
         && request.resource.data.machine.size() > 0 && request.resource.data.machine.size() <= 500
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && (!request.resource.data.keys().hasAny(['referenceDate'])
+          || (request.resource.data.referenceDate is string
+            && request.resource.data.referenceDate.matches('20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])')))
         && request.resource.data.firstDue is string
         && request.resource.data.firstDue.matches('20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])')
         && request.resource.data.intervalDays is int

@@ -1,0 +1,10 @@
+.miyamaPlanImport { margin-block: 1rem; }
+.miyamaPlanImport input[type="file"] { display: block; max-width: 100%; margin-top: .35rem; }
+.miyamaPlanImportActions { display: flex; align-items: end; gap: .8rem; flex-wrap: wrap; margin-bottom: .75rem; }
+.miyamaPlanImportActions select { display: block; }
+.miyamaPlanImportTable { max-height: 34rem; overflow: auto; }
+.miyamaPlanImportTable table { min-width: 58rem; width: 100%; }
+.miyamaPlanImportTable th { position: sticky; top: 0; background: #eaf3fb; }
+.miyamaPlanImportTable td { overflow-wrap: anywhere; vertical-align: top; }
+.miyamaPlanImportTable tr[data-result="invalid"] td:last-child { color: #8e2514; background: #fff3ed; }
+.miyamaPlanImportTable ul { margin: .25rem 0 0; padding-inline-start: 1rem; }
