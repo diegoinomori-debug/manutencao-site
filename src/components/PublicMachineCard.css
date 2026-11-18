@@ -1,0 +1,42 @@
+.miyamaPublicPage {
+  max-width: 52rem;
+  margin-inline: auto;
+  padding: clamp(1rem, 4vw, 2rem);
+  color: #172b4d;
+  overflow-wrap: anywhere;
+}
+
+.miyamaPublicHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.miyamaPublicHeader > span { font-weight: 700; }
+.miyamaPublicHeader > button { min-height: 44px; }
+.miyamaPublicPage h1 { margin: 1rem 0 .75rem; }
+.miyamaPublicPage h2 { margin: 0 0 .4rem; }
+.miyamaPublicPage section { margin-top: 1.25rem; }
+.miyamaPublicFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: .65rem;
+  margin: .7rem 0 0;
+}
+.miyamaPublicFields > div { background: #f0f5fd; padding: .65rem; border-radius: .55rem; }
+.miyamaPublicFields dt { color: #435470; font-size: .875rem; }
+.miyamaPublicFields dd { margin: .2rem 0 0; font-weight: 650; }
+.miyamaPublicPart {
+  margin-top: .7rem;
+  padding: .85rem;
+  background: white;
+  border: 1px solid #bfd4ef;
+  border-inline-start: .3rem solid #3270bd;
+  border-radius: .65rem;
+}
+.miyamaPublicPart h3 { margin: 0 0 .35rem; }
+.miyamaPublicPart[data-overdue="true"] { border-inline-start-color: #b91c1c; }
+.miyamaPublicBadge { display: inline-block; padding: .15rem .45rem; border-radius: .35rem; background: #e7effb; }
+.miyamaPublicPart[data-overdue="true"] .miyamaPublicBadge { color: #991b1b; background: #fee2e2; }

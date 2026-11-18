@@ -1,0 +1,40 @@
+.miyamaMachineCard {
+  margin: 0 0 1rem;
+  padding: clamp(.85rem, 3vw, 1.5rem);
+  border: 1px solid #bfd4ef;
+  border-radius: 1rem;
+  background: #f4f8fe;
+  color: #172b4d;
+  overflow-wrap: anywhere;
+}
+
+.miyamaMachineCard h2,
+.miyamaMachineCard h3,
+.miyamaMachineCard h4,
+.miyamaMachineCard p { margin: 0 0 .5rem; }
+
+.miyamaMachineSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: .65rem;
+  margin-block: .8rem;
+}
+
+.miyamaMachineSummary > div, .miyamaMachineTask {
+  min-width: 0;
+  padding: .75rem;
+  border-radius: .65rem;
+  background: #fff;
+}
+
+.miyamaMachineActions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.miyamaMachineCard button, .miyamaMachineCard summary { min-height: 44px; }
+.miyamaMachineCard summary { cursor: pointer; line-height: 1.5; padding-block: .55rem; }
+.miyamaMachineTasks { margin-top: .7rem; }
+.miyamaMachineTask { margin-top: .5rem; }
+.miyamaMachineForm fieldset { display: grid; gap: .5rem; margin: 0 0 .75rem; min-width: 0; }
+.miyamaMachineForm input { width: 100%; }
+
+@media (max-width: 540px) {
+  .miyamaMachineActions > button { width: 100%; }
+}
