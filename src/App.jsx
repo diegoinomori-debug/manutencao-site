@@ -5455,7 +5455,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
 
   async function saveSpareEdit(id) {
     const edit = spareEdits[id];
-    if (!edit || spareSaveLock.current) return;
+    if (!canWriteReports || !edit || spareSaveLock.current) return;
     const en = appLanguage === "en";
     const fields = { ...edit.fields };
     let stockConflict = false;
@@ -5833,6 +5833,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function saveReportDraft(reportId) {
+    if (!canWriteReports) return;
     const draft = reportDrafts[reportId] || reports.find((r) => r.id === reportId);
     if (!draft) return;
 
@@ -5851,6 +5852,13 @@ function MaintenanceApp({ currentUser, userProfile }) {
       for (const field of ["repairStatus", "repairTrackedAt", "repairTrackedByUid",
         "repairOwner", "repairOwnerUid", "repairStartedAt", "repairResolution",
         "repairCompletedAt", "repairCompletedBy", "repairCompletedByUid"]) {
+        delete reportToSave[field];
+      }
+      // Approval actions write these fields separately. A stale draft must not restore them.
+      for (const field of ["approvalStatus", "inspectionRequestedBy", "inspectionRequestedByUid", "inspectionRequestedAt",
+        "inspectedBy", "inspectedByUid", "inspectedByEmail", "inspectedDate", "inspectedAt",
+        "approvedBy", "approvedByUid", "approvedByEmail", "approvedDate", "approvedAt",
+        "returnedBy", "returnedByUid", "returnedAt"]) {
         delete reportToSave[field];
       }
       await updateDoc(doc(db, "maintenanceReports", reportId), reportToSave);
@@ -6458,6 +6466,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function addPart() {
+    if (!canWriteReports) return;
     const name = window.prompt(appLanguage === "en" ? "Part name" : "部品名を入力してください")?.trim();
     if (!name) return;
     try {
@@ -6572,6 +6581,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   function startNewReport() {
+    if (!canWriteReports) return;
     setWhyAiLoading(false);
     setWhyAiError("");
     setHistoryAiQuestion("");
@@ -6599,7 +6609,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   const reportDraftForSave = newReport;
 
   async function saveNewReport(_event, newReport = reportDraftForSave) {
-    if (!newReport) return;
+    if (!canWriteReports || !newReport) return;
     if (!newReport.equipment && !newReport.phenomenon) {
       alert(
         appLanguage === "es"
@@ -8976,9 +8986,6 @@ Rules:
             >
               <option value="下書き">下書き</option>
               <option value="点検待ち">点検待ち</option>
-              {canInspect && <option value="承認待ち">承認待ち</option>}
-              {canApprove && <option value="承認済み">承認済み</option>}
-              {(canInspect || canApprove) && <option value="差戻し">差戻し</option>}
               <option value="Excel取込">Excel取込</option>
             </select>
 
@@ -11578,7 +11585,7 @@ function renderHome() {
                 style={{ display: "none" }}
               />
             </label>
-            <button className="primaryButton" onClick={addPart}><Plus size={16} /> {en ? "Register part" : "予備品を登録"}</button>
+            {canWriteReports && <button className="primaryButton" onClick={addPart}><Plus size={16} /> {en ? "Register part" : "予備品を登録"}</button>}
           </div>
         </div>
 
@@ -11789,7 +11796,7 @@ function renderHome() {
 
         {!rowsToShow.length && <div className="tableWrap">
           <p>{registeredCount ? (en ? "No matching spare parts." : "条件に一致する予備品はありません。") : (en ? "No spare parts registered." : "予備品が登録されていません。")}</p>
-          {!registeredCount && <button type="button" className="primaryButton" onClick={addPart}>＋ {en ? "Register part" : "予備品を登録"}</button>}
+          {canWriteReports && !registeredCount && <button type="button" className="primaryButton" onClick={addPart}>＋ {en ? "Register part" : "予備品を登録"}</button>}
         </div>}
 
         {rowsToShow.map((savedRow) => {
@@ -11807,7 +11814,7 @@ function renderHome() {
               </span>
               <span className="miyamaSpareToggle">{openSpareId === row.id ? (en ? "Close" : "閉じる") : (en ? "Details" : "詳細")} {openSpareId === row.id ? "▲" : "▼"}</span>
             </button>
-            {openSpareId === row.id && <fieldset className="miyamaSpareEditor" disabled={spareSavingId === row.id || userProfile?.readOnly === true || !["operator", "inspector", "approver", "admin"].includes(currentRole)}>
+            {openSpareId === row.id && <fieldset className="miyamaSpareEditor" disabled={spareSavingId === row.id || !canWriteReports}>
             <div style={{ textAlign: "center" }}>
               {row.image || row.imageUrl ? (
                 <img
@@ -11974,7 +11981,7 @@ function renderHome() {
                 {row.purchaseUrl && (
                   <button className="primaryButton" onClick={() => window.open(row.purchaseUrl, "_blank")}>購入URL</button>
                 )}
-                <button className="deleteButton" onClick={() => removeItem("parts", row.id)}><Trash2 size={16} /> 削除</button>
+                {isAdmin && canWriteReports && <button className="deleteButton" onClick={() => removeItem("parts", row.id)}><Trash2 size={16} /> 削除</button>}
               </div>
               {spareEdits[row.id] && <p className="miyamaSpareHint">{en ? "Unsaved changes" : "未保存の変更があります"}</p>}
               {spareSaveMessages[row.id] && <p role="status">{spareSaveMessages[row.id]}</p>}
@@ -12411,6 +12418,7 @@ function renderHome() {
     const isDirty = !!reportDirty[sourceRow.id];
     const isApprovedLocked = row.approvalStatus === "承認済み";
     const setRow = (field, value) => {
+      if (!canWriteReports) return;
       if (isApprovedLocked) {
         alert("🔒 承認済み報告書はロックされています。修正する場合は、承認権限者が差戻ししてください。");
         return;
@@ -12717,28 +12725,28 @@ function renderHome() {
               {row.approvalStatus || "下書き"}
             </span>
 
-            {!isApprovedLocked && row.approvalStatus !== "点検待ち" && row.approvalStatus !== "承認待ち" && (
+            {canWriteReports && !isApprovedLocked && row.approvalStatus !== "点検待ち" && row.approvalStatus !== "承認待ち" && (
               <button className="primaryButton" type="button" onClick={requestInspection}
                 disabled={reportSavingId === sourceRow.id}>
                 📨 点検依頼
               </button>
             )}
 
-            {canInspect && row.approvalStatus === "点検待ち" && (
+            {canWriteReports && canInspect && row.approvalStatus === "点検待ち" && (
               <button className="primaryButton" type="button" onClick={inspectSavedReport}
                 disabled={reportSavingId === sourceRow.id}>
                 🔎 点検して承認依頼へ
               </button>
             )}
 
-            {canApprove && row.approvalStatus === "承認待ち" && (
+            {canWriteReports && canApprove && row.approvalStatus === "承認待ち" && (
               <button className="primaryButton" type="button" onClick={approveSavedReport}
                 disabled={reportSavingId === sourceRow.id || !row.inspectedBy}>
                 ✅ 承認してロック
               </button>
             )}
 
-            {canApprove && isApprovedLocked && (
+            {canWriteReports && canApprove && isApprovedLocked && (
               <button className="deleteButton" type="button" onClick={returnApprovedReport}
                 disabled={reportSavingId === sourceRow.id}>
                 ↩️ 差戻して再編集
@@ -12747,7 +12755,7 @@ function renderHome() {
             <button
               className="primaryButton"
               onClick={() => saveReportDraft(sourceRow.id)}
-              disabled={reportSavingId === sourceRow.id || isApprovedLocked}
+              disabled={!canWriteReports || reportSavingId === sourceRow.id || isApprovedLocked}
             >
               <Save size={16} /> {isApprovedLocked ? "🔒 承認済み・編集ロック" : reportSavingId === sourceRow.id ? "保存中..." : isDirty ? "変更を保存" : "保存済み"}
             </button>
@@ -12759,7 +12767,7 @@ function renderHome() {
             <button className="primaryButton" onClick={() => printReport(row)}><Printer size={16} /> PDF/印刷</button>
             <button className="primaryButton" onClick={() => exportReportCsv(row)}><FileSpreadsheet size={16} /> Excel/CSV</button>
             <button className="primaryButton" onClick={() => copyReportLink(sourceRow.id)}><Link2 size={16} /> {appLanguage === "en" ? "Report link" : "報告書リンク"}</button>
-            <button className="deleteButton" onClick={() => removeItem("maintenanceReports", sourceRow.id)}><Trash2 size={16} /> 削除</button>
+            {isAdmin && canWriteReports && <button className="deleteButton" onClick={() => removeItem("maintenanceReports", sourceRow.id)}><Trash2 size={16} /> 削除</button>}
           </div>
         </div>
 
@@ -13344,12 +13352,12 @@ function renderHome() {
             <p>Excel原紙の項目を残し、承認・費用計算・停止時間計算・カレンダー連携まで管理します。</p>
           </div>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button className="primaryButton" onClick={startNewReport}><Plus size={16} /> 新規作成</button>
+            {canWriteReports && <button className="primaryButton" onClick={startNewReport}><Plus size={16} /> 新規作成</button>}
             <button className="primaryButton" onClick={() => downloadTextFile(`MIYAMA_保全報告書一覧_${todayText()}.csv`, "\ufeff" + [["作成日","設備名","ライン名","作業者","不具合","停止時間H","合計費用","承認状態"].map(makeCsvSafe).join(","), ...filteredReports.map(r => [r.createdAt, r.equipment, r.lineName, r.worker, r.phenomenon, calculateReport(r).stopTimeHours, calculateReport(r).totalCost, r.approvalStatus].map(makeCsvSafe).join(","))].join("\n"), "text/csv;charset=utf-8")}><Download size={16} /> 一覧CSV</button>
           </div>
         </div>
 
-        {ReportDraftForm()}
+        {canWriteReports && ReportDraftForm()}
 
         <div className="tableWrap" style={{ marginBottom: "18px" }}>
           <h3>🗂️ 表示テーマ</h3>
