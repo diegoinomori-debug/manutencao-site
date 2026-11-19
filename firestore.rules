@@ -265,6 +265,46 @@ service cloud.firestore {
           && completionMatches(getAfter(taskPath()).data, request.resource.data);
       }
     }
+    match /shiftHandover/{entryId} {
+      function actorMatches(uid, name) {
+        return uid == request.auth.uid && name is string
+          && name.size() > 0 && name.size() <= 160
+          && name in [profile().get('name', ''), request.auth.token.get('email', ''), request.auth.uid];
+      }
+
+      function shortText(value, maxSize) {
+        return value is string && value.size() > 0 && value.size() <= maxSize
+          && value.matches('(?s).*\\S.*');
+      }
+
+      allow read: if activeUser();
+      allow create: if canWrite()
+        && request.resource.data.keys().hasOnly([
+          'machine', 'situation', 'nextAction', 'assignee', 'dueDate',
+          'status', 'createdByUid', 'createdByName', 'createdAt'
+        ])
+        && request.resource.data.machine is string
+        && request.resource.data.machine.size() <= 500
+        && request.resource.data.machine.matches('asset:.*')
+        && shortText(request.resource.data.situation, 500)
+        && shortText(request.resource.data.nextAction, 500)
+        && shortText(request.resource.data.assignee, 120)
+        && request.resource.data.dueDate is string
+        && request.resource.data.dueDate.matches('20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])')
+        && request.resource.data.status == 'open'
+        && request.resource.data.createdAt == request.time
+        && actorMatches(request.resource.data.createdByUid, request.resource.data.createdByName);
+
+      allow update: if canWrite()
+        && resource.data.status == 'open'
+        && request.resource.data.status == 'closed'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'closedByUid', 'closedByName', 'closedAt'
+        ])
+        && request.resource.data.closedAt == request.time
+        && actorMatches(request.resource.data.closedByUid, request.resource.data.closedByName);
+    }
+
     match /{collectionName}/{documentId} {
       allow read: if activeUser()
         && collectionName in [

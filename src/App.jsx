@@ -42,6 +42,7 @@ import { searchHistory } from "./services/historySearch";
 import SimilarProblems from "./components/SimilarProblems";
 import LoginScreen from "./components/LoginScreen";
 import MachineCard from "./components/MachineCard";
+import ShiftHandover from "./components/ShiftHandover";
 import MachinePlanImport from "./components/MachinePlanImport";
 import PublicMachineCard from "./components/PublicMachineCard";
 import { EQUIPMENT_CATALOG, equipmentKey, equipmentLabel, equipmentNamesFromRecord, matchPilotEquipment, parseEquipmentKey } from "./utils/equipmentIdentity";
@@ -17364,6 +17365,17 @@ Requirements:
   function renderCurrentPage() {
     if (page === "home") return renderHome();
     if (page === "ai") return renderMiyamaAi();
+    if (page === "shiftHandover") return userProfile?.active === true ? (
+      <ShiftHandover reports={reports} writable={canWriteReports}
+        actor={{ uid: currentUser.uid, name: userProfile.name || currentUser.email || currentUser.uid }}
+        machines={[...new Set([...equipmentNames, ...EQUIPMENT_CATALOG.flatMap(({ group, line, equipment }) =>
+          [equipmentKey(group, line), equipmentKey(group, line, equipment)])])].sort((a, b) =>
+            equipmentLabel(a).localeCompare(equipmentLabel(b), "ja", { numeric: true }))}
+        openMachine={machine => {
+          setEquipmentPilot(machine);
+          setPage("equipmentCards");
+        }} />
+    ) : renderHome();
     if (page === "equipmentCards") return renderEquipmentCards();
     if (page === "report") return renderReports();
     if (page === "approvedReports") return renderApprovedReports();
@@ -17433,15 +17445,16 @@ Requirements:
 
   const menuItems = [
     { key: "home", label: topMenuLabels.home, icon: <Home size={16} /> },
-    { key: "miyamaAi", label: topMenuLabels.miyamaAi, icon: <Bot size={16} /> },
     { key: "calendar", label: topMenuLabels.calendar, icon: <CalendarDays size={16} /> },
-    { key: "report", label: topMenuLabels.report, icon: <FileText size={16} /> },
+    ...(userProfile?.active === true ? [{ key: "shiftHandover", label: "交替勤務の引継ぎ", icon: <ClipboardCheck size={16} /> }] : []),
     { key: "equipmentCards", label: appLanguage === "en" ? "Equipment History" : "設備カルテ", icon: <Factory size={16} /> },
+    { key: "report", label: topMenuLabels.report, icon: <FileText size={16} /> },
     { key: "approvedReports", label: appLanguage === "en" ? "Approved Maintenance Reports" : "保全報告書承認済み", icon: <FileText size={16} /> },
+    { key: "spare", label: topMenuLabels.spare, icon: <Package size={16} /> },
     { key: "maintenance", label: topMenuLabels.maintenance, icon: <Wrench size={16} /> },
     { key: "work", label: topMenuLabels.work, icon: <Hammer size={16} /> },
     { key: "newEquipment", label: topMenuLabels.newEquipment, icon: <Factory size={16} /> },
-    { key: "spare", label: topMenuLabels.spare, icon: <Package size={16} /> },
+    { key: "miyamaAi", label: topMenuLabels.miyamaAi, icon: <Bot size={16} /> },
     { key: "analytics", label: topMenuLabels.analytics, icon: <BarChart3 size={16} /> },
     { key: "dailyProduction", label: topMenuLabels.dailyProduction, icon: <BarChart3 size={16} /> },
     { key: "csvAnalytics", label: topMenuLabels.csvAnalytics, icon: <FileSpreadsheet size={16} /> },
