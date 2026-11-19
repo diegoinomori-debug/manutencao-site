@@ -277,6 +277,14 @@ service cloud.firestore {
           && value.matches('(?s).*\\S.*');
       }
 
+      function validHandoverDetails(data) {
+        return shortText(data.situation, 500)
+          && shortText(data.nextAction, 500)
+          && shortText(data.assignee, 120)
+          && data.dueDate is string
+          && data.dueDate.matches('20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])');
+      }
+
       allow read: if activeUser();
       allow create: if canWrite()
         && request.resource.data.keys().hasOnly([
@@ -286,11 +294,7 @@ service cloud.firestore {
         && request.resource.data.machine is string
         && request.resource.data.machine.size() <= 500
         && request.resource.data.machine.matches('asset:.*')
-        && shortText(request.resource.data.situation, 500)
-        && shortText(request.resource.data.nextAction, 500)
-        && shortText(request.resource.data.assignee, 120)
-        && request.resource.data.dueDate is string
-        && request.resource.data.dueDate.matches('20[0-9]{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])')
+        && validHandoverDetails(request.resource.data)
         && request.resource.data.status == 'open'
         && request.resource.data.createdAt == request.time
         && actorMatches(request.resource.data.createdByUid, request.resource.data.createdByName);
@@ -303,6 +307,16 @@ service cloud.firestore {
         ])
         && request.resource.data.closedAt == request.time
         && actorMatches(request.resource.data.closedByUid, request.resource.data.closedByName);
+
+      allow update: if canWrite()
+        && resource.data.status == 'open'
+        && request.resource.data.status == 'open'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'situation', 'nextAction', 'assignee', 'dueDate', 'updatedAt', 'updatedByUid', 'updatedByName'
+        ])
+        && validHandoverDetails(request.resource.data)
+        && request.resource.data.updatedAt == request.time
+        && actorMatches(request.resource.data.updatedByUid, request.resource.data.updatedByName);
     }
 
     match /{collectionName}/{documentId} {

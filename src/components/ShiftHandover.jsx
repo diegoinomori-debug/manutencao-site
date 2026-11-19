@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { equipmentLabel } from "../utils/equipmentIdentity";
-import { addHandover, closeHandover, handoverCollection, ongoingIncidents, pendingRepairStatuses } from "../utils/shiftHandover";
+import { addHandover, closeHandover, editHandover, handoverCollection, ongoingIncidents, pendingRepairStatuses } from "../utils/shiftHandover";
 import "./ShiftHandover.css";
 
 const dateTime = new Intl.DateTimeFormat("ja-JP", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tokyo" });
 const today = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
 
 export default function ShiftHandover({ reports, machines, writable, actor, openMachine }) {
+  const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(null);
   const [history, setHistory] = useState(null);
   const [trackedReports, setTrackedReports] = useState(null);
@@ -44,7 +45,9 @@ export default function ShiftHandover({ reports, machines, writable, actor, open
       const result = await action();
       setMessage(result === false ? "この項目はすでに完了しています。" : success);
     } catch (error) {
-      setMessage(error.message === "invalid-handover" ? "入力内容を確認してください。" : "保存できませんでした。権限と接続を確認してください。");
+      setMessage(error.message === "invalid-handover" ? "入力内容を確認してください。"
+        : error.message === "handover-conflict" ? "他の作業者が更新しました。編集を取り消し、最新の内容を確認してください。"
+        : "保存できませんでした。権限と接続を確認してください。");
     } finally {
       lock.current = false;
       setBusy(false);
@@ -80,9 +83,28 @@ export default function ShiftHandover({ reports, machines, writable, actor, open
         <div><dt>対応予定日</dt><dd>{item.dueDate}</dd></div>
         {closed && <div><dt>完了者・日時</dt><dd>{item.closedByName} · {closedDate ? dateTime.format(closedDate) : "保存中…"}</dd></div>}
       </dl>
+      {!closed && writable && editing?.id === item.id && <form onSubmit={event => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(event.currentTarget));
+        void save(async () => {
+          const changed = await editHandover(db, editing, values, actor);
+          setEditing(null);
+          return changed;
+        }, "引継ぎ事項を更新しました。");
+      }}>
+        <label>状況<textarea name="situation" maxLength={500} defaultValue={editing.situation} required /></label>
+        <label>次の対応<textarea name="nextAction" maxLength={500} defaultValue={editing.nextAction} required /></label>
+        <label>担当者<input name="assignee" maxLength={120} defaultValue={editing.assignee} required /></label>
+        <label>対応予定日<input name="dueDate" type="date" min="2000-01-01" max="2099-12-31" defaultValue={editing.dueDate} required /></label>
+        <div className="shiftHandoverActions">
+          <button className="primaryButton" type="submit" disabled={busy}>変更を保存</button>
+          <button type="button" disabled={busy} onClick={() => setEditing(null)}>編集を取り消す</button>
+        </div>
+      </form>}
       <div className="shiftHandoverActions">
         {machineButton(item.machine)}
-        {!closed && writable && <button type="button" disabled={busy} onClick={() => {
+        {!closed && writable && !editing && <button type="button" disabled={busy} onClick={() => setEditing(item)}>編集</button>}
+        {!closed && writable && editing?.id !== item.id && <button type="button" disabled={busy} onClick={() => {
           if (window.confirm("この引継ぎ事項を完了にしますか？")) void save(() => closeHandover(db, item.id, actor), "引継ぎ事項を完了しました。");
         }}>完了にする</button>}
       </div>

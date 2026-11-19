@@ -21,18 +21,34 @@ export function ongoingIncidents(reports) {
   });
 }
 
-export function addHandover(db, values, actor) {
-  const { machine, situation, nextAction, assignee, dueDate } = values;
+function validatedHandoverDetails({ situation, nextAction, assignee, dueDate }) {
   const details = { situation: situation.trim(), nextAction: nextAction.trim(), assignee: assignee.trim() };
   const date = parseLocalDate(dueDate);
-  if (!machine.startsWith("asset:") || machine.length > 500 || !/^20\d{2}-/.test(dueDate) ||
+  if (!/^20\d{2}-/.test(dueDate) ||
       !date || toLocalDateText(date) !== dueDate || !details.situation || details.situation.length > 500 ||
       !details.nextAction || details.nextAction.length > 500 || !details.assignee || details.assignee.length > 120) {
     throw new Error("invalid-handover");
   }
+  return { ...details, dueDate };
+}
+
+export function addHandover(db, values, actor) {
+  if (!values.machine.startsWith("asset:") || values.machine.length > 500) throw new Error("invalid-handover");
   return addDoc(collection(db, handoverCollection), {
-    machine, ...details, dueDate, status: "open",
+    machine: values.machine, ...validatedHandoverDetails(values), status: "open",
     createdByUid: actor.uid, createdByName: actor.name, createdAt: serverTimestamp(),
+  });
+}
+
+export function editHandover(db, entry, values, actor) {
+  const details = validatedHandoverDetails(values);
+  const ref = doc(db, handoverCollection, entry.id);
+  return runTransaction(db, async tx => {
+    const item = (await tx.get(ref)).data();
+    if (!item || item.status !== "open") return false;
+    if (Object.keys(details).some(field => item[field] !== entry[field])) throw new Error("handover-conflict");
+    tx.update(ref, { ...details, updatedByUid: actor.uid, updatedByName: actor.name, updatedAt: serverTimestamp() });
+    return true;
   });
 }
 

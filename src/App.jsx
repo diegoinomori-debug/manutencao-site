@@ -6136,6 +6136,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function createNewEquipmentProject() {
+    if (!canWriteReports) return;
     const equipmentName = String(newEquipmentDraft.equipmentName || "").trim();
     const projectName = String(newEquipmentDraft.projectName || "").trim();
 
@@ -6199,6 +6200,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function toggleNewEquipmentChecklist(project, itemId) {
+    if (!canWriteReports) return;
     if (!project?.id || !itemId) return;
     const currentItem = project.checklist?.[itemId] || {};
     const nextCompleted = !currentItem.completed;
@@ -6231,6 +6233,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function updateNewEquipmentStatus(projectId, status) {
+    if (!canWriteReports) return;
     if (!projectId) return;
     try {
       await updateDoc(doc(db, "newEquipmentProjects", projectId), {
@@ -6396,6 +6399,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function updateField(collectionName, id, field, value) {
+    if (!canWriteReports && ["parts", "calendar", "plannedWorks", "newEquipmentProjects"].includes(collectionName)) return;
     await updateDoc(doc(db, collectionName, id), { [field]: value });
     const setter = { parts: setParts, calendar: setCalendarEvents,
       maintenanceReports: setReports, plannedWorks: setPlannedWorks,
@@ -6409,6 +6413,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function updateMaintenanceSchedule(row, changes = {}) {
+    if (!canWriteReports) return;
     const previous = maintenanceSaveQueue.current.get(row.id) || Promise.resolve();
     const operation = previous.catch(() => {}).then(async () => {
       if (dailyProductionRowsRef.current === null) {
@@ -6530,6 +6535,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function addMaintenancePart() {
+    if (!canWriteReports) return;
     await addDoc(collection(db, "parts"), {
       equipment: "",
       lineName: "",
@@ -6889,11 +6895,13 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   function startNewCalendarEvent(date = selectedDate) {
+    if (!canWriteReports) return;
     setEditingCalendarEventId(null);
     setNewCalendarEvent(createBlankCalendarEvent(date));
   }
 
   function startEditCalendarEvent(event) {
+    if (!canWriteReports) return;
     if (!event?.sourceId && !event?.id) return;
 
     setEditingCalendarEventId(event.sourceId || event.id);
@@ -6919,6 +6927,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function saveNewCalendarEvent() {
+    if (!canWriteReports) return;
     if (!newCalendarEvent) return;
     const draft = newCalendarEvent;
     const category = draft.category || "定期保全";
@@ -6983,6 +6992,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   function startNewPlannedWork() {
+    if (!canWriteReports) return;
     setNewPlannedWork(createBlankPlannedWork());
   }
 
@@ -6991,6 +7001,7 @@ function MaintenanceApp({ currentUser, userProfile }) {
   }
 
   async function saveNewPlannedWork() {
+    if (!canWriteReports) return;
     if (!newPlannedWork) return;
     if (newPlannedWork.verificationPlan !== undefined && (!newPlannedWork.owner.trim() || !newPlannedWork.endDate ||
       newPlannedWork.endDate < newPlannedWork.date || !newPlannedWork.verificationPlan.trim())) {
@@ -10282,7 +10293,7 @@ function renderHome() {
                 style={{ display: "none" }}
               />
             </label>
-            <button className="primaryButton" onClick={addMaintenancePart}><Plus size={16} /> 新規追加</button>
+            <button className="primaryButton" disabled={!canWriteReports} onClick={addMaintenancePart}><Plus size={16} /> 新規追加</button>
             <button className="primaryButton" onClick={() => setPage("spare")}>📦 予備品から追加</button>
             <button
               className="deleteButton"
@@ -11995,7 +12006,7 @@ function renderHome() {
   }
 
   function renderCalendarModal() {
-    if (!newCalendarEvent) return null;
+    if (!canWriteReports || !newCalendarEvent) return null;
 
     return (
       <div className="modalBackdrop">
@@ -12250,7 +12261,7 @@ function renderHome() {
             <h2>📅 {calendarText.title}</h2>
             <p>{calendarText.description}</p>
           </div>
-          <button className="primaryButton" onClick={() => startNewCalendarEvent(selectedDate)}>
+          <button className="primaryButton" disabled={!canWriteReports} onClick={() => startNewCalendarEvent(selectedDate)}>
             <Plus size={16} /> {calendarText.addSelected}
           </button>
         </div>
@@ -12343,7 +12354,7 @@ function renderHome() {
                 {calendarText.selectedDescription}
               </p>
             </div>
-            <button className="primaryButton" onClick={() => startNewCalendarEvent(selectedDate)}>
+            <button className="primaryButton" disabled={!canWriteReports} onClick={() => startNewCalendarEvent(selectedDate)}>
               <Plus size={16} /> {calendarText.addThisDay}
             </button>
           </div>
@@ -12389,10 +12400,10 @@ function renderHome() {
                   )}
                   {event.deletable ? (
                     <>
-                      <button className="primaryButton" onClick={() => startEditCalendarEvent(event)}>✏️ {calendarText.edit}</button>
-                      <button className="deleteButton" onClick={() => removeItem("calendar", event.id)}>
+                      {canWriteReports && <button className="primaryButton" onClick={() => startEditCalendarEvent(event)}>✏️ {calendarText.edit}</button>}
+                      {isAdmin && canWriteReports && <button className="deleteButton" onClick={() => removeItem("calendar", event.id)}>
                         <Trash2 size={16} /> {calendarText.delete}
-                      </button>
+                      </button>}
                     </>
                   ) : (
                     <span style={{ color: "#64748b", fontSize: "12px", alignSelf: "center" }}>
@@ -13475,7 +13486,7 @@ function renderHome() {
             <p>計画工事をカード形式で見やすく管理します。保存すると自動でカレンダーにも登録されます。</p>
           </div>
 
-          <button className="primaryButton" onClick={startNewPlannedWork}>
+          <button className="primaryButton" disabled={!canWriteReports} onClick={startNewPlannedWork}>
             <Plus size={16} /> 工事追加
           </button>
         </div>
@@ -13486,7 +13497,7 @@ function renderHome() {
           <SubTabBar items={[{ key: "cards", label: "工事カード", icon: "🏗️" }, { key: "progress", label: "進捗", icon: "📈" }, { key: "risk", label: "リスク", icon: "⚠️" }, { key: "owner", label: "担当者", icon: "👤" }]} value={workViewMode} onChange={setWorkViewMode} />
         </div>
 
-        {newPlannedWork && (
+        {canWriteReports && newPlannedWork && (
           <div className="tableWrap" style={{ border: "2px solid #2563eb" }}>
             <div className="header">
               <div>
@@ -13611,35 +13622,35 @@ function renderHome() {
               </div>}
               <div className="reportGrid" style={{ marginTop: "20px" }}>
                 <label>📅 開始日
-                  <input type="date" value={row.date || ""} onChange={(e) => updateField("plannedWorks", row.id, "date", e.target.value)} />
+                  <input type="date" value={row.date || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "date", e.target.value)} />
                 </label>
 
                 <label>🏁 完了予定日
-                  <input type="date" value={row.endDate || ""} onChange={(e) => updateField("plannedWorks", row.id, "endDate", e.target.value)} />
+                  <input type="date" value={row.endDate || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "endDate", e.target.value)} />
                 </label>
 
                 <label>🏗️ 工事件名
-                  <input value={row.title || ""} onChange={(e) => updateField("plannedWorks", row.id, "title", e.target.value)} />
+                  <input value={row.title || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "title", e.target.value)} />
                 </label>
 
                 <label>⚙️ 設備名
-                  <input value={row.equipment || ""} onChange={(e) => updateField("plannedWorks", row.id, "equipment", e.target.value)} />
+                  <input value={row.equipment || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "equipment", e.target.value)} />
                 </label>
 
                 <label>🎯 目的
-                  <input value={row.purpose || ""} onChange={(e) => updateField("plannedWorks", row.id, "purpose", e.target.value)} />
+                  <input value={row.purpose || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "purpose", e.target.value)} />
                 </label>
 
                 <label>👤 担当者
-                  <input value={row.owner || ""} onChange={(e) => updateField("plannedWorks", row.id, "owner", e.target.value)} />
+                  <input value={row.owner || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "owner", e.target.value)} />
                 </label>
 
                 <label>📈 進捗 %
-                  <input type="number" min="0" max="100" value={row.progress || 0} onChange={(e) => updateField("plannedWorks", row.id, "progress", e.target.value)} />
+                  <input type="number" min="0" max="100" value={row.progress || 0} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "progress", e.target.value)} />
                 </label>
 
                 <label>📌 状態
-                  <select value={row.status || "計画中"} onChange={(e) => updateField("plannedWorks", row.id, "status", e.target.value)}>
+                  <select value={row.status || "計画中"} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "status", e.target.value)}>
                     {statusOptions.map((status) => (
                       <option key={status} value={status}>{status}</option>
                     ))}
@@ -13649,25 +13660,25 @@ function renderHome() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "14px" }}>
                 <label style={{ fontWeight: "800" }}>内容
-                  <textarea style={{ minHeight: "120px" }} value={row.detail || ""} onChange={(e) => updateField("plannedWorks", row.id, "detail", e.target.value)} />
+                  <textarea style={{ minHeight: "120px" }} value={row.detail || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "detail", e.target.value)} />
                 </label>
 
                 <label style={{ fontWeight: "800" }}>リスク
-                  <textarea style={{ minHeight: "120px" }} value={row.risk || ""} onChange={(e) => updateField("plannedWorks", row.id, "risk", e.target.value)} />
+                  <textarea style={{ minHeight: "120px" }} value={row.risk || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "risk", e.target.value)} />
                 </label>
               </div>
 
               <h3>📝 備考</h3>
-              <textarea value={row.note || ""} onChange={(e) => updateField("plannedWorks", row.id, "note", e.target.value)} />
+              <textarea value={row.note || ""} disabled={!canWriteReports} onChange={(e) => updateField("plannedWorks", row.id, "note", e.target.value)} />
 
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
                 <button className="primaryButton" onClick={() => setPage("calendar")}>
                   📅 カレンダー確認
                 </button>
 
-                <button className="deleteButton" onClick={() => removeItem("plannedWorks", row.id)}>
+                {isAdmin && canWriteReports && <button className="deleteButton" onClick={() => removeItem("plannedWorks", row.id)}>
                   <Trash2 size={16} /> 削除
-                </button>
+                </button>}
               </div>
             </div>
           ))}
@@ -16599,7 +16610,7 @@ Requirements:
 
         {newEquipmentMessage && <div className="miyamaUserAdminMessage">{newEquipmentMessage}</div>}
 
-        <section className="miyamaNewEquipmentCreate">
+        {canWriteReports && <section className="miyamaNewEquipmentCreate">
           <div className="miyamaPanelTitle">
             <h3>➕ {appLanguage === "es" ? "Nuevo proyecto" : appLanguage === "en" ? "New Project" : "新規プロジェクト"}</h3>
           </div>
@@ -16669,7 +16680,7 @@ Requirements:
             <Plus size={16} />
             {appLanguage === "es" ? "Crear proyecto" : appLanguage === "en" ? "Create Project" : "プロジェクト作成"}
           </button>
-        </section>
+        </section>}
 
         <section className="miyamaNewEquipmentSummary">
           <div>
@@ -16734,7 +16745,7 @@ Requirements:
                   <span>🔧 {project.maintenanceOwner || "-"}</span>
                   <select
                     value={project.status || "計画中"}
-                    onChange={(e) => updateNewEquipmentStatus(project.id, e.target.value)}
+                    disabled={!canWriteReports} onChange={(e) => updateNewEquipmentStatus(project.id, e.target.value)}
                   >
                     <option value="計画中">{appLanguage === "es" ? "Planificación" : appLanguage === "en" ? "Planning" : "計画中"}</option>
                     <option value="製作中">{appLanguage === "es" ? "Fabricación" : appLanguage === "en" ? "Manufacturing" : "製作中"}</option>
@@ -16770,6 +16781,7 @@ Requirements:
                             type="button"
                             className={`miyamaNewEquipmentCheck ${completed ? "done" : ""}`}
                             key={item.id}
+                            disabled={!canWriteReports}
                             onClick={() => toggleNewEquipmentChecklist(project, item.id)}
                           >
                             {completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
