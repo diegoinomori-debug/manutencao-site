@@ -2002,7 +2002,7 @@
   .tabs.miyamaTopNav {
     position: static;
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 6.5rem);
   }
 
   .tabs.miyamaTopNav :is(.miyamaNavArrow, .miyamaTopMenuViewport) {
@@ -2022,13 +2022,11 @@
   }
 
   .tabs.miyamaTopNav .miyamaFixedControls {
-    display: grid;
-    grid-template-columns: minmax(0, 7rem) minmax(0, 1fr);
-    min-width: 0;
-    max-width: none;
+    display: contents;
   }
 
   .tabs.miyamaTopNav .miyamaLanguageSelect {
+    grid-column: 2;
     width: 100% !important;
     min-width: 0 !important;
     min-height: 44px !important;
@@ -2039,16 +2037,38 @@
   }
 
   .tabs.miyamaTopNav .miyamaUserBox {
+    grid-column: 1 / -1;
     min-width: 0;
     max-width: none;
     min-height: 44px;
-    padding: 3px 6px;
+    padding: 4px 8px;
   }
 
   .tabs.miyamaTopNav .miyamaUserAvatar { display: none; }
-  .tabs.miyamaTopNav .miyamaLogout {
-    min-height: 36px;
+  .tabs.miyamaTopNav .miyamaUserText small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tabs.miyamaTopNav button.miyamaLogout {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 44px;
+    white-space: nowrap !important;
     background: #fff0f1 !important;
     color: #a51d29 !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .tabs.miyamaTopNav .miyamaMobilePageSelect {
+    grid-column: 1 / -1;
+  }
+
+  .tabs.miyamaTopNav .miyamaLanguageSelect {
+    grid-column: 1 / -1;
+    grid-row: 3;
   }
 }
